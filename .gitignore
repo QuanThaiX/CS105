@@ -32,3 +32,4 @@ temp/
 *.cache
 .cache-loader/
 public/*.cache
+GPUCheck.jsx
