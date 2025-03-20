@@ -1,17 +1,21 @@
 import * as THREE from 'three';
 import { Game } from './Game.js'
 
+/**
+ * Bổ sung hitbox tạo thời điểm tạo, và đc cập nhật khi object di chuyển
+ */
+
 class GameObject {
     id;
-    type;
+    faction;
     position; // THREE.Vector3
-    boundingBox;
+    hitBox;
     model;
     isCollision; // bool
 
-    constructor(id, type, position, isCollision){
+    constructor(id, faction, position, isCollision){
         this.id = id;
-        this.type = type;
+        this.faction = faction;
         this.position = new THREE.Vector3(position.x, position.y, position.z);
         this.isCollision = isCollision;
     }
@@ -19,13 +23,19 @@ class GameObject {
     setDefault(){
     }
 
+    setPosition(position){
+        this.position = position;
+        this.model.position = this.position;
+        this.hitBox.position = this.position;
+    }
+
     setModel(model){
         this.model = model;
         Game.instance.scene.add(this.model);
     }
 
-    setType(type){
-        this.type = type;
+    setFaction(faction){
+        this.faction = faction;
     }
 
     setCollision(isCollision){
@@ -33,10 +43,13 @@ class GameObject {
     }
 
     dispose(){
-
+        if (this.model && Game.instance.scene) {
+            Game.instance.scene.remove(this.model);
+        }
+        this.model = null;
     }
 
-    updateLogic(){
+    update(){
     }
 }
 

@@ -35,7 +35,6 @@ class PlayerControl {
       this.tank.rotateRight();
     }
     if (this.keys["Space"] && currentTime - this.tank.lastShotTime >= this.tank.shootCooldown) {
-      console.log("dasdsa");
       this.tank.shoot();
     }
   }

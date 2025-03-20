@@ -2,6 +2,13 @@ import * as THREE from 'three';
 import { GAMECONFIG } from '../config.js'
 import { Game } from './Game.js';
 import { EventManager } from './EventManager.js';
+import { EVENT } from '../utils.js';
+
+/**
+ * Thay vì tạo box3d mỗi lần render để check colision thì lấy hitbox từ model
+ * Cần tối ưu thuật toán detect va chạm thành QuadTree hoặc Octree nếu có projectile 3D trajectory
+ */
+
 class CollisionManager {
   static instance;
   objects;
@@ -66,15 +73,8 @@ class CollisionManager {
         if (!objB.model) continue;
         const boxB = new THREE.Box3().setFromObject(objB.model);
         if (boxA.intersectsBox(boxB)) {
-          // if (typeof objA.onCollision === "function") {
-          //   objA.onCollision(objB);
-          // }
-          // if (typeof objB.onCollision === "function") {
-          //   objB.onCollision(objA);
-          // }
-          //console.log(objA);
-          //console.log(objB);
-          EventManager.instance.notify("collision", {objA, objB})
+
+          EventManager.instance.notify(EVENT.COLLISION, {objA, objB})
         }
       }
     }

@@ -5,7 +5,7 @@ export const GAMECONFIG = Object.freeze({
         DAMAGE: 10
     },
     PLAYER: {
-        HP: 100,
+        HP: 10000,
         SPEED: 5,
         DAMAGE: 10
     },
