@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tank3D</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            z-index: 1000;
+            font-size: 18px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <div id="hp">HP: 0</div>
+        <div id="ammo">Ammo: 0</div>
+    </div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./three/build/three.module.js",
+                "three/examples/jsm/": "./three/examples/jsm/",
+                "@config": "./config.js",
+                "@utils": "./utils.js",
+                "@game": "./class/Game.js",
+                "@class/": "./class/"
+            }
+        }
+    </script>
+    <script type="module">
+        import { Game } from './class/Game.js';
+
+        const game = new Game();
+        game.start();
+
+        function updateHUD() {
+            if (Game.instance) {
+                const data = Game.instance.getHUDData();
+                document.getElementById('hp').innerText = `HP: ${data.playerHP}`;
+                document.getElementById('ammo').innerText = `Ammo: ${data.ammo}`;
+            }
+            requestAnimationFrame(updateHUD);
+        }
+
+        updateHUD();
+    </script>
+</body>
+</html> 
