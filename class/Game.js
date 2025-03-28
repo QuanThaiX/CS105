@@ -1,9 +1,7 @@
 import * as THREE from 'three';
-import { createGround } from './Ground.js';
-import { createSky } from './Sky.js';
-import { OrbitControls } from '../three/examples/jsm/controls/OrbitControls.js';
+import { createGround, createSky, createCamera, createDebugHelpers, createLights, createRenderer, createScene} from './createEnvironment.js';
 import { GAMECONFIG } from '../config.js';
-import { toRad, FACTION } from '../utils.js';
+import { FACTION, EVENT} from '../utils.js';
 import { Tank } from './Tank.js';
 import { PlayerControl } from './PlayerControl.js';
 import { CollisionManager } from './CollisionManager.js';
@@ -28,6 +26,8 @@ class Game {
   scene;
   camera;
   renderer;
+  controls;
+  isRunning = false;
   constructor() {
     if (Game.instance) {
       return Game.instance;
@@ -41,18 +41,42 @@ class Game {
     this.projectilesManager = new ProjectilesManager();
     this.bot = new Bot();
 
-    // Scene setup-----------------------------------------------------------------------------------------------------------------------------
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x123456);
+    this.scene = createScene();
+    this.renderer = createRenderer();
+    this.lights = createLights(this.scene);
+    this.sky = createSky(this.scene);
+    this.ground = createGround(this.scene, {width: 500, height: 500, repeatX: 25, repeatY: 25});
+    this.debugHelpers = createDebugHelpers(this.scene);
 
-    // Add renderer-----------------------------------------------------------------------------------------------------------------------------
-    this.renderer = new THREE.WebGLRenderer();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    document.body.appendChild(this.renderer.domElement);
+    this.registerEventListeners();
+    this.loadLevel();
+  }
 
+  registerEventListeners() {
+    window.addEventListener('resize', () => this.onWindowResize(), false);
+    EventManager.instance.subscribe(EVENT.PLAYER_DIE, this.handlePlayerDie.bind(this));
+    EventManager.instance.subscribe(EVENT.PLAYER_RESTART, this.handlePlayerRestart.bind(this));
+    EventManager.instance.subscribe(EVENT.GAME_OVER, this.handleGameOver.bind(this));
+    EventManager.instance.subscribe(EVENT.GAME_WIN, this.handleGameWin.bind(this));
+    EventManager.instance.subscribe(EVENT.OBJECT_DESTROYED, this.handleObjectDestroyed.bind(this));
+  }
 
+  handleObjectDestroyed({ object }) {
+    if (object.faction === FACTION.ENEMY) {
+      const remainingEnemies = [
+        this.enemy1, this.enemy2, this.enemy3, 
+        this.enemy4, this.enemy5, this.enemy6
+      ].filter(enemy => enemy && !enemy.disposed);
+      
+      if (remainingEnemies.length === 0) {
+        setTimeout(() => {
+          EventManager.instance.notify(EVENT.GAME_WIN, { reason: "All enemies destroyed" });
+        }, 1000);
+      }
+    }
+  }
+
+  loadLevel() {
     this.playerTank = new Tank(0, FACTION.PLAYER, { x: 0, y: 1, z: 0 }, true);
     this.player = new PlayerControl(this.playerTank);
 
@@ -77,67 +101,15 @@ class Game {
     this.collisionManager.add(this.enemy5);
     this.collisionManager.add(this.enemy6);
 
-    // Add camera-----------------------------------------------------------------------------------------------------------------------------
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.set(5, 5, 5);
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.target.copy(this.playerTank.position).add(new THREE.Vector3(0, 1, 0));
-    this.controls.update();
-    this.controls.enablePan = false;
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
-    this.controls.minDistance = 5;
-    this.controls.maxDistance = 100;
-    this.controls.maxPolarAngle = Math.PI / 2;
-    this.controls.mouseButtons = {
-      LEFT: THREE.MOUSE.PAN,
-      RIGHT: THREE.MOUSE.ROTATE,
-    };
-    // console.log(this.camera.projectionMatrix);
-
-    // Add Light-----------------------------------------------------------------------------------------------------------------------------
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0);
-    this.scene.add(ambientLight);
-
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 5);
-    directionalLight.position.set(200, 400, 200);
-    directionalLight.target.position.set(0, 0, 0);
-    directionalLight.castShadow = true;
-
-    directionalLight.shadow.camera.left = -100;
-    directionalLight.shadow.camera.right = 100;
-    directionalLight.shadow.camera.top = 100;
-    directionalLight.shadow.camera.bottom = -100;
-    directionalLight.shadow.camera.near = 100;
-    directionalLight.shadow.camera.far = 1000;
-    directionalLight.shadow.mapSize.width = 4096;
-    directionalLight.shadow.mapSize.height = 4096;
-    directionalLight.shadow.bias = -0.0001;
-    this.scene.add(directionalLight);
-
-    if (GAMECONFIG.DEBUG === true) {
-      const shadowHelper = new THREE.CameraHelper(directionalLight.shadow.camera);
-      this.scene.add(shadowHelper);
-    }
-
-
-    // Add ground-----------------------------------------------------------------------------------------------------------------------------
-    this.ground = createGround(this.scene, {
-      width: 500,
-      height: 500,
-      repeatX: 25,
-      repeatY: 25
+    const { camera, controls } = createCamera(this.scene, this.playerTank.position, this.renderer);
+    this.camera = camera;
+    this.controls = controls;
+    
+    // Thông báo level đã được tải
+    EventManager.instance.notify(EVENT.LEVEL_LOADED, {
+      playerTank: this.playerTank,
+      enemies: [this.enemy1, this.enemy2, this.enemy3, this.enemy4, this.enemy5, this.enemy6]
     });
-
-    // Add sky --------------------------------------------------------------------------------------------------------------------------------
-    this.sky = createSky(this.scene);
-
-    if (GAMECONFIG.DEBUG === true) {
-      const axesHelper = new THREE.AxesHelper(100);
-      this.scene.add(axesHelper);
-    }
-
-    window.addEventListener('resize', () => this.onWindowResize(), false);
   }
 
   onWindowResize() {
@@ -178,17 +150,70 @@ class Game {
 
   }
 
+  handlePlayerDie(data) {
+    console.log("Player died");
+    setTimeout(() => {
+      EventManager.instance.notify(EVENT.GAME_OVER, { reason: "Player died" });
+    }, 1000);
+  }
+  
+  handlePlayerRestart() {
+    this.resetGame();
+  }
+  
+  handleGameOver(data) {
+    console.log("Game Over:", data.reason);
+    this.stop();
+  }
+  
+  handleGameWin(data) {
+    console.log("Game Won!");
+    this.stop();
+  }
+  
+  resetGame() {
+    this.projectilesManager.clear();
+    this.stop();
+    this.initGame();
+    this.start();
+  }
+
   start() {
-    const animate = () => {
-      this.updateLogic();
-      this.renderer.render(this.scene, this.camera);
-      requestAnimationFrame(animate);
-    };
-    animate();
+    if (!this.isRunning) {
+      this.isRunning = true;
+      
+      EventManager.instance.notify(EVENT.GAME_STARTED, {
+        playerTank: this.playerTank
+      });
+      
+      const animate = () => {
+        if (this.isRunning) {
+          this.updateLogic();
+          this.renderer.render(this.scene, this.camera);
+          requestAnimationFrame(animate);
+        }
+      };
+      animate();
+    }
   }
 
   stop() {
-    this.renderer.setAnimationLoop(null)
+    this.isRunning = false;
+  }
+  
+  pause() {
+    if (this.isRunning) {
+      this.isRunning = false;
+      EventManager.instance.notify(EVENT.GAME_PAUSED, {});
+    }
+  }
+  
+  resume() {
+    if (!this.isRunning) {
+      this.isRunning = true;
+      EventManager.instance.notify(EVENT.GAME_RESUMED, {});
+      this.start();
+    }
   }
 }
 

@@ -12,14 +12,30 @@ const FACTION = Object.freeze({
 
 const EVENT = Object.freeze({
     COLLISION: "collision",
+    
+    OBJECT_MOVED: "object_moved",
+    OBJECT_LOADED: "object_loaded", 
+    OBJECT_DAMAGED: "object_damaged",   
+    OBJECT_DESTROYED: "object_destroyed", 
+    OBJECT_SHOOT: "object_shoot",        
+    
+    BULLET_EXPIRED: "bullet_expired",
+    
     PLAYER_MOVE: "player_move",
-    PLAYER_SHOOT: "player_shoot",
     PLAYER_DIE: "player_die",
     PLAYER_RESTART: "player_restart",
-    BULLET_HIT: "bullet_hit",
-    BULLET_EXPIRED: "bullet_expired",
-    TANK_SHOOT: "tank_shoot",
-    TANK_DESTROYED: "tank_destroyed",
+    
+    GAME_STARTED: "game_started",
+    GAME_PAUSED: "game_paused",
+    GAME_RESUMED: "game_resumed",
+    GAME_OVER: "game_over",
+    GAME_WIN: "game_win",
+    
+    LEVEL_LOADED: "level_loaded",
+    LEVEL_COMPLETED: "level_completed",
+    
+    ITEM_SPAWNED: "item_spawned",
+    ITEM_COLLECTED: "item_collected"
 })
 
 const COLOR = Object.freeze({

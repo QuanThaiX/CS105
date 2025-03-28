@@ -13,7 +13,7 @@ class Bullet extends GameObject{
   velocity;
   lifeTime = 5000;
   creaationTime;
-  hasCollied = false;
+  hasCollided = false;
   damage = 10;
 
   constructor(faction, position) {
@@ -46,7 +46,7 @@ class Bullet extends GameObject{
     });
     let mesh = new THREE.Mesh(geometry, material);
     mesh.position.copy(this.position);
-    mesh.castShadow = true;
+    mesh.castShadow = false;
 
     const light = new THREE.PointLight(COLOR.yellow, 1, 3);
     light.position.set(0, 0, 0);
@@ -72,11 +72,6 @@ class Bullet extends GameObject{
       const otherObject = objA === this ? objB : objA;
       
       if (otherObject instanceof Tank && this.faction !== otherObject.faction) {
-        EventManager.instance.notify(EVENT.BULLET_HIT, {
-          bullet: this,
-          obj: otherObject,
-          damage: this.damage,
-        })
         console.log(`Log_${EVENT.COLLISION}: ${this.id} -- ${otherObject.id}`);
         this.hasCollided = true;
         this.dispose();

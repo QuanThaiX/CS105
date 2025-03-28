@@ -18,11 +18,13 @@ import { Bot } from "./Bot.js";
 
 class Tank extends GameObject{
   hp;
+  maxHp;
   moveSpeed;
   rotateSpeed;
   prevPosition;
   lastShotTime = 0;
   shootCooldown = 450;
+
   HealthBar;
 
   constructor(id, faction, position, isCollision) {
@@ -33,7 +35,7 @@ class Tank extends GameObject{
     this.healthBar = new HealthBar(this, this.hp);
 
     EventManager.instance.subscribe(EVENT.COLLISION, this.handleCollision.bind(this));
-    EventManager.instance.subscribe(EVENT.BULLET_HIT, this.handleBulletHit.bind(this));
+    EventManager.instance.subscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
   }
 
   loadModel(modelPath) {
@@ -73,10 +75,13 @@ class Tank extends GameObject{
     this.rotateSpeed = 0.03;
     if (this.faction == FACTION.PLAYER){
       this.hp = GAMECONFIG.PLAYER.HP;
+      this.maxHp = GAMECONFIG.PLAYER.HP;
     } else if (this.faction == FACTION.ENEMY){
       this.hp = GAMECONFIG.ENEMY.HP;
+      this.maxHp = GAMECONFIG.ENEMY.HP;
     } else {
       this.hp = GAMECONFIG.DEFAULT.HP;
+      this.maxHp = GAMECONFIG.DEFAULT.HP;
     }
   }
 
@@ -127,18 +132,16 @@ class Tank extends GameObject{
       bulletPosition.add(forward.clone().multiplyScalar(4));
 
       this.createMuzzleFlash(bulletPosition.clone(), forward);
-
-      const projectilesManager = new ProjectilesManager();
-      const bullet = projectilesManager.createBullet(
-        this.faction, 
-        bulletPosition, 
-        forward.clone(), 
-        0.5
-      );
       
-      // Cập nhật thời gian bắn cuối cùng
       this.lastShotTime = currentTime;
-      return bullet;
+      EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
+        tank: this,
+        position: bulletPosition,
+        direction: forward.clone(),
+        speed: 0.5
+      });
+      
+      return true;
     }
     return null;
   }
@@ -201,7 +204,7 @@ class Tank extends GameObject{
     this.stopAutoShoot();
     super.dispose();
     if (this.faction === FACTION.PLAYER) {
-      EventManager.instance.notify(EVENT.PLAYER_DESTROYED, {tank: this});
+      EventManager.instance.notify(EVENT.PLAYER_DIE, {tank: this});
     } else if (this.faction === FACTION.ENEMY) {
       Bot.instance.removeTank(this);
     }
@@ -213,21 +216,16 @@ class Tank extends GameObject{
 
     EventManager.instance.notify(EVENT.TANK_DESTROYED, { tank: this });
     EventManager.instance.unsubscribe(EVENT.COLLISION, this.handleCollision.bind(this));
-    EventManager.instance.unsubscribe(EVENT.BULLET_HIT, this.handleBulletHit.bind(this));
+    EventManager.instance.unsubscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
     CollisionManager.instance.remove(this);
   }
 
-  handleBulletHit({ bullet, tank, damage }) {
-    if (tank === this && this.faction !== bullet.faction) {
-      this.hp -= damage;
+  handleDamage({ object, damage, source, remainingHp }) {
+    if (object === this) {
       if (this.healthBar) {
-        this.healthBar.updateHP(this.hp);
+        this.healthBar.updateHP(remainingHp);
       }
-
-      console.log(`${this.id} HP: ${this.hp}`);
-      if (this.hp <= 0) {
-        this.dispose();
-      }
+      console.log(`${this.id} HP: ${remainingHp}`);
     }
   }
 
@@ -243,18 +241,8 @@ class Tank extends GameObject{
         }
       }
 
-      if (otherObject instanceof Bullet) {
-        if (this.faction !== otherObject.faction) {
-          this.hp -= 10;
-          if (this.healthBar) {
-            this.healthBar.updateHP(this.hp);
-          }
-
-          console.log(this.hp);
-          if (this.hp <= 0) {
-            this.dispose();
-          }
-        }
+      if (otherObject instanceof Bullet && this.faction !== otherObject.faction) {
+        this.takeDamage(otherObject.damage, otherObject);
       }
     }
   }

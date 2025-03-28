@@ -20,12 +20,12 @@ class ProjectilesManager {
     }
     ProjectilesManager.instance = this;
 
-    EventManager.instance.subscribe(EVENT.TANK_SHOOT, this.handleTankShoot.bind(this));
+    EventManager.instance.subscribe(EVENT.OBJECT_SHOOT, this.handleObjectShoot.bind(this));
     EventManager.instance.subscribe(EVENT.BULLET_EXPIRED, this.handleBulletExpired.bind(this));
-    EventManager.instance.subscribe(EVENT.BULLET_HIT, this.handleBulletHitTank.bind(this));
+    EventManager.instance.subscribe(EVENT.COLLISION, this.handleCollision.bind(this));
   }
 
-  handleTankShoot({ tank, position, direction, speed }) {
+  handleObjectShoot({ tank, position, direction, speed }) {
     this.createBullet(tank.faction, position, direction, speed);
   }
   
@@ -33,8 +33,14 @@ class ProjectilesManager {
     this.removeBullet(bullet);
   }
   
-  handleBulletHitTank({ bullet }) {
-    this.removeBullet(bullet);
+  handleCollision({ objA, objB }) {
+    if (objA instanceof Bullet || objB instanceof Bullet) {
+      const bullet = objA instanceof Bullet ? objA : objB;
+      
+      if (bullet.hasCollided) {
+        this.removeBullet(bullet);
+      }
+    }
   }
   
   addProjectile(bullet) {

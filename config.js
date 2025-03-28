@@ -15,6 +15,6 @@ export const GAMECONFIG = Object.freeze({
         DAMAGE: 5
     },
 
-    DEBUG: true,
+    DEBUG: false,
 
 });
