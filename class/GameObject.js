@@ -3,10 +3,6 @@ import { Game } from './Game.js'
 import { EventManager } from './EventManager.js';
 import { EVENT } from '../utils.js';
 
-/**
- * Bổ sung hitbox tạo thời điểm tạo, và đc cập nhật khi object di chuyển
- */
-
 class GameObject {
     id;
     faction;
@@ -32,10 +28,6 @@ class GameObject {
         this.position = position;
         this.model.position = this.position;
         this.hitBox.position = this.position;
-        // EventManager.instance.notify(EVENT.OBJECT_MOVED, {
-        //     object: this,
-        //     position: this.position
-        // });
     }
 
     setModel(model){
@@ -75,6 +67,9 @@ class GameObject {
         return false;
     }
 
+    /**
+     * Thực hiện xử lí các logic của game
+     */
     destroy() {
         if (!this.disposed) {
             EventManager.instance.notify(EVENT.OBJECT_DESTROYED, {
@@ -85,6 +80,9 @@ class GameObject {
         }
     }
 
+    /*
+     * Xóa khỏi scene
+     */
     dispose(){
         if (this.model && Game.instance.scene) {
             Game.instance.scene.remove(this.model);

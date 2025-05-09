@@ -33,8 +33,8 @@ class Bot {
             currentState: State.IDLE,
             playerTank: Game.instance.playerTank, // Mục tiêu
 
-            detectionRange: 30,      // Phạm vi phát hiện
-            attackRange: 20,         // Phạm vi tấn công
+            detectionRange: 300,      // Phạm vi phát hiện
+            attackRange: 50,         // Phạm vi tấn công
             safeRange: 7,            // Khoảng cách an toàn
             patrolPoints: this.generatePatrolPoints(tank.position), // Các điểm tuần tra
             currentPatrolIndex: 0,
@@ -282,10 +282,10 @@ class Bot {
         else {
             this.faceTarget(tank, bot.playerTank.position);
             // 5% cơ hội di chuyển sang ngang để né đạn j4f
-            if (Math.random() < 0.05) {
-                const moveDir = Math.random() > 0.5 ? 1 : -1;
-                this.moveStrafe(tank, moveDir);
-            }
+            // if (Math.random() < 0.05) {
+            //     const moveDir = Math.random() > 0.5 ? 1 : -1;
+            //     this.moveStrafe(tank, moveDir);
+            // }
         }
     }
 

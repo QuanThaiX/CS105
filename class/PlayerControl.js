@@ -1,11 +1,21 @@
 class PlayerControl {
   tank;
   keys;
+  keyDownHandler;
+  keyUpHandler;
+  debug = false;
+  
   constructor(tank) {
     this.keys = {};
     this.tank = tank;
-    window.addEventListener("keydown", (event) => this.onKeyDown(event), false);
-    window.addEventListener("keyup", (event) => this.onKeyUp(event), false);
+    
+    this.keyDownHandler = this.onKeyDown.bind(this);
+    this.keyUpHandler = this.onKeyUp.bind(this);
+    
+    window.addEventListener("keydown", this.keyDownHandler, false);
+    window.addEventListener("keyup", this.keyUpHandler, false);
+    
+    console.log("PlayerControl initialized for tank", tank.id);
   }
 
   onKeyDown(event) {
@@ -21,6 +31,10 @@ class PlayerControl {
   }
 
   update(){
+    if (!this.tank) {
+      return;
+    }
+    
     const currentTime = Date.now();
     if (this.keys["KeyW"]) {
       this.tank.moveForward();
@@ -34,10 +48,25 @@ class PlayerControl {
     if (this.keys["KeyD"]) {
       this.tank.rotateRight();
     }
-    if (this.keys["Space"] && currentTime - this.tank.lastShotTime >= this.tank.shootCooldown) {
-      this.tank.shoot();
+    if (this.keys["Space"]) {
+      const timeSinceLastShot = currentTime - this.tank.lastShotTime;
+      if (timeSinceLastShot >= this.tank.shootCooldown) {
+        const result = this.tank.shoot();
+      }
     }
   }
+  
+  // dispose() {
+  //   console.log("Disposing PlayerControl");
+  //   window.removeEventListener("keydown", this.keyDownHandler);
+  //   window.removeEventListener("keyup", this.keyUpHandler);
+  //   this.keys = {};
+  //   this.tank = null;
+  // }
+
+  // setDebug(enableDebug) {
+  //   this.debug = enableDebug;
+  // }
 }
 
 export { PlayerControl };

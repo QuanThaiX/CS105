@@ -1,41 +1,128 @@
 import * as THREE from 'three';
+import { GLTFLoader } from "./three/examples/jsm/loaders/GLTFLoader.js";
 
-function toRad(deg){
+function toRad(deg) {
     return THREE.MathUtils.degToRad(deg);
+}
+
+const HITBOX_SCALE = {
+    TANK: 0.8,
+    ROCK: 0.5,
+    TREE: 1,
+};
+
+function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
+    let modelPath = tankType.assetPathGLTF;
+    return new Promise((resolve, reject) => {
+        const loader = new GLTFLoader();
+        loader.load(
+            modelPath,
+            (gltf) => {
+                const model = gltf.scene;
+
+                if (tankType == TANKTYPE.V001) {
+                    model.position.set(position.x, position.y, position.z);
+                    model.scale.set(3.5, 3.5, 3.5);
+                } else if (tankType == TANKTYPE.V003) {
+                    model.position.set(position.x, position.y - 1, position.z);
+                    model.scale.set(3.0, 3.0, 3.0);
+                }
+                else {
+                    model.position.copy(this.position);
+                    model.scale.set(3.5, 3.5, 3.5);
+                }
+
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+
+                        if (child.material.map) {
+                            console.log("Texture loaded:", child.material.map);
+                        } else {
+                            console.warn("Texture missing in", child.name);
+                        }
+                    }
+                });
+
+                resolve(model);
+            },
+            undefined,
+            (error) => reject(error)
+        );
+    });
 }
 
 const FACTION = Object.freeze({
     PLAYER: "player",
     ENEMY: "enemy",
     NEUTRAL: "neutral",
-  });
+});
+
+const TANK_STATS = Object.freeze({
+    V001: {
+        hp: 100,
+        maxHp: 500,
+        moveSpeed: 0.1,
+        rotateSpeed: 0.03,
+        shootCooldown: 2000,
+        damage: 100,
+        defense: 70,
+    },
+    V003: {
+        hp: 600,
+        maxHp: 600,
+        moveSpeed: 0.08,
+        rotateSpeed: 0.025,
+        shootCooldown: 2500,
+        damage: 120,
+        defense: 85,
+    }
+});
+
+const TANKTYPE = Object.freeze({
+    V001: {
+        name: "V001",
+        assetPathGLTF: "./assets/tankv001/tankv001.gltf",
+        assetPathFBX: "./assets/tankv001/cartoon_tank.fbx",
+    },
+
+    V003: {
+        name: "V003",
+        assetPathGLTF: "./assets/tankv003/tankv003.gltf",
+    }
+});
 
 const EVENT = Object.freeze({
     COLLISION: "collision",
-    
+
     OBJECT_MOVED: "object_moved",
-    OBJECT_LOADED: "object_loaded", 
-    OBJECT_DAMAGED: "object_damaged",   
-    OBJECT_DESTROYED: "object_destroyed", 
-    OBJECT_SHOOT: "object_shoot",        
-    
+    OBJECT_LOADED: "object_loaded",
+    OBJECT_DAMAGED: "object_damaged",
+    OBJECT_DESTROYED: "object_destroyed",
+    OBJECT_SHOOT: "object_shoot",
+
     BULLET_EXPIRED: "bullet_expired",
-    
+
     PLAYER_MOVE: "player_move",
     PLAYER_DIE: "player_die",
     PLAYER_RESTART: "player_restart",
-    
+
     GAME_STARTED: "game_started",
     GAME_PAUSED: "game_paused",
     GAME_RESUMED: "game_resumed",
     GAME_OVER: "game_over",
     GAME_WIN: "game_win",
-    
+
     LEVEL_LOADED: "level_loaded",
     LEVEL_COMPLETED: "level_completed",
-    
+
     ITEM_SPAWNED: "item_spawned",
-    ITEM_COLLECTED: "item_collected"
+    ITEM_COLLECTED: "item_collected",
+    
+    TANK_DESTROYED: "tank_destroyed",
+    
+    SCORE_CHANGED: "score_changed"
 })
 
 const COLOR = Object.freeze({
@@ -81,4 +168,4 @@ const COLOR = Object.freeze({
     darkPurple: 0x4b0082,
 });
 
-export {toRad, FACTION, EVENT, COLOR};
+export { toRad, loadTankModel, FACTION, EVENT, COLOR, TANKTYPE, TANK_STATS, HITBOX_SCALE };

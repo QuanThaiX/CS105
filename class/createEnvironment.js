@@ -36,6 +36,10 @@ function createCamera(scene, targetPosition, renderer) {
     return { camera, controls };
 }
 
+function updateControlTarget(camera, targetPosition) {
+
+}
+
 function createLights(scene) {
     // Ánh sáng môi trường
     const ambientLight = new THREE.AmbientLight(0xffffff, 0);
@@ -50,7 +54,7 @@ function createLights(scene) {
     directionalLight.shadow.camera.right = 100;
     directionalLight.shadow.camera.top = 100;
     directionalLight.shadow.camera.bottom = -100;
-    directionalLight.shadow.camera.near = 100;
+    directionalLight.shadow.camera.near = 1;
     directionalLight.shadow.camera.far = 1000;
     directionalLight.shadow.mapSize.width = 4096;
     directionalLight.shadow.mapSize.height = 4096;
@@ -64,6 +68,11 @@ function createLights(scene) {
     }
 
     return { ambientLight, directionalLight, shadowHelper };
+}
+
+function updateShadowArea(directionalLight, targetPosition) {
+    directionalLight.target.position.copy(targetPosition);
+    directionalLight.target.updateMatrixWorld();
 }
 
 function createSky(scene) {
@@ -159,5 +168,6 @@ export {
     createGround, 
     createDebugHelpers, 
     createScene,
-    handleWindowResize
+    handleWindowResize,
+    updateShadowArea
 }; 

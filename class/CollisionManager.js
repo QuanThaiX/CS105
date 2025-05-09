@@ -2,12 +2,10 @@ import * as THREE from 'three';
 import { GAMECONFIG } from '../config.js'
 import { Game } from './Game.js';
 import { EventManager } from './EventManager.js';
-import { EVENT } from '../utils.js';
-
-/**
- * Thay vì tạo box3d mỗi lần render để check colision thì lấy hitbox từ model
- * Cần tối ưu thuật toán detect va chạm thành QuadTree hoặc Octree nếu có projectile 3D trajectory
- */
+import { EVENT, HITBOX_SCALE } from '../utils.js';
+import { Tank } from './Tank.js';
+import { Rock } from './Rock.js';
+import { Tree } from './Tree.js';
 
 class CollisionManager {
   static instance;
@@ -67,14 +65,57 @@ class CollisionManager {
     for (let i = 0; i < this.objects.length; i++) {
       const objA = this.objects[i];
       if (!objA.model) continue;
+      
+      // Áp dụng tỷ lệ hitbox phù hợp dựa vào loại đối tượng
+      let scaleA = 1.0;
+      if (objA instanceof Tank) {
+        scaleA = HITBOX_SCALE.TANK;
+      } else if (objA instanceof Rock) {
+        scaleA = HITBOX_SCALE.ROCK;
+      } else if (objA instanceof Tree) {
+        scaleA = HITBOX_SCALE.TREE;
+      }
+      
       const boxA = new THREE.Box3().setFromObject(objA.model);
+      // Điều chỉnh kích thước box
+      if (scaleA !== 1.0) {
+        const center = new THREE.Vector3();
+        boxA.getCenter(center);
+        const size = new THREE.Vector3();
+        boxA.getSize(size);
+        
+        const newSize = size.multiplyScalar(scaleA);
+        boxA.setFromCenterAndSize(center, newSize);
+      }
+      
       for (let j = i + 1; j < this.objects.length; j++) {
         const objB = this.objects[j];
         if (!objB.model) continue;
+        
+        // Áp dụng tỷ lệ hitbox phù hợp dựa vào loại đối tượng
+        let scaleB = 1.0;
+        if (objB instanceof Tank) {
+          scaleB = HITBOX_SCALE.TANK;
+        } else if (objB instanceof Rock) {
+          scaleB = HITBOX_SCALE.ROCK;
+        } else if (objB instanceof Tree) {
+          scaleB = HITBOX_SCALE.TREE;
+        }
+        
         const boxB = new THREE.Box3().setFromObject(objB.model);
+        // Điều chỉnh kích thước box
+        if (scaleB !== 1.0) {
+          const center = new THREE.Vector3();
+          boxB.getCenter(center);
+          const size = new THREE.Vector3();
+          boxB.getSize(size);
+          
+          const newSize = size.multiplyScalar(scaleB);
+          boxB.setFromCenterAndSize(center, newSize);
+        }
+        
         if (boxA.intersectsBox(boxB)) {
-
-          EventManager.instance.notify(EVENT.COLLISION, {objA, objB})
+          EventManager.instance.notify(EVENT.COLLISION, {objA, objB});
         }
       }
     }

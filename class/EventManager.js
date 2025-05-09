@@ -28,6 +28,10 @@ class EventManager {
             this.events[event].forEach(callback => callback(data));
         }
     }
+
+    clearAllEvents() {
+        this.events = {};
+    }
 }
 
 export {EventManager}

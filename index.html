@@ -4,26 +4,103 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tank3D</title>
-    <style>
-        body { margin: 0; overflow: hidden; }
-        #hud {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            z-index: 1000;
-            font-size: 18px;
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 5px;
-        }
-    </style>
+    <link rel="stylesheet" href="index.css">
 </head>
 <body>
-    <div id="hud">
-        <div id="hp">HP: 0</div>
-        <div id="ammo">Ammo: 0</div>
+    <div id="menu-container">
+        <!-- Left Menu -->
+        <div id="menu-left">
+            <h1 class="menu-title">TANK3D</h1>
+            <button id="start-button" class="menu-button">Bắt Đầu Game</button>
+            <button id="continue-button" class="menu-button" disabled>Tiếp Tục Game</button>
+            <button id="settings-button" class="menu-button">Cài Đặt</button>
+            <button id="exit-button" class="menu-button">Thoát Game</button>
+        </div>
+        
+        <!-- Right Menu - Tank Selection -->
+        <div id="menu-right">
+            <!-- Wrapper for 80% height canvas area -->
+            <div id="tank-display-wrapper">
+                <div id="tank-display"></div> <!-- Actual canvas host -->
+            </div>
+
+            <!-- Panel at the bottom for controls (20% height) -->
+            <div id="bottom-panel">
+                <!-- Container for prev button, tank info, next button in a row -->
+                <div id="tank-selection-controls">
+                    <div id="prev-tank" class="nav-button"><</div> <!-- class="nav-button" will be overridden -->
+                    
+                    <div id="tank-info-center"> <!-- Groups tank name and stats -->
+                        <div id="tank-name">Tank v001</div>
+                        <div id="tank-stats">
+                            <div class="stat-container">
+                                <div class="stat-label">Sức mạnh</div>
+                                <div class="stat-bar">
+                                    <div id="power-stat" class="stat-fill" style="width: 80%; background-color: #ff0000;"></div>
+                                </div>
+                            </div>
+                            <div class="stat-container">
+                                <div class="stat-label">Tốc độ</div>
+                                <div class="stat-bar">
+                                    <div id="speed-stat" class="stat-fill" style="width: 60%; background-color: #00ff00;"></div>
+                                </div>
+                            </div>
+                            <div class="stat-container">
+                                <div class="stat-label">Phòng thủ</div>
+                                <div class="stat-bar">
+                                    <div id="defense-stat" class="stat-fill" style="width: 70%; background-color: #0000ff;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="next-tank" class="nav-button">></div> <!-- class="nav-button" will be overridden -->
+                </div>
+                <button id="select-button">Chọn Tank</button>
+            </div>
+        </div>
     </div>
+
+    <!-- Game Container -->
+    <div id="game-container">
+        <div id="hud">
+            <div id="hp">HP: 0</div>
+            <div id="score">Điểm: 0</div>
+            <div id="high-score">Điểm cao: 0</div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="endgame-screen">
+        <div class="endgame-content">
+            <h2 id="gameover-title">GAME OVER</h2>
+            <div id="gameover-score-info">
+                <p>Điểm số: <span id="gameover-score">0</span></p>
+                <p>Điểm cao: <span id="gameover-highscore">0</span></p>
+            </div>
+            <div class="endgame-buttons">
+                <button id="gameover-menu-button" class="endgame-button">Trở Về Menu</button>
+                <button id="gameover-restart-button" class="endgame-button">Chơi Lại</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Win Screen -->
+    <div id="win-screen" class="endgame-screen">
+        <div class="endgame-content">
+            <h2 id="win-title">CHIẾN THẮNG!</h2>
+            <div id="win-score-info">
+                <p>Điểm số: <span id="win-score">0</span></p>
+                <p>Điểm cao: <span id="win-highscore">0</span></p>
+            </div>
+            <div class="endgame-buttons">
+                <button id="win-menu-button" class="endgame-button">Trở Về Menu</button>
+                <button id="win-restart-button" class="endgame-button">Chơi Lại</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-message">Đang tải game...</div>
     <script type="importmap">
         {
             "imports": {
@@ -37,21 +114,7 @@
         }
     </script>
     <script type="module">
-        import { Game } from './class/Game.js';
-
-        const game = new Game();
-        game.start();
-
-        function updateHUD() {
-            if (Game.instance) {
-                const data = Game.instance.getHUDData();
-                document.getElementById('hp').innerText = `HP: ${data.playerHP}`;
-                document.getElementById('ammo').innerText = `Ammo: ${data.ammo}`;
-            }
-            requestAnimationFrame(updateHUD);
-        }
-
-        updateHUD();
+        import './UI.js';
     </script>
 </body>
-</html> 
+</html>

@@ -63,7 +63,7 @@ class HealthBar {
         if (this.parent && this.parent.position && this.sprite) {
             this.sprite.position.set(
                 this.parent.position.x,
-                this.parent.position.y + this.yOffset,
+                (this.parent.position.y <= 1) ? (1 + this.yOffset) : (this.parent.position.y + this.yOffset),
                 this.parent.position.z
             );
             

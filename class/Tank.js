@@ -1,7 +1,6 @@
 import * as THREE from "three";
-import { FACTION, EVENT } from "../utils.js";
+import { loadTankModel, FACTION, EVENT, TANKTYPE, TANK_STATS } from "../utils.js";
 import { GAMECONFIG } from '../config.js';
-import { GLTFLoader } from "../three/examples/jsm/loaders/GLTFLoader.js";
 import { Bullet } from "./Bullet.js";
 import { CollisionManager } from "./CollisionManager.js";
 import { Game } from './Game.js'
@@ -10,80 +9,57 @@ import { GameObject } from './GameObject.js'
 import { EventManager } from "./EventManager.js";
 import { ProjectilesManager } from "./ProjectilesManager.js";
 import { Bot } from "./Bot.js";
-
-/**
- * Bổ sung hitbox tạo thời điểm tạo, và đc cập nhật khi object di chuyển
- * Bổ sung texture
- */
+import { Rock } from "./Rock.js";
 
 class Tank extends GameObject{
+  tankType;               // TANKTYPE.
   hp;
   maxHp;
   moveSpeed;
   rotateSpeed;
+  shootCooldown = 2500;   // ms
+  damage;
+  defense;
+
+  lastShotTime = 0;       // ms
   prevPosition;
-  lastShotTime = 0;
-  shootCooldown = 450;
+  prevRotation;
 
   HealthBar;
 
-  constructor(id, faction, position, isCollision) {
+  constructor(id, faction, position, isCollision, tankType = TANKTYPE.V001) {
     super(id, faction, position, isCollision);
-    this.setStat();
+    this.tankType = tankType;
+    this.setTankStats(this.tankType);
+
+    loadTankModel(tankType, this.position).then((model) => {this.setModel(model)});
+
     this.prevPosition = this.position.clone();
-    this.loadModel("./assets/tankv001.gltf").then((model) => {this.setModel(model)});
+    this.prevRotation = 0;
     this.healthBar = new HealthBar(this, this.hp);
 
     EventManager.instance.subscribe(EVENT.COLLISION, this.handleCollision.bind(this));
     EventManager.instance.subscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
   }
 
-  loadModel(modelPath) {
-    return new Promise((resolve, reject) => {
-      const loader = new GLTFLoader();
-      loader.load(
-        modelPath,
-        (gltf) => {
-          const model = gltf.scene;
-          model.position.copy(this.position);
-          model.scale.set(3.5, 3.5, 3.5);
+  setTankStats(tankType, stats = null){
+    const tankStats = stats || TANK_STATS[tankType.name];
 
-          model.traverse((child) => {
-            if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-
-              if (child.material.map) {
-                console.log("Texture loaded:", child.material.map);
-              } else {
-                console.warn("Texture missing in", child.name);
-              }
-            }
-          });
-
-          resolve(model);
-        },
-        undefined,
-        (error) => reject(error)
-      );
-    });
+    this.hp = tankStats.hp;
+    this.maxHp = tankStats.maxHp;
+    this.moveSpeed = tankStats.moveSpeed;
+    this.rotateSpeed = tankStats.rotateSpeed;
+    this.shootCooldown = tankStats.shootCooldown;
+    this.damage = tankStats.damage;
+    this.defense = tankStats.defense;
   }
 
-
-  setStat(){
-    this.moveSpeed = 0.1;
-    this.rotateSpeed = 0.03;
-    if (this.faction == FACTION.PLAYER){
-      this.hp = GAMECONFIG.PLAYER.HP;
-      this.maxHp = GAMECONFIG.PLAYER.HP;
-    } else if (this.faction == FACTION.ENEMY){
-      this.hp = GAMECONFIG.ENEMY.HP;
-      this.maxHp = GAMECONFIG.ENEMY.HP;
-    } else {
-      this.hp = GAMECONFIG.DEFAULT.HP;
-      this.maxHp = GAMECONFIG.DEFAULT.HP;
-    }
+  setTankHP(hp){
+    this.hp = hp;
+    this.maxHp = hp;
   }
+
+// MOVE --------------------------------------------------------------------------------------------------------------------------------
 
   moveForward(distance = this.moveSpeed) {
     if (this.model) {
@@ -107,12 +83,14 @@ class Tank extends GameObject{
 
   rotateLeft(angle = this.rotateSpeed) {
     if (this.model) {
+      this.prevRotation = this.model.rotation.y;
       this.model.rotation.y += angle;
     }
   }
 
   rotateRight(angle = this.rotateSpeed) {
     if (this.model) {
+      this.prevRotation = this.model.rotation.y;
       this.model.rotation.y -= angle;
     }
   }
@@ -130,8 +108,6 @@ class Tank extends GameObject{
         .applyQuaternion(this.model.quaternion)
         .normalize();
       bulletPosition.add(forward.clone().multiplyScalar(4));
-
-      this.createMuzzleFlash(bulletPosition.clone(), forward);
       
       this.lastShotTime = currentTime;
       EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
@@ -144,42 +120,6 @@ class Tank extends GameObject{
       return true;
     }
     return null;
-  }
-
-  createMuzzleFlash(position, direction) {
-    // Tạo ánh sáng khi bắn
-    const light = new THREE.PointLight(0xffaa00, 40, 10);
-    light.position.copy(position);
-    Game.instance.scene.add(light);
-
-    // Tạo hiệu ứng hạt khi bắn
-    const particleGeometry = new THREE.BufferGeometry();
-    const particleCount = 20;
-    const posArray = new Float32Array(particleCount * 3);
-    
-    for (let i = 0; i < particleCount; i++) {
-      const i3 = i * 3;
-      posArray[i3] = position.x + (Math.random() - 0.5) * 0.5;
-      posArray[i3 + 1] = position.y + (Math.random() - 0.5) * 0.5;
-      posArray[i3 + 2] = position.z + (Math.random() - 0.5) * 0.5;
-    }
-    
-    particleGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-    
-    const particleMaterial = new THREE.PointsMaterial({
-      color: 0xffaa00,
-      size: 0.2,
-      transparent: true,
-      opacity: 0.8
-    });
-    
-    const particles = new THREE.Points(particleGeometry, particleMaterial);
-    Game.instance.scene.add(particles);
-    
-    setTimeout(() => {
-      Game.instance.scene.remove(light);
-      Game.instance.scene.remove(particles);
-    }, 100);
   }
 
   playShootSound() {
@@ -203,41 +143,69 @@ class Tank extends GameObject{
   dispose(){
     this.stopAutoShoot();
     super.dispose();
-    if (this.faction === FACTION.PLAYER) {
-      EventManager.instance.notify(EVENT.PLAYER_DIE, {tank: this});
-    } else if (this.faction === FACTION.ENEMY) {
+    if (this.faction === FACTION.ENEMY) {
       Bot.instance.removeTank(this);
     }
-
+    
     if (this.healthBar) {
       this.healthBar.remove();
       this.healthBar = null;
     }
 
-    EventManager.instance.notify(EVENT.TANK_DESTROYED, { tank: this });
+    EventManager.instance.notify(EVENT.TANK_DESTROYED, { 
+      tank: this,
+      pointValue: this.faction === FACTION.ENEMY ? this.pointValue || 100 : 0
+    });
     EventManager.instance.unsubscribe(EVENT.COLLISION, this.handleCollision.bind(this));
     EventManager.instance.unsubscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
     CollisionManager.instance.remove(this);
   }
 
-  handleDamage({ object, damage, source, remainingHp }) {
+  takeDamage(atk, objSource){
+    if (this.hp !== undefined || this.hp !== null){
+      let damage = atk - this.defense > 0 ? atk - this.defense : 1;
+      this.hp -= damage;
+      EventManager.instance.notify(EVENT.OBJECT_DAMAGED, {
+        object: this,
+        damage: damage,
+        objSource: objSource,
+        remainingHp: this.hp
+      });
+
+      if (this.hp <= 0){
+        this.destroy();
+        if (this.faction == FACTION.PLAYER){
+          EventManager.instance.notify(EVENT.PLAYER_DIE, {tank: this});
+        }
+      }
+
+      return true;
+    }
+    return false;
+  }
+
+  handleDamage({ object, damage, objSource, remainingHp }) {
     if (object === this) {
       if (this.healthBar) {
         this.healthBar.updateHP(remainingHp);
       }
-      console.log(`${this.id} HP: ${remainingHp}`);
+      // console.log(`${this.id} HP: ${remainingHp}`);
     }
   }
 
   handleCollision({ objA, objB }) {
     if (objA === this || objB === this) {
       const otherObject = objA === this ? objB : objA;
-      console.log("collision: " + this.constructor.name + "---" + otherObject.constructor.name);
+      //console.log("collision: " + this.constructor.name + "---" + otherObject.constructor.name);
 
-      if (otherObject instanceof Tank) {
+      if (otherObject instanceof Tank || otherObject instanceof Rock) {
         if (this.prevPosition) {
           this.model.position.copy(this.prevPosition);
           this.position.copy(this.prevPosition);
+          
+          if (this.model.rotation.y !== this.prevRotation) {
+            this.model.rotation.y = this.prevRotation;
+          }
         }
       }
 

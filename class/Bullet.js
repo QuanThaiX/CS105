@@ -6,6 +6,7 @@ import { Tank } from './Tank.js';
 import { Game } from './Game.js';
 import { GameObject } from "./GameObject.js";
 import { EventManager} from "./EventManager.js";
+import { Rock } from "./Rock.js";
 
 class Bullet extends GameObject{
   static count = 0;
@@ -14,7 +15,7 @@ class Bullet extends GameObject{
   lifeTime = 5000;
   creaationTime;
   hasCollided = false;
-  damage = 10;
+  damage = 100;
 
   constructor(faction, position) {
     super("Bullet" + Bullet.count, faction, position, true);
@@ -46,7 +47,7 @@ class Bullet extends GameObject{
     });
     let mesh = new THREE.Mesh(geometry, material);
     mesh.position.copy(this.position);
-    mesh.castShadow = false;
+    mesh.castShadow = true;
 
     const light = new THREE.PointLight(COLOR.yellow, 1, 3);
     light.position.set(0, 0, 0);
@@ -71,7 +72,7 @@ class Bullet extends GameObject{
     if (objA === this || objB === this) {
       const otherObject = objA === this ? objB : objA;
       
-      if (otherObject instanceof Tank && this.faction !== otherObject.faction) {
+      if ((otherObject instanceof Tank && this.faction !== otherObject.faction) || otherObject instanceof Rock) {
         console.log(`Log_${EVENT.COLLISION}: ${this.id} -- ${otherObject.id}`);
         this.hasCollided = true;
         this.dispose();

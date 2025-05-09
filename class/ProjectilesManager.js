@@ -5,10 +5,6 @@ import { CollisionManager } from './CollisionManager.js';
 import { EventManager } from './EventManager.js';
 import { Game } from './Game.js';
 
-/**
- * Refactor code
-*/
-
 class ProjectilesManager {
   static instance;
   projectiles = [];
@@ -73,7 +69,14 @@ class ProjectilesManager {
       const projectile = this.projectiles[i];
       projectile.update();
       
-      if (projectile.position.distanceTo(new THREE.Vector3(0, 0, 0)) > 100 || projectile.hasCollided) {
+      let tankPosition = null;
+      if (Game.instance.playerTank.model){
+        tankPosition = Game.instance.playerTank.model.position;
+      } else {
+        return;
+      }
+      //const tankPosition = Game.instance.playerTank.model.position;
+      if (projectile.position.distanceTo(tankPosition) > 100 || projectile.hasCollided) {
         if (projectile.model && Game.instance.scene) {
           Game.instance.scene.remove(projectile.model);
         }

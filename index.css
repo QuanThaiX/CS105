@@ -1,0 +1,413 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background-color: #1a1a1a; /* Base background */
+    color: white;
+    display: flex; /* Make body a flex container */
+    width: 100vw;
+    height: 100vh;
+}
+#game-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: none;
+}
+#hud {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: white;
+    z-index: 1000;
+    font-size: 18px;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+/* #menu-container {
+    position: relative;
+} */
+
+#menu-container {
+    display: flex; /* Use flex for side-by-side menus */
+    width: 100%;   /* Full width of body */
+    height: 100%;  /* Full height of body */
+    margin: 0;     /* Override any margins from index.css */
+}
+
+#menu-left {
+    width: 30vw;
+    height: 100vh;
+    background-color: rgba(30, 168, 92, 0.8);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 0px;
+    box-sizing: border-box;
+}
+
+#menu-right {
+    width: 70vw; /* 70% of viewport width */
+    height: 100vh; /* Full viewport height */
+    background-color: rgba(30, 30, 30, 0.7);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    padding: 0px; /* Add padding inside #menu-right for spacing */
+    box-sizing: border-box; /* Include padding in width/height calculations */
+}
+
+.menu-title {
+    font-size: 48px;
+    margin-bottom: 50px;
+    color: #ff9900;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+.menu-button {
+    width: 80%;
+    padding: 15px;
+    margin: 10px;
+    background-color: #ff9900;
+    color: black;
+    font-size: 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.menu-button:hover {
+    background-color: #ffb444;
+    transform: scale(1.05);
+}
+.menu-button:disabled {
+    background-color: #777;
+    cursor: not-allowed;
+    transform: none;
+}
+
+#tank-display-wrapper {
+    width: 100%; 
+    height: 70vh;
+    padding: 0px;
+    box-sizing: border-box;
+}
+
+#tank-display {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    box-sizing: border-box;
+}
+
+#bottom-panel {
+    width: 100%;
+    height: 30vh;
+    background-color: rgba(40, 40, 40, 0.8);
+    padding: 0px 30% 0px 30%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;   /* Stack selection-controls row and select-button */
+    justify-content: center; /* Vertically center content within the 20% height */
+    align-items: center;     /* Horizontally center content (like the select button if not full width) */
+}
+
+#tank-selection-controls {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%; 
+    margin-bottom: 20px;
+}
+
+#tank-name {
+    font-size: 32px;
+    margin-top: 20px;
+    color: #ff9900;
+}
+
+#tank-selection {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Styles for the tank statistics container */
+#tank-stats {
+    width: 80%; /* Make the stats container narrower than #tank-display */
+    max-width: 350px; /* Maximum width for the stats section, helps keep bars short */
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* Space between each stat item */
+    margin-bottom: 20px; /* Space below stats, before the select button */
+}
+
+.nav-button {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    font-size: 36px;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.nav-button:hover {
+    background-color: rgba(255, 153, 0, 0.8);
+}
+#prev-tank {
+    left: 50px;
+}
+#next-tank {
+    right: 50px;
+}
+#select-button {
+    padding: 15px 30px;
+    margin-top: 20px;
+    background-color: #ff9900;
+    color: black;
+    font-size: 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+#select-button:hover {
+    background-color: #ffb444;
+    transform: scale(1.05);
+}
+#loading-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 24px;
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 20px;
+    border-radius: 10px;
+    display: none;
+}
+
+#hp {
+    color: #ff5555;
+    font-weight: bold;
+}
+
+#score {
+    color: #ffcc00;
+    font-weight: bold;
+}
+
+#high-score {
+    color: #55ff55;
+    font-weight: bold;
+}
+
+/* #menu-left takes 30% of viewport width, full height */
+/* Its internal content centering is handled by index.css's existing rules for #menu-left */
+
+
+/* === STYLES FOR #menu-right AND ITS NEW INTERNAL STRUCTURE === */
+
+
+/* Wrapper for the Three.js canvas area (80% of screen height) */
+
+
+/* Panel at the bottom for controls (20% of screen height) */
+
+
+/* Styles for the < and > navigation buttons (overriding .nav-button from index.css) */
+/* This ensures they are not absolutely positioned */
+.nav-button {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    font-size: 28px; /* Adjusted size */
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s;
+    /* Crucially, remove position: absolute and related properties (top, transform, left, right) */
+    position: static !important; /* Override absolute positioning */
+    transform: none !important;  /* Override transform */
+}
+.nav-button:hover {
+    background-color: rgba(255, 153, 0, 0.8);
+}
+/* ID-specific positioning for #prev-tank, #next-tank from index.css is no longer needed here */
+
+
+/* Container for tank name and stats, centered between nav buttons */
+#tank-info-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Center tank name and stats block horizontally */
+    margin: 0 10px; /* Spacing from nav buttons */
+    flex-grow: 1; /* Allow it to take available space in the middle, helps center stats */
+    min-width: 0; /* Prevents flex item from overflowing if content is too wide */
+}
+
+/* Tank name styling */
+#tank-name {
+    font-size: 22px; /* Adjusted size */
+    color: #ff9900;
+    margin-bottom: 8px; /* Space between name and stats */
+    text-align: center;
+}
+
+/* Tank stats container */
+#tank-stats {
+    width: 100%; /* Takes width of #tank-info-center */
+    max-width: 320px; /* Max width for stat bars, effectively centering them */
+    display: flex;
+    flex-direction: column;
+    gap: 5px; /* Space between each stat item */
+}
+
+/* Styles for individual statistic bars */
+.stat-bar {
+    width: 100%; 
+    height: 18px; /* Slightly smaller bars */
+    background-color: #555; /* Darker background for bars */
+    border-radius: 9px;
+    overflow: hidden;
+    margin-bottom: 0; /* Gap on parent #tank-stats is used instead */
+}
+
+/* Styles for the filled part of the statistic bar */
+.stat-fill {
+    height: 100%;
+    border-radius: 9px;
+}
+
+/* Container for a single stat (label + bar) */
+.stat-container {
+    display: flex;
+    align-items: center;
+    /* margin-bottom is handled by gap on #tank-stats */
+}
+
+/* Styles for the label of a statistic */
+.stat-label {
+    width: 70px; /* Adjusted width */
+    font-weight: bold;
+    font-size: 0.9em;
+    margin-right: 8px;
+    color: #ccc;
+}
+
+/* Select Tank button */
+#select-button {
+    padding: 10px 20px; /* Adjusted padding */
+    background-color: #ff9900;
+    color: black;
+    font-size: 16px; /* Adjusted font size */
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+    /* margin-top is handled by margin-bottom on #tank-selection-controls */
+}
+#select-button:hover {
+    background-color: #ffb444;
+    transform: scale(1.05);
+}
+
+/* Màn hình kết thúc game (thắng/thua) */
+.endgame-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.endgame-content {
+    background-color: rgba(50, 50, 50, 0.95);
+    border: 3px solid #555;
+    border-radius: 15px;
+    padding: 30px;
+    width: 90%;
+    max-width: 500px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+}
+
+#gameover-title {
+    color: #ff3030;
+    font-size: 48px;
+    margin: 0 0 30px 0;
+    text-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+#win-title {
+    color: #30ff30;
+    font-size: 48px;
+    margin: 0 0 30px 0;
+    text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+#gameover-score-info, #win-score-info {
+    font-size: 24px;
+    margin-bottom: 30px;
+    color: #fff;
+}
+
+.endgame-buttons {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 20px;
+}
+
+.endgame-button {
+    background-color: #444;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    font-size: 18px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.1s;
+}
+
+.endgame-button:hover {
+    background-color: #666;
+    transform: scale(1.05);
+}
+
+.endgame-button:active {
+    transform: scale(0.98);
+}
+
+#gameover-restart-button, #win-restart-button {
+    background-color: #2a6;
+}
+
+#gameover-restart-button:hover, #win-restart-button:hover {
+    background-color: #3b7;
+}
