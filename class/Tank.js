@@ -31,7 +31,7 @@ class Tank extends GameObject{
     super(id, faction, position, isCollision);
     this.tankType = tankType;
     this.setTankStats(this.tankType);
-
+    // console.log("Tank stats: ", this.tankType, this.hp, this.maxHp, this.moveSpeed, this.rotateSpeed, this.shootCooldown, this.damage, this.defense);
     loadTankModel(tankType, this.position).then((model) => {this.setModel(model)});
 
     this.prevPosition = this.position.clone();
@@ -189,7 +189,7 @@ class Tank extends GameObject{
       if (this.healthBar) {
         this.healthBar.updateHP(remainingHp);
       }
-      // console.log(`${this.id} HP: ${remainingHp}`);
+      console.log(`${this.id} HP: ${remainingHp}`);
     }
   }
 

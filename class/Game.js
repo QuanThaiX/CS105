@@ -77,8 +77,9 @@ class Game {
     this.projectilesManager = new ProjectilesManager();
     this.effectManager = new Effect();
     this.bot = new Bot();
-    
-    // Khởi tạo mảng enemies trống
+    if (ProjectilesManager.instance) {
+      ProjectilesManager.instance.clear();
+    }
     this.enemies = [];
 
     this.scene = createScene();
@@ -97,7 +98,8 @@ class Game {
 
   loadLevel() {
     this.playerTank = new Tank(0, FACTION.PLAYER, { x: 0, y: 1, z: 0 }, true, this.selectedTankType);
-    this.playerTank.setTankHP(1000);
+    // this.playerTank.setTankHP(1000);
+    console.log("Player tank hp: ", this.playerTank.hp)
     this.player = new PlayerControl(this.playerTank);
 
     this.enemy1 = new Tank(1, FACTION.ENEMY, { x: 10, y: 1, z: 0 }, true);
@@ -214,7 +216,7 @@ class Game {
 
   handleTankDestroyed(data) {
     const { tank, pointValue } = data;
-
+    
     if (tank && tank.faction === FACTION.ENEMY && pointValue) {
       this.addScore(pointValue);
       const index = this.enemies.indexOf(tank);

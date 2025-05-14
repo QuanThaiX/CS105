@@ -61,7 +61,7 @@ const FACTION = Object.freeze({
 
 const TANK_STATS = Object.freeze({
     V001: {
-        hp: 100,
+        hp: 1000,
         maxHp: 500,
         moveSpeed: 0.1,
         rotateSpeed: 0.03,

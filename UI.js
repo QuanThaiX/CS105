@@ -4,11 +4,13 @@ import { Game } from './class/Game.js';
 import { EVENT, COLOR, TANKTYPE, loadTankModel } from './utils.js';
 
 let game = null;
-let selectedTankModel = TANKTYPE.V001;
+let selectedTankModel = TANKTYPE.V001; // Default selected tank
 let menuScene, menuCamera, menuRenderer, menuControls;
-let tankModel = null;
+let tankModel = null; // Holds the 3D model in the menu
 let availableTanks = [TANKTYPE.V001, TANKTYPE.V003];
 let currentTankIndex = 0;
+
+const GAME_START_DELAY = 250; // ms, for loading simulation or DOM readiness
 
 const tankStatsData = {
     [TANKTYPE.V001.name]: {
@@ -21,6 +23,13 @@ const tankStatsData = {
         speed: 50,
         defense: 85
     }
+};
+
+// Cache for stat bar colors
+const statBarColors = {
+    power: new THREE.Color(COLOR.red).getStyle(),
+    speed: new THREE.Color(COLOR.green).getStyle(),
+    defense: new THREE.Color(COLOR.blue).getStyle()
 };
 
 function initMenuScene() {
@@ -38,25 +47,29 @@ function initMenuScene() {
     menuScene.add(directionalLight);
 
     const tankDisplayDiv = document.getElementById('tank-display');
+    if (!tankDisplayDiv) {
+        console.error("Tank display div not found!");
+        return;
+    }
 
     const displayWidth = tankDisplayDiv.clientWidth;
     const displayHeight = tankDisplayDiv.clientHeight;
 
     menuCamera = new THREE.PerspectiveCamera(45, displayWidth / displayHeight, 0.1, 1000);
-    menuCamera.position.set(0, 1.5, 6); // Adjust for better framing in the new aspect ratio
+    menuCamera.position.set(0, 1.5, 6);
 
-    menuRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); // alpha:true if #tank-display has CSS bg
+    menuRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     menuRenderer.setSize(displayWidth, displayHeight);
     menuRenderer.setPixelRatio(window.devicePixelRatio);
     menuRenderer.shadowMap.enabled = true;
-    menuRenderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+    menuRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     tankDisplayDiv.appendChild(menuRenderer.domElement);
 
     menuControls = new OrbitControls(menuCamera, menuRenderer.domElement);
     menuControls.enableDamping = true;
-    menuControls.dampingFactor = 0.15; // Adjust damping
-    menuControls.target.set(0, 0.5, 0); // Adjust target if model pivot is not at base
+    menuControls.dampingFactor = 0.15;
+    menuControls.target.set(0, 0.5, 0);
     menuControls.minDistance = 3;
     menuControls.maxDistance = 15;
 
@@ -72,75 +85,92 @@ function initMenuScene() {
     menuScene.add(ground);
 
     loadTankForMenu(availableTanks[currentTankIndex]);
-    animateMenu(); // Changed from animate to avoid conflict if global animate exists
+    animateMenu();
+}
+
+function disposeTankModel() {
+    if (tankModel) {
+        tankModel.traverse(object => {
+            if (object.isMesh) {
+                if (object.geometry) {
+                    object.geometry.dispose();
+                }
+                if (object.material) {
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach(material => material.dispose());
+                    } else {
+                        object.material.dispose();
+                    }
+                }
+            }
+        });
+        menuScene.remove(tankModel);
+        tankModel = null;
+    }
 }
 
 function loadTankForMenu(tankType) {
     document.getElementById('tank-name').textContent = `Đang tải ${tankType.name}...`;
 
-    if (tankModel) {
-        menuScene.remove(tankModel);
-        // TODO: Properly dispose of old model's geometry and materials
-        tankModel = null;
-    }
+    disposeTankModel(); // Dispose previous model before loading new one
 
     loadTankModel(tankType)
         .then(model => {
             tankModel = model;
-            tankModel.traverse(node => { // Ensure all parts of model cast/receive shadow
+            tankModel.traverse(node => {
                 if (node.isMesh) {
                     node.castShadow = true;
                     node.receiveShadow = true;
                 }
             });
-            // model.position.y = 0; // Adjust if tank pivot is not at its base
             menuScene.add(tankModel);
 
-            document.getElementById('tank-name').textContent = tankType.name; // Use name from TANKTYPE
-
-            updateTankStatsUI(tankType.name); // Changed name
-            selectedTankModel = tankType;
-            menuControls.target.set(0, 0.5, 0); // Re-center controls target
-            menuControls.update();
+            document.getElementById('tank-name').textContent = tankType.name;
+            updateTankStatsUI(tankType.name);
+            selectedTankModel = tankType; // Update the globally selected tank
+            if (menuControls) {
+                menuControls.target.set(0, 0.5, 0); // Re-center controls target
+                menuControls.update();
+            }
         })
         .catch(error => {
-            console.error('Error loading tank model:', error);
+            console.error('Error loading tank model for menu:', error);
             document.getElementById('tank-name').textContent = `Lỗi tải ${tankType.name}`;
         });
 }
 
-function updateTankStatsUI(tankName) { // Renamed
-    const stats = tankStatsData[tankName]; // Use renamed data object
-
+function updateTankStatsUI(tankName) {
+    const stats = tankStatsData[tankName];
     if (stats) {
-        document.getElementById('power-stat').style.width = `${stats.power}%`;
-        document.getElementById('power-stat').style.backgroundColor = new THREE.Color(COLOR.red).getStyle();
+        const powerStatEl = document.getElementById('power-stat');
+        powerStatEl.style.width = `${stats.power}%`;
+        powerStatEl.style.backgroundColor = statBarColors.power;
 
-        document.getElementById('speed-stat').style.width = `${stats.speed}%`;
-        document.getElementById('speed-stat').style.backgroundColor = new THREE.Color(COLOR.green).getStyle();
+        const speedStatEl = document.getElementById('speed-stat');
+        speedStatEl.style.width = `${stats.speed}%`;
+        speedStatEl.style.backgroundColor = statBarColors.speed;
 
-        document.getElementById('defense-stat').style.width = `${stats.defense}%`;
-        document.getElementById('defense-stat').style.backgroundColor = new THREE.Color(COLOR.blue).getStyle();
+        const defenseStatEl = document.getElementById('defense-stat');
+        defenseStatEl.style.width = `${stats.defense}%`;
+        defenseStatEl.style.backgroundColor = statBarColors.defense;
     }
 }
 
-function animateMenu() { // Renamed
+function animateMenu() {
     requestAnimationFrame(animateMenu);
-
     if (tankModel) {
-        tankModel.rotation.y += 0.005; // Slower rotation
+        tankModel.rotation.y += 0.005;
     }
-
     if (menuControls) menuControls.update();
     if (menuRenderer && menuScene && menuCamera) menuRenderer.render(menuScene, menuCamera);
 }
 
 function onWindowResize() {
+    // Menu renderer resize
     const tankDisplayDiv = document.getElementById('tank-display');
-    if (menuCamera && menuRenderer && tankDisplayDiv) {
+    if (menuCamera && menuRenderer && tankDisplayDiv && tankDisplayDiv.offsetParent !== null) { // Check if visible
         const displayWidth = tankDisplayDiv.clientWidth;
         const displayHeight = tankDisplayDiv.clientHeight;
-
         if (displayWidth > 0 && displayHeight > 0) {
             menuCamera.aspect = displayWidth / displayHeight;
             menuCamera.updateProjectionMatrix();
@@ -148,10 +178,10 @@ function onWindowResize() {
         }
     }
 
+    // Game renderer resize
     if (game && game.camera && game.renderer) {
         const gameContainer = document.getElementById('game-container');
         if (gameContainer.style.display !== 'none') {
-            // Game renderer takes full window dimensions
             game.camera.aspect = window.innerWidth / window.innerHeight;
             game.camera.updateProjectionMatrix();
             game.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -159,63 +189,108 @@ function onWindowResize() {
     }
 }
 
-document.getElementById('start-button').addEventListener('click', () => {
-    document.getElementById('loading-message').style.display = 'block';
-    document.getElementById('menu-container').style.display = 'none';
+function setupGameRendererDOM(gameInstance) {
+    const gameCanvasContainer = document.getElementById('game-container');
+    const hudElement = document.getElementById('hud');
 
+    if (!gameInstance || !gameInstance.renderer || !gameInstance.renderer.domElement) {
+        console.warn("setupGameRendererDOM: Game instance or renderer not available.");
+        return;
+    }
+
+    // Remove any existing non-HUD, non-current-renderer canvas elements
+    Array.from(gameCanvasContainer.childNodes).forEach(child => {
+        if (child !== hudElement && child !== gameInstance.renderer.domElement && child.tagName === 'CANVAS') {
+            gameCanvasContainer.removeChild(child);
+        }
+    });
+    
+    if (!gameCanvasContainer.contains(gameInstance.renderer.domElement)) {
+        if (hudElement && gameCanvasContainer.contains(hudElement)) {
+            gameCanvasContainer.insertBefore(gameInstance.renderer.domElement, hudElement);
+        } else {
+            gameCanvasContainer.appendChild(gameInstance.renderer.domElement);
+        }
+    }
+}
+
+function disposeCurrentGame() {
+    stopHUDUpdates();
     if (game) {
         const gameCanvasContainer = document.getElementById('game-container');
         if (game.renderer && game.renderer.domElement && gameCanvasContainer.contains(game.renderer.domElement)) {
             gameCanvasContainer.removeChild(game.renderer.domElement);
         }
-
-        game.dispose();
+        if (typeof game.dispose === 'function') {
+            game.dispose();
+        }
         game = null;
     }
+}
 
-    game = new Game({ tankType: selectedTankModel });
+function startNewGame(tankTypeToUse) {
+    document.getElementById('loading-message').style.display = 'block';
+    document.getElementById('menu-container').style.display = 'none';
+    document.getElementById('game-container').style.display = 'none';
+    document.getElementById('game-over-screen').style.display = 'none';
+    document.getElementById('win-screen').style.display = 'none';
+
+    disposeCurrentGame(); // Ensure any old game is cleaned up
+
+    game = new Game({ tankType: tankTypeToUse });
 
     setTimeout(() => {
+        if (!game) return; // Game might have been disposed if user navigated away quickly
+
         game.start();
+        setupGameRendererDOM(game);
 
         document.getElementById('game-container').style.display = 'block';
         document.getElementById('loading-message').style.display = 'none';
-        document.getElementById('continue-button').disabled = false;
+        document.getElementById('continue-button').disabled = !(game && game.canResume());
 
-        const gameCanvasContainer = document.getElementById('game-container');
-        if (game.renderer && game.renderer.domElement) {
-            // Clear previous canvas if any
-            while (gameCanvasContainer.firstChild && gameCanvasContainer.firstChild !== document.getElementById('hud')) {
-                gameCanvasContainer.removeChild(gameCanvasContainer.firstChild);
-            }
-            gameCanvasContainer.insertBefore(game.renderer.domElement, document.getElementById('hud'));
-        }
         startHUDUpdates();
-        onWindowResize();
-    }, 250);
+        onWindowResize(); // Resize after DOM is visible
+    }, GAME_START_DELAY);
+}
+
+function returnToMainMenu(preserveGameInstanceForPause = false) {
+    if (!preserveGameInstanceForPause) {
+        disposeCurrentGame();
+    } else if (game) {
+        game.pause(); // Ensure game is paused if preserved
+        stopHUDUpdates();
+    }
+
+    document.getElementById('game-over-screen').style.display = 'none';
+    document.getElementById('win-screen').style.display = 'none';
+    document.getElementById('game-container').style.display = 'none';
+    document.getElementById('loading-message').style.display = 'none';
+    document.getElementById('menu-container').style.display = 'flex';
+
+    document.getElementById('continue-button').disabled = !(game && game.canResume());
+    onWindowResize(); // Ensure menu is sized correctly
+}
+
+
+// Event Listeners
+document.getElementById('start-button').addEventListener('click', () => {
+    startNewGame(selectedTankModel);
 });
 
 document.getElementById('continue-button').addEventListener('click', () => {
     if (game && game.canResume()) {
         document.getElementById('menu-container').style.display = 'none';
         document.getElementById('game-container').style.display = 'block';
+        document.getElementById('loading-message').style.display = 'none';
 
-        // Đảm bảo renderer đã được gắn vào DOM
-        const gameCanvasContainer = document.getElementById('game-container');
-        if (game.renderer && game.renderer.domElement && !gameCanvasContainer.contains(game.renderer.domElement)) {
-            // Xóa các canvas cũ nếu có
-            while (gameCanvasContainer.firstChild && gameCanvasContainer.firstChild !== document.getElementById('hud')) {
-                gameCanvasContainer.removeChild(gameCanvasContainer.firstChild);
-            }
-            gameCanvasContainer.insertBefore(game.renderer.domElement, document.getElementById('hud'));
-        }
+        setupGameRendererDOM(game); // Ensure renderer is in place
 
         game.resume();
         startHUDUpdates();
         onWindowResize();
     } else {
-        // Nếu không thể tiếp tục, chuyển sang tạo game mới
-        document.getElementById('start-button').click();
+        startNewGame(selectedTankModel); // Fallback to new game if cannot resume
     }
 });
 
@@ -226,12 +301,13 @@ document.getElementById('settings-button').addEventListener('click', () => {
 document.getElementById('exit-button').addEventListener('click', () => {
     if (confirm('Bạn có chắc muốn thoát game không?')) {
         if (game) {
-            game.stop();
+            game.stop(); // Or disposeCurrentGame() if full cleanup desired
         }
         stopHUDUpdates();
         try {
-            window.close();
+            window.close(); // May not work in all browser contexts
         } catch (e) {
+            // Fallback for browsers that block window.close
             document.body.innerHTML = "<div style='text-align:center; padding-top: 50px; font-size: 24px; color: white;'>Cảm ơn đã chơi! Bạn có thể đóng tab này.</div>";
         }
     }
@@ -248,24 +324,25 @@ document.getElementById('next-tank').addEventListener('click', () => {
 });
 
 document.getElementById('select-button').addEventListener('click', () => {
+    // selectedTankModel is already updated by prev/next. This button is more of a visual confirmation.
     alert(`Đã chọn ${selectedTankModel.name}`);
-    // The selectedTankModel is passed to the Game instance when 'start-button' is clicked.
+    // The actual tank used is `selectedTankModel` when 'start-button' is pressed.
 });
 
+// HUD Management
 let hudUpdateRequestId = null;
 function updateHUD() {
-    if (Game.instance && Game.instance.isRunning) {
-        const data = Game.instance.getHUDData();
+    if (game && game.isRunning) { // Use the local 'game' instance
+        const data = game.getHUDData(); // Assuming Game instance has getHUDData method
         if (data) {
-            if (document.getElementById('hp')) {
-                document.getElementById('hp').innerText = `HP: ${data.playerHP}`;
-            }
-            if (document.getElementById('score')) {
-                document.getElementById('score').innerText = `Điểm: ${data.score}`;
-            }
-            if (document.getElementById('high-score')) {
-                document.getElementById('high-score').innerText = `Điểm cao: ${data.highScore}`;
-            }
+            const hpEl = document.getElementById('hp');
+            if (hpEl) hpEl.innerText = `HP: ${data.playerHP}`;
+            
+            const scoreEl = document.getElementById('score');
+            if (scoreEl) scoreEl.innerText = `Điểm: ${data.score}`;
+
+            const highScoreEl = document.getElementById('high-score');
+            if (highScoreEl) highScoreEl.innerText = `Điểm cao: ${data.highScore}`;
         }
     }
     hudUpdateRequestId = requestAnimationFrame(updateHUD);
@@ -273,7 +350,7 @@ function updateHUD() {
 
 function startHUDUpdates() {
     if (!hudUpdateRequestId) {
-        updateHUD();
+        hudUpdateRequestId = requestAnimationFrame(updateHUD);
     }
 }
 function stopHUDUpdates() {
@@ -283,141 +360,34 @@ function stopHUDUpdates() {
     }
 }
 
+// Global Event Listeners
 window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && game && game.isRunning) {
-        game.pause();
-        stopHUDUpdates();
-        document.getElementById('menu-container').style.display = 'flex'; // Show menu
-        document.getElementById('game-container').style.display = 'none'; // Hide game
-        // No need to re-init menu scene if it's preserved.
+        returnToMainMenu(true); // Preserve game instance for pausing
     }
 });
 
 window.addEventListener('resize', onWindowResize, false);
-initMenuScene();
 
-// Đăng ký lắng nghe sự kiện cho các nút trên màn hình thắng/thua
+// End Game Screen Event Setup
 function setupEndGameScreenEvents() {
-    // Màn hình Game Over
-    document.getElementById('gameover-restart-button').addEventListener('click', function () {
-        document.getElementById('game-over-screen').style.display = 'none';
-
-        // Xóa game hiện tại và tạo mới
-        if (game) {
-            // Xóa renderer khỏi DOM
-            const gameCanvasContainer = document.getElementById('game-container');
-            if (game.renderer && game.renderer.domElement && gameCanvasContainer.contains(game.renderer.domElement)) {
-                gameCanvasContainer.removeChild(game.renderer.domElement);
-            }
-            // Giải phóng hoàn toàn tài nguyên game
-            game.dispose();
-            // Xóa tham chiếu tới game cũ
-            game = null;
-        }
-
-        // Tạo game mới
-        document.getElementById('loading-message').style.display = 'block';
-        document.getElementById('game-container').style.display = 'none';
-
-        setTimeout(() => {
-            game = new Game({ tankType: selectedTankModel });
-
-            game.start();
-            document.getElementById('game-container').style.display = 'block';
-            document.getElementById('loading-message').style.display = 'none';
-            document.getElementById('continue-button').disabled = false;
-
-            const gameCanvasContainer = document.getElementById('game-container');
-            if (game.renderer && game.renderer.domElement) {
-                gameCanvasContainer.insertBefore(game.renderer.domElement, document.getElementById('hud'));
-            }
-
-            startHUDUpdates();
-            onWindowResize();
-        }, 250);
+    // Game Over Screen
+    document.getElementById('gameover-restart-button').addEventListener('click', () => {
+        startNewGame(selectedTankModel);
+    });
+    document.getElementById('gameover-menu-button').addEventListener('click', () => {
+        returnToMainMenu(false); // Do not preserve game instance
     });
 
-    document.getElementById('gameover-menu-button').addEventListener('click', function () {
-        document.getElementById('game-over-screen').style.display = 'none';
-        document.getElementById('game-container').style.display = 'none';
-        document.getElementById('menu-container').style.display = 'flex';
-
-        // Xóa game hiện tại
-        if (game) {
-            // Xóa renderer khỏi DOM
-            const gameCanvasContainer = document.getElementById('game-container');
-            if (game.renderer && game.renderer.domElement && gameCanvasContainer.contains(game.renderer.domElement)) {
-                gameCanvasContainer.removeChild(game.renderer.domElement);
-            }
-            // Giải phóng hoàn toàn tài nguyên game
-            game.dispose();
-            // Xóa tham chiếu tới game cũ
-            game = null;
-        }
-
-        stopHUDUpdates();
+    // Win Screen
+    document.getElementById('win-restart-button').addEventListener('click', () => {
+        startNewGame(selectedTankModel);
     });
-
-    // Màn hình Win
-    document.getElementById('win-restart-button').addEventListener('click', function () {
-        document.getElementById('win-screen').style.display = 'none';
-
-        // Xóa game hiện tại và tạo mới
-        if (game) {
-            // Xóa renderer khỏi DOM
-            const gameCanvasContainer = document.getElementById('game-container');
-            if (game.renderer && game.renderer.domElement && gameCanvasContainer.contains(game.renderer.domElement)) {
-                gameCanvasContainer.removeChild(game.renderer.domElement);
-            }
-            // Giải phóng hoàn toàn tài nguyên game
-            game.dispose();
-            // Xóa tham chiếu tới game cũ
-            game = null;
-        }
-
-        // Tạo game mới
-        document.getElementById('loading-message').style.display = 'block';
-        document.getElementById('game-container').style.display = 'none';
-
-        setTimeout(() => {
-            game = new Game({ tankType: selectedTankModel });
-
-            game.start();
-            document.getElementById('game-container').style.display = 'block';
-            document.getElementById('loading-message').style.display = 'none';
-            document.getElementById('continue-button').disabled = false;
-
-            const gameCanvasContainer = document.getElementById('game-container');
-            if (game.renderer && game.renderer.domElement) {
-                gameCanvasContainer.insertBefore(game.renderer.domElement, document.getElementById('hud'));
-            }
-
-            startHUDUpdates();
-            onWindowResize();
-        }, 250);
-    });
-
-    document.getElementById('win-menu-button').addEventListener('click', function () {
-        document.getElementById('win-screen').style.display = 'none';
-        document.getElementById('game-container').style.display = 'none';
-        document.getElementById('menu-container').style.display = 'flex';
-
-        // Xóa game hiện tại
-        if (game) {
-            // Xóa renderer khỏi DOM
-            const gameCanvasContainer = document.getElementById('game-container');
-            if (game.renderer && game.renderer.domElement && gameCanvasContainer.contains(game.renderer.domElement)) {
-                gameCanvasContainer.removeChild(game.renderer.domElement);
-            }
-            // Giải phóng hoàn toàn tài nguyên game
-            game.dispose();
-            // Xóa tham chiếu tới game cũ
-            game = null;
-        }
-
-        stopHUDUpdates();
+    document.getElementById('win-menu-button').addEventListener('click', () => {
+        returnToMainMenu(false); // Do not preserve game instance
     });
 }
 
-// Thiết lập sự kiện cho màn hình kết thúc game
+// Initialization
+initMenuScene();
 setupEndGameScreenEvents();
