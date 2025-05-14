@@ -57,6 +57,8 @@ class Tank extends GameObject{
   setTankHP(hp){
     this.hp = hp;
     this.maxHp = hp;
+    this.healthBar = new HealthBar(this, this.hp);
+
   }
 
 // MOVE --------------------------------------------------------------------------------------------------------------------------------
