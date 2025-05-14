@@ -32,7 +32,7 @@ function generateScatteredObjects(count, types, scaleMin, scaleMax, maxSpawnRadi
     const angle = Math.random() * Math.PI * 2;
     const effectiveMinRadius = Math.min(minSpawnRadius, maxSpawnRadius);
     const radius = getRandomInRange(effectiveMinRadius, maxSpawnRadius);
-    
+
     const x = radius * Math.cos(angle);
     const z = radius * Math.sin(angle);
 
@@ -45,6 +45,33 @@ function generateScatteredObjects(count, types, scaleMin, scaleMax, maxSpawnRadi
   }
   return objects;
 }
+
+function generateEnemyDefinitions(count, types, pointValue, hp, maxSpawnRadius, minSpawnRadius = 0) {
+  const definitions = [];
+  if (!types || types.length === 0) {
+    console.warn("generateEnemyDefinitions: No enemy types provided, cannot generate enemies.");
+    return definitions;
+  }
+
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const effectiveMinRadius = Math.min(minSpawnRadius, maxSpawnRadius);
+    const radius = getRandomInRange(effectiveMinRadius, maxSpawnRadius);
+
+    const x = radius * Math.cos(angle);
+    const z = radius * Math.sin(angle);
+
+    definitions.push({
+      id: `enemy-${i + 1}`, // Unique ID for each enemy
+      position: { x, y: 1, z }, // y=1 for ground level
+      pointValue: typeof pointValue === 'function' ? pointValue(getRandomElement(types)) : pointValue,
+      type: getRandomElement(types),
+      hp: typeof hp === 'function' ? hp(getRandomElement(types)) : hp,
+    });
+  }
+  return definitions;
+}
+
 
 const DEFAULT_SCENERY_CONFIG = {
     NUM_ROCKS: 15,
@@ -59,11 +86,29 @@ const DEFAULT_SCENERY_CONFIG = {
     MAX_SPAWN_RADIUS_FACTOR: 0.9
 };
 
+const DEFAULT_ENEMY_CONFIG = {
+    NUM_ENEMIES: 6,
+    ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V002],
+    ENEMY_POINT_VALUE: 100, // Can be a number or a function(type) => number
+    ENEMY_HP: 100,          // Can be a number or a function(type) => number
+    MIN_SPAWN_RADIUS: 30,   // Min distance from player start (0,0,0)
+    MAX_SPAWN_RADIUS_FACTOR: 0.8 // Relative to world boundary
+};
+
 const HIGH_SCORE_STORAGE_KEY = 'tankGame_highScore';
+
+// Local GAMECONFIG definition for internal use, will be merged with exported one.
+// This ensures defaults are available if the exported one isn't fully defined yet.
+const LOCAL_GAMECONFIG_DEFAULTS = {
+    WORLD_BOUNDARY: 500,
+    SCENERY: DEFAULT_SCENERY_CONFIG,
+    ENEMY_CONFIG: DEFAULT_ENEMY_CONFIG
+};
+
 
 class Game {
   static instance;
-  static debug = true;
+  static debug = true; // Default debug, can be overridden by GAMECONFIG.DEBUG
   static isRunning = false;
 
   scene;
@@ -86,6 +131,22 @@ class Game {
       return Game.instance;
     }
     Game.instance = this;
+
+    // Use GAMECONFIG from the end of the file, falling back to local defaults
+    this.gameConfig = {
+        ...LOCAL_GAMECONFIG_DEFAULTS,
+        ...(typeof GAMECONFIG !== 'undefined' ? GAMECONFIG : {}), // GAMECONFIG is exported later
+        SCENERY: {
+            ...DEFAULT_SCENERY_CONFIG,
+            ...(typeof GAMECONFIG !== 'undefined' && GAMECONFIG.SCENERY ? GAMECONFIG.SCENERY : {})
+        },
+        ENEMY_CONFIG: {
+            ...DEFAULT_ENEMY_CONFIG,
+            ...(typeof GAMECONFIG !== 'undefined' && GAMECONFIG.ENEMY_CONFIG ? GAMECONFIG.ENEMY_CONFIG : {})
+        }
+    };
+    Game.debug = this.gameConfig.DEBUG !== undefined ? this.gameConfig.DEBUG : Game.debug;
+
 
     this.highScore = this.loadHighScore();
     this.selectedTankType = this.setSelectedTank(options.tankType);
@@ -116,7 +177,8 @@ class Game {
     this.renderer = createRenderer();
     this.lights = createLights(this.scene);
     this.sky = createSky(this.scene);
-    this.ground = createGround(this.scene, { width: 500, height: 500, repeatX: 25, repeatY: 25 });
+    this.ground = createGround(this.scene, { width: this.gameConfig.WORLD_BOUNDARY, height: this.gameConfig.WORLD_BOUNDARY, repeatX: this.gameConfig.WORLD_BOUNDARY/20, repeatY: this.gameConfig.WORLD_BOUNDARY/20 });
+
 
     if (Game.debug) {
       this.debugHelpers = createDebugHelpers(this.scene);
@@ -131,37 +193,43 @@ class Game {
     this.player = new PlayerControl(this.playerTank);
     this.collisionManager.add(this.playerTank);
 
-    const enemyDefinitions = [
-      { id: 1, position: { x: 10, y: 1, z: 0 }, pointValue: 100, type: TANKTYPE.V001 },
-      { id: 2, position: { x: -15, y: 1, z: 15 }, pointValue: 100, type: TANKTYPE.V001 },
-      { id: 3, position: { x: 0, y: 1, z: -20 }, pointValue: 100, type: TANKTYPE.V002 },
-      { id: 4, position: { x: 30, y: 1, z: 20 }, pointValue: 100, type: TANKTYPE.V001 },
-      { id: 5, position: { x: -45, y: 1, z: 10 }, pointValue: 100, type: TANKTYPE.V002 },
-      { id: 6, position: { x: 70, y: 1, z: -20 }, pointValue: 100, type: TANKTYPE.V001 },
-    ];
+    const worldBoundaryHalf = (this.gameConfig.WORLD_BOUNDARY / 2) || (this.ground.geometry.parameters.width / 2) || 250;
+
+    // Load Enemies
+    const activeEnemyConfig = this.gameConfig.ENEMY_CONFIG;
+    const maxEnemySpawnRadius = worldBoundaryHalf * activeEnemyConfig.MAX_SPAWN_RADIUS_FACTOR;
+    const minEnemySpawnRadius = activeEnemyConfig.MIN_SPAWN_RADIUS;
+
+    const enemyDefinitions = generateEnemyDefinitions(
+      activeEnemyConfig.NUM_ENEMIES,
+      activeEnemyConfig.ENEMY_TYPES,
+      activeEnemyConfig.ENEMY_POINT_VALUE,
+      activeEnemyConfig.ENEMY_HP,
+      maxEnemySpawnRadius,
+      minEnemySpawnRadius
+    );
 
     this.enemies = enemyDefinitions.map(def => {
       const enemyTank = new Tank(def.id, FACTION.ENEMY, def.position, true, def.type);
-      enemyTank.setTankHP(100);
+      enemyTank.setTankHP(def.hp);
       enemyTank.pointValue = def.pointValue;
       this.bot.addTank(enemyTank);
       this.collisionManager.add(enemyTank);
       return enemyTank;
     });
 
-    const worldBoundary = (GAMECONFIG.WORLD_BOUNDARY / 2) || (this.ground.geometry.parameters.width / 2) || 250;
-    const activeSceneryConfig = { ...DEFAULT_SCENERY_CONFIG, ...(GAMECONFIG.SCENERY || {}) };
-    
-    const maxSpawnRadius = worldBoundary * activeSceneryConfig.MAX_SPAWN_RADIUS_FACTOR;
-    const minSpawnRadius = activeSceneryConfig.MIN_SPAWN_RADIUS;
+    // Load Scenery
+    const activeSceneryConfig = this.gameConfig.SCENERY;
+    const maxScenerySpawnRadius = worldBoundaryHalf * activeSceneryConfig.MAX_SPAWN_RADIUS_FACTOR;
+    const minScenerySpawnRadius = activeSceneryConfig.MIN_SPAWN_RADIUS;
 
     const rockProperties = generateScatteredObjects(
       activeSceneryConfig.NUM_ROCKS,
       activeSceneryConfig.ROCK_TYPES,
       activeSceneryConfig.ROCK_SCALE_MIN,
       activeSceneryConfig.ROCK_SCALE_MAX,
-      maxSpawnRadius,
-      minSpawnRadius
+      maxScenerySpawnRadius,
+      minScenerySpawnRadius
     );
     this.rocks = Rock.createRocksFromList(rockProperties);
     this.rocks.forEach(rock => this.collisionManager.add(rock));
@@ -171,8 +239,8 @@ class Game {
       activeSceneryConfig.TREE_TYPES,
       activeSceneryConfig.TREE_SCALE_MIN,
       activeSceneryConfig.TREE_SCALE_MAX,
-      maxSpawnRadius,
-      minSpawnRadius
+      maxScenerySpawnRadius,
+      minScenerySpawnRadius
     );
     this.trees = Tree.createTreesFromList(treeProperties);
     this.trees.forEach(tree => this.collisionManager.add(tree));
@@ -235,14 +303,14 @@ class Game {
 
   handleTankDestroyed(data) {
     const { tank, pointValue } = data;
-    
-    if (tank && tank.faction === FACTION.ENEMY && pointValue) {
+
+    if (tank && tank.faction === FACTION.ENEMY && pointValue !== undefined) { // Check pointValue defined
       this.addScore(pointValue);
       const index = this.enemies.indexOf(tank);
       if (index !== -1) {
         this.enemies.splice(index, 1);
       }
-    
+
       if (this.isWin()) {
         setTimeout(() => {
           EventManager.instance.notify(EVENT.GAME_WIN, {
@@ -355,10 +423,10 @@ class Game {
       });
       this.enemies = [];
     }
-    
+
     this.projectilesManager.clear();
-    this.eventManager.clearAllEvents(); // Assuming this clears subscriptions or is handled by re-init
-    this.initGame(); // Re-initializes and re-subscribes
+    this.eventManager.clearAllEvents();
+    this.initGame();
   }
 
   setSelectedTank(tankType = TANKTYPE.V001) {
@@ -486,6 +554,9 @@ class Game {
 
     if (this.renderer) {
       this.renderer.dispose();
+      if (this.renderer.domElement && this.renderer.domElement.parentNode) {
+          this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
+      }
       this.renderer = null;
     }
 
@@ -504,30 +575,30 @@ class Game {
     }
 
     this.camera = null;
+    if (this.controls && typeof this.controls.dispose === 'function') {
+        this.controls.dispose();
+    }
     this.controls = null;
-    this.lights = null;
-    this.sky = null;
-    this.ground = null;
+    this.lights = null; 
+    this.sky = null; 
+    this.ground = null; 
     this.debugHelpers = null;
-    
+
     if(this.bot) {
-        this.bot.dispose(); // Assuming bot has a dispose method to clear its tanks array or other resources
+        if (typeof this.bot.dispose === 'function') this.bot.dispose();
         this.bot = null;
     }
     if(this.collisionManager) {
-        this.collisionManager.dispose(); // Assuming a dispose method to clear its collidables array
+        if (typeof this.collisionManager.dispose === 'function') this.collisionManager.dispose();
         this.collisionManager = null;
     }
     if(this.eventManager) {
-        this.eventManager.clearAllEvents(); // Or a more specific dispose method
-        this.eventManager = null;
+        this.eventManager.clearAllEvents();
     }
-    // EffectManager might need disposal if it holds resources
     if(this.effectManager && typeof this.effectManager.dispose === 'function') {
         this.effectManager.dispose();
         this.effectManager = null;
     }
-
 
     Game.instance = null;
   }
