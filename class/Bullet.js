@@ -78,6 +78,12 @@ class Bullet extends GameObject{
         this.dispose();
         this.createImpactEffect();
       }
+
+      if (otherObject instanceof Bullet){
+          this.hasCollided = true;
+          this.dispose();
+          this.createImpactEffect();
+      }
     }
   }
 

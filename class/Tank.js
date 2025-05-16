@@ -103,7 +103,11 @@ class Tank extends GameObject{
 
     if (this.model) {
       const bulletPosition = this.model.position.clone();
-      bulletPosition.y += 1.2;
+      if (this.tankType === TANKTYPE.V003) {
+        bulletPosition.y += 2.5;
+      } else if (this.tankType === TANKTYPE.V001) {
+        bulletPosition.y += 1.2;
+      }
       const forward = new THREE.Vector3(0, 0, 1)
         .applyQuaternion(this.model.quaternion)
         .normalize();

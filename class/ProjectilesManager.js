@@ -76,7 +76,7 @@ class ProjectilesManager {
         return;
       }
       //const tankPosition = Game.instance.playerTank.model.position;
-      if (projectile.position.distanceTo(tankPosition) > 100 || projectile.hasCollided) {
+      if (projectile.position.distanceTo(tankPosition) > 40 || projectile.hasCollided) {
         if (projectile.model && Game.instance.scene) {
           Game.instance.scene.remove(projectile.model);
         }

@@ -186,7 +186,7 @@ class Game {
 
   handleGameOver(data) {
     console.log("Game Over:", data.reason);
-
+    this.score = 0;
     if (this.isRunning == true) {
       const gameOverScreen = document.getElementById('game-over-screen');
       if (gameOverScreen) {
@@ -521,7 +521,8 @@ class Game {
 
       this.scene = null;
     }
-
+    
+    this.player = null;
     this.camera = null;
     this.controls = null;
     this.lights = null;
