@@ -10,6 +10,7 @@ import { EventManager } from "./EventManager.js";
 import { ProjectilesManager } from "./ProjectilesManager.js";
 import { Bot } from "./Bot.js";
 import { Rock } from "./Rock.js";
+import { Tree } from "./Tree.js";
 
 class Tank extends GameObject{
   tankType;               // TANKTYPE.
@@ -20,6 +21,9 @@ class Tank extends GameObject{
   shootCooldown = 2500;   // ms
   damage;
   defense;
+  isMoving = false;
+  lastMoveTime = 0;
+  moveSoundDuration = 100; // 0.1s
 
   lastShotTime = 0;       // ms
   prevPosition;
@@ -31,7 +35,7 @@ class Tank extends GameObject{
     super(id, faction, position, isCollision);
     this.tankType = tankType;
     this.setTankStats(this.tankType);
-
+    // console.log("Tank stats: ", this.tankType, this.hp, this.maxHp, this.moveSpeed, this.rotateSpeed, this.shootCooldown, this.damage, this.defense);
     loadTankModel(tankType, this.position).then((model) => {this.setModel(model)});
 
     this.prevPosition = this.position.clone();
@@ -57,12 +61,19 @@ class Tank extends GameObject{
   setTankHP(hp){
     this.hp = hp;
     this.maxHp = hp;
+    this.healthBar = new HealthBar(this, this.hp);
+
   }
 
 // MOVE --------------------------------------------------------------------------------------------------------------------------------
 
   moveForward(distance = this.moveSpeed) {
     if (this.model) {
+      this.isMoving = true;
+      this.lastMoveTime = Date.now();
+      if (this.faction === FACTION.PLAYER) {
+        EventManager.instance.notify(EVENT.PLAYER_MOVE, { isMoving: true });
+      }
       this.prevPosition.copy(this.position);
       const forward = new THREE.Vector3(0, 0, 1);
       forward.applyQuaternion(this.model.quaternion);
@@ -73,6 +84,11 @@ class Tank extends GameObject{
 
   moveBackward(distance = this.moveSpeed) {
     if (this.model) {
+      this.isMoving = true;
+      this.lastMoveTime = Date.now();
+      if (this.faction === FACTION.PLAYER) {
+        EventManager.instance.notify(EVENT.PLAYER_MOVE, { isMoving: true });
+      }
       this.prevPosition.copy(this.position);
       const backward = new THREE.Vector3(0, 0, -1);
       backward.applyQuaternion(this.model.quaternion);
@@ -83,6 +99,11 @@ class Tank extends GameObject{
 
   rotateLeft(angle = this.rotateSpeed) {
     if (this.model) {
+      this.isMoving = true;
+      this.lastMoveTime = Date.now();
+      if (this.faction === FACTION.PLAYER) {
+        EventManager.instance.notify(EVENT.PLAYER_MOVE, { isMoving: true });
+      }
       this.prevRotation = this.model.rotation.y;
       this.model.rotation.y += angle;
     }
@@ -90,6 +111,11 @@ class Tank extends GameObject{
 
   rotateRight(angle = this.rotateSpeed) {
     if (this.model) {
+      this.isMoving = true;
+      this.lastMoveTime = Date.now();
+      if (this.faction === FACTION.PLAYER) {
+        EventManager.instance.notify(EVENT.PLAYER_MOVE, { isMoving: true });
+      }
       this.prevRotation = this.model.rotation.y;
       this.model.rotation.y -= angle;
     }
@@ -103,11 +129,7 @@ class Tank extends GameObject{
 
     if (this.model) {
       const bulletPosition = this.model.position.clone();
-      if (this.tankType === TANKTYPE.V003) {
-        bulletPosition.y += 2.5;
-      } else if (this.tankType === TANKTYPE.V001) {
-        bulletPosition.y += 1.2;
-      }
+      bulletPosition.y += 1.2;
       const forward = new THREE.Vector3(0, 0, 1)
         .applyQuaternion(this.model.quaternion)
         .normalize();
@@ -193,7 +215,7 @@ class Tank extends GameObject{
       if (this.healthBar) {
         this.healthBar.updateHP(remainingHp);
       }
-      // console.log(`${this.id} HP: ${remainingHp}`);
+      console.log(`${this.id} HP: ${remainingHp}`);
     }
   }
 
@@ -202,7 +224,7 @@ class Tank extends GameObject{
       const otherObject = objA === this ? objB : objA;
       //console.log("collision: " + this.constructor.name + "---" + otherObject.constructor.name);
 
-      if (otherObject instanceof Tank || otherObject instanceof Rock) {
+      if (otherObject instanceof Tank || otherObject instanceof Rock || otherObject instanceof Tree) {
         if (this.prevPosition) {
           this.model.position.copy(this.prevPosition);
           this.position.copy(this.prevPosition);
@@ -222,6 +244,14 @@ class Tank extends GameObject{
   update() {
     if (this.healthBar) {
       this.healthBar.update();
+    }
+
+    const currentTime = Date.now();
+    if (this.isMoving && currentTime - this.lastMoveTime > this.moveSoundDuration) {
+      this.isMoving = false;
+      if (this.faction === FACTION.PLAYER) {
+        EventManager.instance.notify(EVENT.PLAYER_MOVE, { isMoving: false });
+      }
     }
   }
 }

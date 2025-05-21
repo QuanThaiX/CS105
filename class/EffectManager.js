@@ -319,7 +319,7 @@ class MuzzleFlash extends EffectInstance {
             intensity: options.intensity || 40,
             distance: options.distance || 10,
             duration: options.duration || 100, // milliseconds
-            particleCount: options.particleCount || 20,
+            particleCount: options.particleCount || 9,
             particleSize: options.particleSize || 0.2,
             ...options
         };

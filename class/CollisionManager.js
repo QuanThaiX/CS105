@@ -66,8 +66,7 @@ class CollisionManager {
       const objA = this.objects[i];
       if (!objA.model) continue;
       
-      // Áp dụng tỷ lệ hitbox phù hợp dựa vào loại đối tượng
-      let scaleA = 1.0;
+      let scaleA = { x: 1.0, y: 1.0, z: 1.0 };
       if (objA instanceof Tank) {
         scaleA = HITBOX_SCALE.TANK;
       } else if (objA instanceof Rock) {
@@ -77,14 +76,18 @@ class CollisionManager {
       }
       
       const boxA = new THREE.Box3().setFromObject(objA.model);
-      // Điều chỉnh kích thước box
-      if (scaleA !== 1.0) {
+      // Điều chỉnh kích thước box theo từng trục
+      if (scaleA.x !== 1.0 || scaleA.y !== 1.0 || scaleA.z !== 1.0) {
         const center = new THREE.Vector3();
         boxA.getCenter(center);
         const size = new THREE.Vector3();
         boxA.getSize(size);
         
-        const newSize = size.multiplyScalar(scaleA);
+        const newSize = new THREE.Vector3(
+          size.x * scaleA.x,
+          size.y * scaleA.y,
+          size.z * scaleA.z
+        );
         boxA.setFromCenterAndSize(center, newSize);
       }
       
@@ -93,7 +96,7 @@ class CollisionManager {
         if (!objB.model) continue;
         
         // Áp dụng tỷ lệ hitbox phù hợp dựa vào loại đối tượng
-        let scaleB = 1.0;
+        let scaleB = { x: 1.0, y: 1.0, z: 1.0 };
         if (objB instanceof Tank) {
           scaleB = HITBOX_SCALE.TANK;
         } else if (objB instanceof Rock) {
@@ -103,14 +106,18 @@ class CollisionManager {
         }
         
         const boxB = new THREE.Box3().setFromObject(objB.model);
-        // Điều chỉnh kích thước box
-        if (scaleB !== 1.0) {
+        // Điều chỉnh kích thước box theo từng trục
+        if (scaleB.x !== 1.0 || scaleB.y !== 1.0 || scaleB.z !== 1.0) {
           const center = new THREE.Vector3();
           boxB.getCenter(center);
           const size = new THREE.Vector3();
           boxB.getSize(size);
           
-          const newSize = size.multiplyScalar(scaleB);
+          const newSize = new THREE.Vector3(
+            size.x * scaleB.x,
+            size.y * scaleB.y,
+            size.z * scaleB.z
+          );
           boxB.setFromCenterAndSize(center, newSize);
         }
         

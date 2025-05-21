@@ -50,15 +50,15 @@ function createLights(scene) {
     directionalLight.target.position.set(0, 0, 0);
     directionalLight.castShadow = true;
 
-    directionalLight.shadow.camera.left = -50;
-    directionalLight.shadow.camera.right = 50;
-    directionalLight.shadow.camera.top = 50;
-    directionalLight.shadow.camera.bottom = -50;
+    directionalLight.shadow.camera.left = -100;
+    directionalLight.shadow.camera.right = 100;
+    directionalLight.shadow.camera.top = 100;
+    directionalLight.shadow.camera.bottom = -100;
     directionalLight.shadow.camera.near = 1;
     directionalLight.shadow.camera.far = 1000;
-    directionalLight.shadow.mapSize.width = 1024;
-    directionalLight.shadow.mapSize.height = 1024;
-    directionalLight.shadow.bias = -0.00001;
+    directionalLight.shadow.mapSize.width = 4096;
+    directionalLight.shadow.mapSize.height = 4096;
+    directionalLight.shadow.bias = -0.0001;
     scene.add(directionalLight);
 
     let shadowHelper;

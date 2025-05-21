@@ -76,7 +76,7 @@ class ProjectilesManager {
         return;
       }
       //const tankPosition = Game.instance.playerTank.model.position;
-      if (projectile.position.distanceTo(tankPosition) > 40 || projectile.hasCollided) {
+      if (projectile.position.distanceTo(tankPosition) > 100 || projectile.hasCollided) {
         if (projectile.model && Game.instance.scene) {
           Game.instance.scene.remove(projectile.model);
         }
@@ -86,14 +86,22 @@ class ProjectilesManager {
     }
   }
   
+  // clear() {
+  //   this.projectiles.forEach(projectile => {
+  //     if (projectile.model && Game.instance.scene) {
+  //       Game.instance.scene.remove(projectile.model);
+  //     }
+  //     CollisionManager.instance.remove(projectile);
+  //   });
+  //   this.projectiles = [];
+  // }
   clear() {
-    this.projectiles.forEach(projectile => {
-      if (projectile.model && Game.instance.scene) {
-        Game.instance.scene.remove(projectile.model);
-      }
-      CollisionManager.instance.remove(projectile);
-    });
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const projectile = this.projectiles[i];
+      projectile.dispose();
+    }
     this.projectiles = [];
+    Bullet.count = 0; 
   }
 }
 

@@ -3,10 +3,10 @@ import { Game } from './Game.js'
 import { GAMECONFIG } from '../config.js'
 
 class HealthBar {
-    constructor(parent, maxHP) {
+    constructor(parent, maxHp) {
         this.parent = parent;
-        this.maxHP = maxHP;
-        this.currentHP = maxHP;
+        this.maxHp = maxHp;
+        this.currentHP = maxHp;
         
         this.barWidth = 2.0;
         this.barHeight = 0.25;
@@ -35,7 +35,8 @@ class HealthBar {
     }
     
     updateHP(hp) {
-        this.currentHP = Math.max(0, Math.min(hp, this.maxHP));
+        this.currentHP = Math.max(0, Math.min(hp, this.maxHp));
+        this.sprite.scale.set(this.barWidth, this.barHeight, 1);
         this.updateBar();
     }
     
@@ -49,7 +50,7 @@ class HealthBar {
         ctx.fillRect(0, 0, width, height);
         ctx.fillStyle = '#FF0000';
         ctx.fillRect(2, 2, width - 4, height - 4);
-        const healthPercent = this.currentHP / this.maxHP;
+        const healthPercent = this.currentHP / this.maxHp;
         if (healthPercent > 0) {
             ctx.fillStyle = '#00FF00';
             const healthWidth = (width - 4) * healthPercent;

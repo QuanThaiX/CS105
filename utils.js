@@ -6,9 +6,9 @@ function toRad(deg) {
 }
 
 const HITBOX_SCALE = {
-    TANK: 0.8,
-    ROCK: 0.5,
-    TREE: 1,
+    TANK: { x: 0.7, y: 1.0, z: 0.7 },
+    ROCK: { x: 0.6, y: 1.0, z: 0.6 },
+    TREE: { x: 0.1, y: 1.0, z: 0.1 },
 };
 
 function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
@@ -26,9 +26,20 @@ function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
                 } else if (tankType == TANKTYPE.V003) {
                     model.position.set(position.x, position.y - 1, position.z);
                     model.scale.set(3.0, 3.0, 3.0);
-                }
-                else {
-                    model.position.copy(this.position);
+                } else if (tankType == TANKTYPE.V002) {
+                    model.position.set(position.x, position.y - 1, position.z);
+                    model.scale.set(2.0, 2.0, 2.0);
+                } else if (tankType == TANKTYPE.V004) {
+                    model.position.set(position.x, position.y - 1, position.z);
+                    model.scale.set(2.4, 2.4, 2.4);
+                } else if (tankType == TANKTYPE.V005) {
+                    model.position.set(position.x, position.y - 1, position.z);
+                    model.scale.set(1.4, 1.4, 1.4);
+                } else if (tankType == TANKTYPE.V006) {
+                    model.position.set(position.x, position.y - 1, position.z);
+                    model.scale.set(1.2, 1.2, 1.2);
+                } else {
+                    model.position.copy(position);
                     model.scale.set(3.5, 3.5, 3.5);
                 }
 
@@ -61,13 +72,22 @@ const FACTION = Object.freeze({
 
 const TANK_STATS = Object.freeze({
     V001: {
-        hp: 100,
+        hp: 1000,
         maxHp: 500,
         moveSpeed: 0.1,
         rotateSpeed: 0.03,
-        shootCooldown: 2000,
+        shootCooldown: 1500,
         damage: 100,
         defense: 70,
+    },
+    V002: {
+        hp: 800,
+        maxHp: 800,
+        moveSpeed: 0.07,
+        rotateSpeed: 0.02,
+        shootCooldown: 2200,
+        damage: 150,
+        defense: 90,
     },
     V003: {
         hp: 600,
@@ -77,6 +97,33 @@ const TANK_STATS = Object.freeze({
         shootCooldown: 2500,
         damage: 120,
         defense: 85,
+    },
+    V004: {
+        hp: 700,
+        maxHp: 700,
+        moveSpeed: 0.12,
+        rotateSpeed: 0.035,
+        shootCooldown: 1800,
+        damage: 90,
+        defense: 60,
+    },
+    V005: {
+        hp: 500,
+        maxHp: 500,
+        moveSpeed: 0.14,
+        rotateSpeed: 0.04,
+        shootCooldown: 1500,
+        damage: 80,
+        defense: 50,
+    },
+    V006: {
+        hp: 1200,
+        maxHp: 1200,
+        moveSpeed: 0.06,
+        rotateSpeed: 0.015,
+        shootCooldown: 3000,
+        damage: 200,
+        defense: 100,
     }
 });
 
@@ -86,10 +133,25 @@ const TANKTYPE = Object.freeze({
         assetPathGLTF: "./assets/tankv001/tankv001.gltf",
         assetPathFBX: "./assets/tankv001/cartoon_tank.fbx",
     },
-
+    V002: {
+        name: "V002",
+        assetPathGLTF: "./assets/tankv002/tankv002.gltf",
+    },
     V003: {
         name: "V003",
         assetPathGLTF: "./assets/tankv003/tankv003.gltf",
+    },
+    V004: {
+        name: "V004",
+        assetPathGLTF: "./assets/tankv004/tankv004.gltf",
+    },
+    V005: {
+        name: "V005",
+        assetPathGLTF: "./assets/tankv005/tankv005.gltf",
+    },
+    V006: {
+        name: "V006",
+        assetPathGLTF: "./assets/tankv006/tankv006.gltf",
     }
 });
 

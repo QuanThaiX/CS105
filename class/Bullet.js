@@ -7,28 +7,31 @@ import { Game } from './Game.js';
 import { GameObject } from "./GameObject.js";
 import { EventManager} from "./EventManager.js";
 import { Rock } from "./Rock.js";
+import { Tree } from "./Tree.js";
 
 class Bullet extends GameObject{
   static count = 0;
   prevPosition;
   velocity;
   lifeTime = 5000;
-  creaationTime;
+  creationTime;
   hasCollided = false;
   damage = 100;
+  boundHandleCollision;
 
   constructor(faction, position) {
     super("Bullet" + Bullet.count, faction, position, true);
     
     this.prevPosition = this.position.clone();
     this.velocity = new THREE.Vector3(0, 0, 0);
-    this.creaationTime = Date.now();
+    this.creationTime = Date.now();
 
     this.setModel(this.createMesh());
 
     Bullet.count++;
     CollisionManager.instance.add(this);
-    EventManager.instance.subscribe(EVENT.COLLISION, this.handleCollision.bind(this));
+    this.boundHandleCollision = this.handleCollision.bind(this);
+    EventManager.instance.subscribe(EVENT.COLLISION, this.boundHandleCollision);
   }
 
   setVelocity(velocityVector) {
@@ -62,7 +65,7 @@ class Bullet extends GameObject{
       this.model.position.add(this.velocity);
       this.position.copy(this.model.position);
 
-      if (Date.now() - this.creaationTime > this.lifeTime){
+      if (Date.now() - this.creationTime > this.lifeTime){
         EventManager.instance.notify(EVENT.BULLET_EXPIRED, {bullet: this});
       }
     }
@@ -72,17 +75,11 @@ class Bullet extends GameObject{
     if (objA === this || objB === this) {
       const otherObject = objA === this ? objB : objA;
       
-      if ((otherObject instanceof Tank && this.faction !== otherObject.faction) || otherObject instanceof Rock) {
+      if ((otherObject instanceof Tank && this.faction !== otherObject.faction) || otherObject instanceof Rock || otherObject instanceof Tree) {
         console.log(`Log_${EVENT.COLLISION}: ${this.id} -- ${otherObject.id}`);
         this.hasCollided = true;
         this.dispose();
         this.createImpactEffect();
-      }
-
-      if (otherObject instanceof Bullet){
-          this.hasCollided = true;
-          this.dispose();
-          this.createImpactEffect();
       }
     }
   }
@@ -127,6 +124,19 @@ class Bullet extends GameObject{
     super.dispose();
     EventManager.instance.unsubscribe(EVENT.COLLISION, this.handleCollision.bind(this));
     CollisionManager.instance.remove(this);
+    if (this.model && this.model.parent) {
+      this.model.parent.remove(this.model);
+    }
+    if (this.model) {
+      if (this.model.geometry) this.model.geometry.dispose();
+      if (this.model.material) {
+          if (Array.isArray(this.model.material)) {
+              this.model.material.forEach(m => m.dispose());
+          } else {
+              this.model.material.dispose();
+          }
+      }
+    }
   }
 }
 
