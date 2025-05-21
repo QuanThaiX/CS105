@@ -43,7 +43,7 @@ class Bot {
             lastStateChangeTime: 0,  // Thời gian thay đổi trạng thái gần nhất
             minStateTime: 60,        // Thời gian tối thiểu để giữ một trạng thái (frames)
             frameCount: 0,           // Đếm frame
-            retreatThreshold: 300,    // HP dưới mức này sẽ rút lui
+            retreatThreshold: 0,    // HP dưới mức này sẽ rút lui
             retreatTime: 180,        // Thời gian rút lui trước khi đánh giá lại (frames)
             retreatStartTime: 0,     // Thời điểm bắt đầu rút lui
 

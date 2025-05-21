@@ -9,6 +9,7 @@ const HITBOX_SCALE = {
     TANK: { x: 0.7, y: 1.0, z: 0.7 },
     ROCK: { x: 0.6, y: 1.0, z: 0.6 },
     TREE: { x: 0.1, y: 1.0, z: 0.1 },
+    BARREL: { x: 1.0, y: 1.0, z: 1.0 },
 };
 
 function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {

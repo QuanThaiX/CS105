@@ -22,7 +22,7 @@ class Effect {
     
     handleTankDestroyed(data) {
         const { tank } = data;
-        this.createExplosion(tank.position, 10, { particleCount: 10000 });
+        this.createExplosion(tank.position, 0.7, { particleCount: 1000 });
     }
     
     handleObjectShoot(data) {

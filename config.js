@@ -12,7 +12,7 @@ export const GAMECONFIG = Object.freeze({
         TREE_TYPES: ['tree01'],
         TREE_SCALE_MIN: 0.9,
         TREE_SCALE_MAX: 1.6,
-        MIN_SPAWN_RADIUS: 10, // Scenery can spawn closer to the center
+        MIN_SPAWN_RADIUS: 50, // Scenery can spawn closer to the center
         MAX_SPAWN_RADIUS_FACTOR: 0.95, // Scenery will spawn up to this factor of (WORLD_BOUNDARY / 2)
     },
     ENEMY_CONFIG: {

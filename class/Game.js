@@ -13,6 +13,7 @@ import { Rock } from './Rock.js';
 import { Effect } from './EffectManager.js';
 import { Tree } from './Tree.js';
 import { SoundManager } from './SoundManager.js';
+import { Barrel } from './Barrel.js';
 
 function getRandomInRange(min, max) {
   return Math.random() * (max - min) + min;

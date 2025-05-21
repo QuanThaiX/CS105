@@ -34,10 +34,10 @@ class SoundManager {
         });
 
         EventManager.instance.subscribe(EVENT.OBJECT_SHOOT, (data) => {
-            // if (data.tank && data.tank.faction === FACTION.PLAYER) {
-            //     this.handleTankShot();
-            // }
-            this.handleTankShot();
+            if (data.tank && data.tank.faction === FACTION.PLAYER) {
+                this.handleTankShot();
+            }
+            //this.handleTankShot();
         });
     }
 

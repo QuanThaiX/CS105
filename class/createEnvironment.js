@@ -36,10 +36,6 @@ function createCamera(scene, targetPosition, renderer) {
     return { camera, controls };
 }
 
-function updateControlTarget(camera, targetPosition) {
-
-}
-
 function createLights(scene) {
     // Ánh sáng môi trường
     const ambientLight = new THREE.AmbientLight(0xffffff, 0);
@@ -81,15 +77,15 @@ function createSky(scene) {
     scene.add(sky);
 
     const skyUniforms = sky.material.uniforms;
-    skyUniforms['turbidity'].value = 10;  // Độ đục của khí quyển
+    skyUniforms['turbidity'].value = 100;  // Độ đục của khí quyển
     skyUniforms['rayleigh'].value = 2;    // Tán xạ ánh sáng
     skyUniforms['mieCoefficient'].value = 0.005;
     skyUniforms['mieDirectionalG'].value = 0.8;
 
     // Mặt trời
     const sun = new THREE.Vector3();
-    const phi = THREE.MathUtils.degToRad(90 - 20);
-    const theta = THREE.MathUtils.degToRad(90);   
+    const phi = THREE.MathUtils.degToRad(120);
+    const theta = THREE.MathUtils.degToRad(60);   
     sun.setFromSphericalCoords(1, phi, theta);
     skyUniforms['sunPosition'].value.copy(sun);
 
