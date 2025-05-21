@@ -1,7 +1,7 @@
 import { TANKTYPE } from './utils.js';
 
 export const GAMECONFIG = Object.freeze({
-    DEBUG: true,
+    DEBUG: false,
     WORLD_BOUNDARY: 500,
     SCENERY: {
         NUM_ROCKS: 20,

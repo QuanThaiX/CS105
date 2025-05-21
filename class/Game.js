@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createGround, createSky, createCamera, createDebugHelpers, createLights, createRenderer, createScene, updateShadowArea } from './createEnvironment.js';
+import { startLoadingScreen, hideLoadingScreen } from '../UI.js';
 import { GAMECONFIG } from '../config.js';
 import { FACTION, EVENT, TANKTYPE } from '../utils.js';
 import { Tank } from './Tank.js';
@@ -75,25 +76,25 @@ function generateEnemyDefinitions(count, types, pointValue, hp, maxSpawnRadius, 
 
 
 const DEFAULT_SCENERY_CONFIG = {
-    NUM_ROCKS: 15,
-    ROCK_TYPES: ['rock09', 'rock13'],
-    ROCK_SCALE_MIN: 2.5,
-    ROCK_SCALE_MAX: 7.5,
-    NUM_TREES: 25,
-    TREE_TYPES: ['tree01'],
-    TREE_SCALE_MIN: 0.8,
-    TREE_SCALE_MAX: 1.5,
-    MIN_SPAWN_RADIUS: 80,
-    MAX_SPAWN_RADIUS_FACTOR: 0.9
+  NUM_ROCKS: 15,
+  ROCK_TYPES: ['rock09', 'rock13'],
+  ROCK_SCALE_MIN: 2.5,
+  ROCK_SCALE_MAX: 7.5,
+  NUM_TREES: 25,
+  TREE_TYPES: ['tree01'],
+  TREE_SCALE_MIN: 0.8,
+  TREE_SCALE_MAX: 1.5,
+  MIN_SPAWN_RADIUS: 80,
+  MAX_SPAWN_RADIUS_FACTOR: 0.9
 };
 
 const DEFAULT_ENEMY_CONFIG = {
-    NUM_ENEMIES: 6,
-    ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006],
-    ENEMY_POINT_VALUE: 100, // Can be a number or a function(type) => number
-    ENEMY_HP: 100,          // Can be a number or a function(type) => number
-    MIN_SPAWN_RADIUS: 30,   // Min distance from player start (0,0,0)
-    MAX_SPAWN_RADIUS_FACTOR: 0.8 // Relative to world boundary
+  NUM_ENEMIES: 6,
+  ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006],
+  ENEMY_POINT_VALUE: 100, // Can be a number or a function(type) => number
+  ENEMY_HP: 100,          // Can be a number or a function(type) => number
+  MIN_SPAWN_RADIUS: 30,   // Min distance from player start (0,0,0)
+  MAX_SPAWN_RADIUS_FACTOR: 0.8 // Relative to world boundary
 };
 
 const HIGH_SCORE_STORAGE_KEY = 'tankGame_highScore';
@@ -101,9 +102,9 @@ const HIGH_SCORE_STORAGE_KEY = 'tankGame_highScore';
 // Local GAMECONFIG definition for internal use, will be merged with exported one.
 // This ensures defaults are available if the exported one isn't fully defined yet.
 const LOCAL_GAMECONFIG_DEFAULTS = {
-    WORLD_BOUNDARY: 500,
-    SCENERY: DEFAULT_SCENERY_CONFIG,
-    ENEMY_CONFIG: DEFAULT_ENEMY_CONFIG
+  WORLD_BOUNDARY: 500,
+  SCENERY: DEFAULT_SCENERY_CONFIG,
+  ENEMY_CONFIG: DEFAULT_ENEMY_CONFIG
 };
 
 
@@ -138,16 +139,16 @@ class Game {
 
     // Use GAMECONFIG from the end of the file, falling back to local defaults
     this.gameConfig = {
-        ...LOCAL_GAMECONFIG_DEFAULTS,
-        ...(typeof GAMECONFIG !== 'undefined' ? GAMECONFIG : {}), // GAMECONFIG is exported later
-        SCENERY: {
-            ...DEFAULT_SCENERY_CONFIG,
-            ...(typeof GAMECONFIG !== 'undefined' && GAMECONFIG.SCENERY ? GAMECONFIG.SCENERY : {})
-        },
-        ENEMY_CONFIG: {
-            ...DEFAULT_ENEMY_CONFIG,
-            ...(typeof GAMECONFIG !== 'undefined' && GAMECONFIG.ENEMY_CONFIG ? GAMECONFIG.ENEMY_CONFIG : {})
-        }
+      ...LOCAL_GAMECONFIG_DEFAULTS,
+      ...(typeof GAMECONFIG !== 'undefined' ? GAMECONFIG : {}), // GAMECONFIG is exported later
+      SCENERY: {
+        ...DEFAULT_SCENERY_CONFIG,
+        ...(typeof GAMECONFIG !== 'undefined' && GAMECONFIG.SCENERY ? GAMECONFIG.SCENERY : {})
+      },
+      ENEMY_CONFIG: {
+        ...DEFAULT_ENEMY_CONFIG,
+        ...(typeof GAMECONFIG !== 'undefined' && GAMECONFIG.ENEMY_CONFIG ? GAMECONFIG.ENEMY_CONFIG : {})
+      }
     };
     Game.debug = this.gameConfig.DEBUG !== undefined ? this.gameConfig.DEBUG : Game.debug;
 
@@ -181,7 +182,7 @@ class Game {
     this.renderer = createRenderer();
     this.lights = createLights(this.scene);
     this.sky = createSky(this.scene);
-    this.ground = createGround(this.scene, { width: this.gameConfig.WORLD_BOUNDARY, height: this.gameConfig.WORLD_BOUNDARY, repeatX: this.gameConfig.WORLD_BOUNDARY/20, repeatY: this.gameConfig.WORLD_BOUNDARY/20 });
+    this.ground = createGround(this.scene, { width: this.gameConfig.WORLD_BOUNDARY, height: this.gameConfig.WORLD_BOUNDARY, repeatX: this.gameConfig.WORLD_BOUNDARY / 20, repeatY: this.gameConfig.WORLD_BOUNDARY / 20 });
 
 
     if (Game.debug) {
@@ -343,9 +344,9 @@ class Game {
 
   onWindowResize() {
     if (this.camera && this.renderer) {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
-        this.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
     }
   }
 
@@ -476,19 +477,25 @@ class Game {
   start() {
     if (!this.isRunning) {
       this.isRunning = true;
-      EventManager.instance.notify(EVENT.GAME_STARTED, {
-        playerTank: this.playerTank,
-        score: this.score,
-        highScore: this.highScore
-      });
 
-      if (this.playerTank && this.camera) {
-        const playerPos = this.playerTank.position;
-        this.camera.position.set(playerPos.x, playerPos.y + 10, playerPos.z + 15);
-        this.controls.target.set(playerPos.x, playerPos.y + 1, playerPos.z);
-        this.controls.update();
-      }
-      this._animate();
+      startLoadingScreen();
+      setTimeout(() => {
+        EventManager.instance.notify(EVENT.GAME_STARTED, {
+          playerTank: this.playerTank,
+          score: this.score,
+          highScore: this.highScore
+        });
+
+        if (this.playerTank && this.camera) {
+          const playerPos = this.playerTank.position;
+          this.camera.position.set(playerPos.x, playerPos.y + 10, playerPos.z + 15);
+          this.controls.target.set(playerPos.x, playerPos.y + 1, playerPos.z);
+          this.controls.update();
+        }
+        
+        this._animate();
+        hideLoadingScreen();
+      }, 2500);
     }
   }
 
@@ -559,7 +566,7 @@ class Game {
     if (this.renderer) {
       this.renderer.dispose();
       if (this.renderer.domElement && this.renderer.domElement.parentNode) {
-          this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
+        this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
       }
       this.renderer = null;
     }
@@ -580,28 +587,28 @@ class Game {
 
     this.camera = null;
     if (this.controls && typeof this.controls.dispose === 'function') {
-        this.controls.dispose();
+      this.controls.dispose();
     }
     this.controls = null;
-    this.lights = null; 
-    this.sky = null; 
-    this.ground = null; 
+    this.lights = null;
+    this.sky = null;
+    this.ground = null;
     this.debugHelpers = null;
 
-    if(this.bot) {
-        if (typeof this.bot.dispose === 'function') this.bot.dispose();
-        this.bot = null;
+    if (this.bot) {
+      if (typeof this.bot.dispose === 'function') this.bot.dispose();
+      this.bot = null;
     }
-    if(this.collisionManager) {
-        if (typeof this.collisionManager.dispose === 'function') this.collisionManager.dispose();
-        this.collisionManager = null;
+    if (this.collisionManager) {
+      if (typeof this.collisionManager.dispose === 'function') this.collisionManager.dispose();
+      this.collisionManager = null;
     }
     // if(this.eventManager) {
     //     this.eventManager.clearAllEvents();
     // }
-    if(this.effectManager && typeof this.effectManager.dispose === 'function') {
-        this.effectManager.dispose();
-        this.effectManager = null;
+    if (this.effectManager && typeof this.effectManager.dispose === 'function') {
+      this.effectManager.dispose();
+      this.effectManager = null;
     }
 
     Game.instance = null;

@@ -250,7 +250,7 @@ function disposeCurrentGame() {
 }
 
 function startNewGame(tankTypeToUse) {
-    document.getElementById('loading-message').style.display = 'block';
+    // document.getElementById('loading-message').style.display = 'block';
     document.getElementById('menu-container').style.display = 'none';
     document.getElementById('game-container').style.display = 'none';
     document.getElementById('game-over-screen').style.display = 'none';
@@ -267,7 +267,7 @@ function startNewGame(tankTypeToUse) {
         setupGameRendererDOM(game);
 
         document.getElementById('game-container').style.display = 'block';
-        document.getElementById('loading-message').style.display = 'none';
+        // document.getElementById('loading-message').style.display = 'none';
         document.getElementById('continue-button').disabled = !(game && game.canResume());
 
         startHUDUpdates();
@@ -286,7 +286,7 @@ function returnToMainMenu(preserveGameInstanceForPause = false) {
     document.getElementById('game-over-screen').style.display = 'none';
     document.getElementById('win-screen').style.display = 'none';
     document.getElementById('game-container').style.display = 'none';
-    document.getElementById('loading-message').style.display = 'none';
+    // document.getElementById('loading-message').style.display = 'none';
     document.getElementById('menu-container').style.display = 'flex';
 
     document.getElementById('continue-button').disabled = !(game && game.canResume());
@@ -303,7 +303,7 @@ document.getElementById('continue-button').addEventListener('click', () => {
     if (game && game.canResume()) {
         document.getElementById('menu-container').style.display = 'none';
         document.getElementById('game-container').style.display = 'block';
-        document.getElementById('loading-message').style.display = 'none';
+        // document.getElementById('loading-message').style.display = 'none';
 
         setupGameRendererDOM(game); // Ensure renderer is in place
 
@@ -407,6 +407,36 @@ function setupEndGameScreenEvents() {
     document.getElementById('win-menu-button').addEventListener('click', () => {
         returnToMainMenu(false); // Do not preserve game instance
     });
+}
+
+export function startLoadingScreen() {
+    if (!document.getElementById('loading-screen')) {
+        const loadingHTML = `
+            <div id="loading-screen">
+                <div class="loader">
+                    <div class="cube">
+                        <div class="face"></div>
+                        <div class="face"></div>
+                        <div class="face"></div>
+                        <div class="face"></div>
+                        <div class="face"></div>
+                        <div class="face"></div>
+                    </div>
+                </div>
+                // <div class="loaderBar"></div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', loadingHTML);
+
+        // document.body.style.overflow = 'hidden'; // Thêm dòng này nếu muốn ngăn cuộn
+    }
+}
+
+export function hideLoadingScreen() {
+    const loadingScreen = document.getElementById('loading-screen');
+    if (loadingScreen) {
+        loadingScreen.remove();
+    }
 }
 
 // Initialization
