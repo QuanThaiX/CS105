@@ -12,69 +12,10 @@ import { Bot } from './Bot.js';
 import { Rock } from './Rock.js';
 import { Effect } from './EffectManager.js';
 import { Tree } from './Tree.js';
-import { SoundManager } from './SoundManager.js';
 import { Barrel } from './Barrel.js';
-
-function getRandomInRange(min, max) {
-  return Math.random() * (max - min) + min;
-}
-
-function getRandomElement(arr) {
-  if (!arr || arr.length === 0) return undefined;
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function generateScatteredObjects(count, types, scaleMin, scaleMax, maxSpawnRadius, minSpawnRadius = 0) {
-  const objects = [];
-  if (!types || types.length === 0) {
-    console.warn("generateScatteredObjects: No types provided, cannot generate objects.");
-    return objects;
-  }
-
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const effectiveMinRadius = Math.min(minSpawnRadius, maxSpawnRadius);
-    const radius = getRandomInRange(effectiveMinRadius, maxSpawnRadius);
-
-    const x = radius * Math.cos(angle);
-    const z = radius * Math.sin(angle);
-
-    objects.push({
-      position: { x, y: 0, z },
-      scale: getRandomInRange(scaleMin, scaleMax),
-      rotation: Math.random() * Math.PI * 2,
-      type: getRandomElement(types),
-    });
-  }
-  return objects;
-}
-
-function generateEnemyDefinitions(count, types, pointValue, hp, maxSpawnRadius, minSpawnRadius = 0) {
-  const definitions = [];
-  if (!types || types.length === 0) {
-    console.warn("generateEnemyDefinitions: No enemy types provided, cannot generate enemies.");
-    return definitions;
-  }
-
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const effectiveMinRadius = Math.min(minSpawnRadius, maxSpawnRadius);
-    const radius = getRandomInRange(effectiveMinRadius, maxSpawnRadius);
-
-    const x = radius * Math.cos(angle);
-    const z = radius * Math.sin(angle);
-
-    definitions.push({
-      id: `enemy-${i + 1}`, // Unique ID for each enemy
-      position: { x, y: 1, z }, // y=1 for ground level
-      pointValue: typeof pointValue === 'function' ? pointValue(getRandomElement(types)) : pointValue,
-      type: getRandomElement(types),
-      hp: typeof hp === 'function' ? hp(getRandomElement(types)) : hp,
-    });
-  }
-  return definitions;
-}
-
+import { SoundManager } from './SoundManager.js';
+import { Generator } from './Generator.js';
+import { GameStateManager } from './GameStateManager.js';
 
 const DEFAULT_SCENERY_CONFIG = {
   NUM_ROCKS: 15,
@@ -85,6 +26,10 @@ const DEFAULT_SCENERY_CONFIG = {
   TREE_TYPES: ['tree01'],
   TREE_SCALE_MIN: 0.8,
   TREE_SCALE_MAX: 1.5,
+  NUM_BARRELS: 8,
+  BARREL_TYPES: ['barrel'],
+  BARREL_SCALE_MIN: 0.8,
+  BARREL_SCALE_MAX: 1.5,
   MIN_SPAWN_RADIUS: 80,
   MAX_SPAWN_RADIUS_FACTOR: 0.9
 };
@@ -119,12 +64,15 @@ class Game {
   renderer;
   controls;
   soundManager;
-  // lastMoveTime = 0;
-  // moveCheckInterval = null;
+  generator;
+  gameStateManager;
 
   score = 0;
   highScore = 0;
   enemies = [];
+  rocks = [];
+  trees = [];
+  barrels = [];
 
   boundHandlePlayerDie;
   boundHandleGameOver;
@@ -174,10 +122,16 @@ class Game {
     this.effectManager = new Effect();
     this.soundManager = new SoundManager();
     this.bot = new Bot();
+    this.generator = new Generator();
+    this.gameStateManager = new GameStateManager(this);
+    
     if (ProjectilesManager.instance) {
       ProjectilesManager.instance.clear();
     }
     this.enemies = [];
+    this.rocks = [];
+    this.trees = [];
+    this.barrels = [];
 
     this.scene = createScene();
     this.renderer = createRenderer();
@@ -195,80 +149,98 @@ class Game {
   }
 
   loadLevel() {
+    // Create player tank
     this.playerTank = new Tank(0, FACTION.PLAYER, { x: 0, y: 1, z: 0 }, true, this.selectedTankType);
     this.player = new PlayerControl(this.playerTank);
     this.collisionManager.add(this.playerTank);
 
-    const worldBoundaryHalf = (this.gameConfig.WORLD_BOUNDARY / 2) || (this.ground.geometry.parameters.width / 2) || 250;
+    // Generate level using async Generator
+    this.loadLevelAsync();
 
-    // Load Enemies
-    const activeEnemyConfig = this.gameConfig.ENEMY_CONFIG;
-    const maxEnemySpawnRadius = worldBoundaryHalf * activeEnemyConfig.MAX_SPAWN_RADIUS_FACTOR;
-    const minEnemySpawnRadius = activeEnemyConfig.MIN_SPAWN_RADIUS;
-
-    const enemyDefinitions = generateEnemyDefinitions(
-      activeEnemyConfig.NUM_ENEMIES,
-      activeEnemyConfig.ENEMY_TYPES,
-      activeEnemyConfig.ENEMY_POINT_VALUE,
-      activeEnemyConfig.ENEMY_HP,
-      maxEnemySpawnRadius,
-      minEnemySpawnRadius
-    );
-
-    this.enemies = enemyDefinitions.map(def => {
-      const enemyTank = new Tank(def.id, FACTION.ENEMY, def.position, true, def.type);
-      enemyTank.setTankHP(def.hp);
-      enemyTank.pointValue = def.pointValue;
-      this.bot.addTank(enemyTank);
-      this.collisionManager.add(enemyTank);
-      return enemyTank;
-    });
-
-    // Load Scenery
-    const activeSceneryConfig = this.gameConfig.SCENERY;
-    const maxScenerySpawnRadius = worldBoundaryHalf * activeSceneryConfig.MAX_SPAWN_RADIUS_FACTOR;
-    const minScenerySpawnRadius = activeSceneryConfig.MIN_SPAWN_RADIUS;
-
-    const rockProperties = generateScatteredObjects(
-      activeSceneryConfig.NUM_ROCKS,
-      activeSceneryConfig.ROCK_TYPES,
-      activeSceneryConfig.ROCK_SCALE_MIN,
-      activeSceneryConfig.ROCK_SCALE_MAX,
-      maxScenerySpawnRadius,
-      minScenerySpawnRadius
-    );
-    this.rocks = Rock.createRocksFromList(rockProperties);
-    this.rocks.forEach(rock => this.collisionManager.add(rock));
-
-    const treeProperties = generateScatteredObjects(
-      activeSceneryConfig.NUM_TREES,
-      activeSceneryConfig.TREE_TYPES,
-      activeSceneryConfig.TREE_SCALE_MIN,
-      activeSceneryConfig.TREE_SCALE_MAX,
-      maxScenerySpawnRadius,
-      minScenerySpawnRadius
-    );
-    this.trees = Tree.createTreesFromList(treeProperties);
-    this.trees.forEach(tree => this.collisionManager.add(tree));
-
+    // Setup camera
     const { camera, controls } = createCamera(this.scene, this.playerTank.position, this.renderer);
     this.camera = camera;
     this.controls = controls;
 
-    EventManager.instance.notify(EVENT.LEVEL_LOADED, {
-      playerTank: this.playerTank,
-      enemies: this.enemies,
-      rocks: this.rocks,
-      trees: this.trees
+    // Notify with proper event data structure
+    EventManager.instance.notify(EVENT.TANK_SPAWNED, {
+        tank: this.playerTank,
+        position: this.playerTank.position,
+        tankType: this.selectedTankType
     });
+  }
+
+  async loadLevelAsync() {
+    try {
+      console.log('🎯 Starting async level generation...');
+      
+      const levelData = await this.generator.generateLevel({
+        worldBoundary: this.gameConfig.WORLD_BOUNDARY,
+        sceneryConfig: this.gameConfig.SCENERY,
+        enemyConfig: this.gameConfig.ENEMY_CONFIG
+      });
+
+      // Create enemies from definitions (async)
+      this.enemies = await this.generator.createEnemyTanks(
+        levelData.enemyDefinitions, 
+        this.bot, 
+        this.collisionManager
+      );
+
+      // Create scenery objects from definitions (async)
+      this.rocks = await this.generator.createRocks(levelData.rockDefinitions, this.collisionManager);
+      this.trees = await this.generator.createTrees(levelData.treeDefinitions, this.collisionManager);
+      this.barrels = await this.generator.createBarrels(levelData.barrelDefinitions, this.collisionManager);
+
+      console.log('✅ Async level generation completed!');
+
+      // Notify with enhanced event data
+      EventManager.instance.notify(EVENT.LEVEL_LOADED, {
+        playerTank: this.playerTank,
+        enemies: this.enemies,
+        rocks: this.rocks,
+        trees: this.trees,
+        barrels: this.barrels,
+        totalObjects: this.enemies.length + this.rocks.length + this.trees.length + this.barrels.length,
+        loadTime: performance.now()
+      });
+
+    } catch (error) {
+      console.error('❌ Error during async level loading:', error);
+      
+      // Notify system error
+      EventManager.instance.notify(EVENT.SYSTEM_ERROR, {
+        error: error,
+        context: 'loadLevelAsync',
+        severity: 'high',
+        timestamp: Date.now()
+      });
+    }
   }
 
   registerEventListeners() {
     window.addEventListener('resize', this.boundOnWindowResize, false);
-    EventManager.instance.subscribe(EVENT.PLAYER_DIE, this.boundHandlePlayerDie);
-    EventManager.instance.subscribe(EVENT.GAME_OVER, this.boundHandleGameOver);
-    EventManager.instance.subscribe(EVENT.GAME_WIN, this.boundHandleGameWin);
-    EventManager.instance.subscribe(EVENT.TANK_DESTROYED, this.boundHandleTankDestroyed);
+    
+    // Subscribe with async support and proper priority
+    EventManager.instance.subscribe(EVENT.PLAYER_DIE, this.boundHandlePlayerDie, {
+      priority: 10,
+      async: true
+    });
+    
+    EventManager.instance.subscribe(EVENT.GAME_OVER, this.boundHandleGameOver, {
+      priority: 10,
+      async: true
+    });
+    
+    EventManager.instance.subscribe(EVENT.GAME_WIN, this.boundHandleGameWin, {
+      priority: 10,
+      async: true
+    });
+    
+    EventManager.instance.subscribe(EVENT.TANK_DESTROYED, this.boundHandleTankDestroyed, {
+      priority: 5,
+      async: false
+    });
   }
 
   unregisterEventListeners() {
@@ -279,7 +251,7 @@ class Game {
     EventManager.instance.unsubscribe(EVENT.TANK_DESTROYED, this.boundHandleTankDestroyed);
   }
 
-  handleGameWin(data) {
+  async handleGameWin(data) {
     if (this.isRunning) {
       const winScreen = document.getElementById('win-screen');
       if (winScreen) {
@@ -287,11 +259,20 @@ class Game {
         document.getElementById('win-highscore').textContent = this.highScore;
         winScreen.style.display = 'flex';
       }
+      
+      // Notify UI update with proper data structure
+      EventManager.instance.notify(EVENT.UI_UPDATE_HUD, {
+        playerHP: 0,
+        score: this.score,
+        highScore: this.highScore,
+        ammo: 0
+      });
+      
       this.stop();
     }
   }
 
-  handleGameOver(data) {
+  async handleGameOver(data) {
     if (this.isRunning) {
       const gameOverScreen = document.getElementById('game-over-screen');
       if (gameOverScreen) {
@@ -299,6 +280,15 @@ class Game {
         document.getElementById('gameover-highscore').textContent = this.highScore;
         gameOverScreen.style.display = 'flex';
       }
+      
+      // Notify UI update
+      EventManager.instance.notify(EVENT.UI_UPDATE_HUD, {
+        playerHP: 0,
+        score: this.score,
+        highScore: this.highScore,
+        ammo: 0
+      });
+      
       this.stop();
     }
   }
@@ -310,19 +300,28 @@ class Game {
   handleTankDestroyed(data) {
     const { tank, pointValue } = data;
 
-    if (tank && tank.faction === FACTION.ENEMY && pointValue !== undefined) { // Check pointValue defined
+    if (tank && tank.faction === FACTION.ENEMY && pointValue !== undefined) {
       this.addScore(pointValue);
       const index = this.enemies.indexOf(tank);
       if (index !== -1) {
         this.enemies.splice(index, 1);
       }
 
+      // Enhanced event notification
+      EventManager.instance.notify(EVENT.SCORE_CHANGED, {
+        score: this.score,
+        highScore: this.highScore,
+        pointsAdded: pointValue,
+        reason: `Enemy tank ${tank.id} destroyed`
+      });
+
       if (this.isWin()) {
         setTimeout(() => {
           EventManager.instance.notify(EVENT.GAME_WIN, {
             reason: "All enemies destroyed",
             score: this.score,
-            highScore: this.highScore
+            highScore: this.highScore,
+            timeToComplete: performance.now()
           });
         }, 1000);
       }
@@ -333,12 +332,16 @@ class Game {
     return this.isRunning && this.enemies.length === 0;
   }
 
-  handlePlayerDie(data) {
+  async handlePlayerDie(data) {
     setTimeout(() => {
       EventManager.instance.notify(EVENT.GAME_OVER, {
         reason: "Player died",
         score: this.score,
-        highScore: this.highScore
+        highScore: this.highScore,
+        finalStats: {
+          enemiesDestroyed: data.enemiesKilled || 0,
+          survivalTime: data.survivalTime || 0
+        }
       });
     }, 1000);
   }
@@ -363,6 +366,14 @@ class Game {
     return !this.isRunning && this.playerTank && !this.playerTank.disposed;
   }
 
+  /**
+   * Get game state manager for Bot AI access
+   * @returns {GameStateManager} Game state manager instance
+   */
+  getGameStateManager() {
+    return this.gameStateManager;
+  }
+
   updateLogic() {
     const prevPlayerPos = this.playerTank.position.clone();
 
@@ -385,6 +396,12 @@ class Game {
     if (this.rocks) {
       this.rocks.forEach(rock => {
         if (rock && !rock.disposed && rock.update) rock.update();
+      });
+    }
+
+    if (this.barrels) {
+      this.barrels.forEach(barrel => {
+        if (barrel && !barrel.disposed && barrel.update) barrel.update();
       });
     }
 
@@ -421,6 +438,13 @@ class Game {
         if (tree && !tree.disposed) tree.dispose();
       });
       this.trees = [];
+    }
+
+    if (this.barrels) {
+      this.barrels.forEach(barrel => {
+        if (barrel && !barrel.disposed) barrel.dispose();
+      });
+      this.barrels = [];
     }
 
     if (this.enemies) {
@@ -464,14 +488,28 @@ class Game {
   }
 
   addScore(points) {
+    const previousScore = this.score;
     this.score += points;
+    
     if (this.score > this.highScore) {
+      const previousHighScore = this.highScore;
       this.highScore = this.score;
       this.saveHighScore();
+      
+      // Notify high score achievement
+      EventManager.instance.notify(EVENT.HIGH_SCORE_ACHIEVED, {
+        newHighScore: this.highScore,
+        previousHighScore: previousHighScore,
+        achievement: 'New High Score!'
+      });
     }
+    
+    // Enhanced score change event
     EventManager.instance.notify(EVENT.SCORE_CHANGED, {
       score: this.score,
-      highScore: this.highScore
+      highScore: this.highScore,
+      pointsAdded: points,
+      reason: 'Points added'
     });
   }
 
@@ -481,10 +519,13 @@ class Game {
 
       startLoadingScreen();
       setTimeout(() => {
+        // Enhanced game started event
         EventManager.instance.notify(EVENT.GAME_STARTED, {
           playerTank: this.playerTank,
           score: this.score,
-          highScore: this.highScore
+          highScore: this.highScore,
+          startTime: Date.now(),
+          levelConfig: this.gameConfig
         });
 
         if (this.playerTank && this.camera) {
@@ -506,21 +547,28 @@ class Game {
 
   pause() {
     if (this.isRunning) {
+      const pauseTime = Date.now();
       this.isRunning = false;
+      
       EventManager.instance.notify(EVENT.GAME_PAUSED, {
         score: this.score,
-        highScore: this.highScore
+        highScore: this.highScore,
+        timestamp: pauseTime
       });
     }
   }
 
   resume() {
     if (!this.isRunning && this.canResume()) {
+      const resumeTime = Date.now();
       this.isRunning = true;
+      
       EventManager.instance.notify(EVENT.GAME_RESUMED, {
         score: this.score,
-        highScore: this.highScore
+        highScore: this.highScore,
+        pauseDuration: resumeTime - (this.pauseTime || resumeTime)
       });
+      
       this._animate();
     }
   }
@@ -546,6 +594,13 @@ class Game {
         if (tree && !tree.disposed) tree.dispose();
       });
       this.trees = [];
+    }
+
+    if (this.barrels) {
+      this.barrels.forEach(barrel => {
+        if (barrel && !barrel.disposed) barrel.dispose();
+      });
+      this.barrels = [];
     }
 
     if (this.projectilesManager) {
@@ -604,13 +659,22 @@ class Game {
       if (typeof this.collisionManager.dispose === 'function') this.collisionManager.dispose();
       this.collisionManager = null;
     }
-    // if(this.eventManager) {
-    //     this.eventManager.clearAllEvents();
-    // }
     if (this.effectManager && typeof this.effectManager.dispose === 'function') {
       this.effectManager.dispose();
       this.effectManager = null;
     }
+    if (this.generator) {
+      if (typeof this.generator.dispose === 'function') this.generator.dispose();
+      this.generator = null;
+    }
+    if (this.gameStateManager) {
+      if (typeof this.gameStateManager.dispose === 'function') this.gameStateManager.dispose();
+      this.gameStateManager = null;
+    }
+
+    // Note: Không dispose ModelLoader cache ở đây vì có thể cần cho game sessions khác
+    // ModelLoader cache sẽ persist throughout application lifecycle
+    // Nếu muốn clear cache, gọi ModelLoader.instance.clearCache() manually
 
     Game.instance = null;
   }

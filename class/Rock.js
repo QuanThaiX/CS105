@@ -4,6 +4,7 @@ import { GameObject } from './GameObject.js';
 import { Game } from './Game.js';
 import { EventManager } from './EventManager.js';
 import { EVENT, HITBOX_SCALE } from '../utils.js';
+import { ModelLoader } from '../loader.js';
 
 class Rock extends GameObject {
     constructor(id, position, scale = 1, rotation = 0, rockType = 'rock09') {
@@ -16,6 +17,46 @@ class Rock extends GameObject {
     }
 
     loadModel() {
+        // Thử lấy từ ModelLoader cache trước
+        const modelLoader = new ModelLoader();
+        
+        if (modelLoader.isPreloaded) {
+            try {
+                const model = modelLoader.getRockModel(
+                    this.rockType, 
+                    this.position, 
+                    this.scale, 
+                    this.rotation
+                );
+                
+                if (model) {
+                    // Setup shadows cho model từ cache
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    
+                    this.setModel(model);
+                    
+                    // Hiển thị box helper nếu debug mode
+                    if (Game.instance.debug) {
+                        this.createBoxHelper();
+                    }
+                    return;
+                }
+            } catch (error) {
+                console.error('Error getting rock model from cache:', error);
+            }
+        }
+
+        // Fallback: Load trực tiếp nếu chưa preload
+        console.warn(`⚠️ Rock model ${this.rockType} chưa được preload, đang load trực tiếp...`);
+        this.loadModelDirect();
+    }
+
+    loadModelDirect() {
         // Xác định đường dẫn đến model dựa trên loại đá
         let modelPath;
         
@@ -128,49 +169,6 @@ class Rock extends GameObject {
         if (this.boxHelper) {
             this.updateBoxHelper();
         }
-    }
-
-    // Phương thức tĩnh để tạo đá từ danh sách vị trí
-    static createRocksFromList(rockList) {
-        const rocks = [];
-        
-        rockList.forEach((rockData, index) => {
-            const { position, scale = 1, rotation = 0, type = 'rock09' } = rockData;
-            
-            if (position) {
-                const rockPosition = new THREE.Vector3(position.x, position.y || 0, position.z);
-                const rock = new Rock(`rock_${index}`, rockPosition, scale, rotation, type);
-                rocks.push(rock);
-            }
-        });
-        
-        return rocks;
-    }
-
-    // Phương thức tĩnh để tạo đá ngẫu nhiên trên bản đồ (giữ lại cho tương thích ngược)
-    static createRandomRocks(count, minX, maxX, minZ, maxZ, minScale = 0.5, maxScale = 2.0) {
-        const rocks = [];
-        const rockTypes = ['rock09', 'rock13'];
-        
-        for (let i = 0; i < count; i++) {
-            // Tạo vị trí ngẫu nhiên
-            const x = minX + Math.random() * (maxX - minX);
-            const z = minZ + Math.random() * (maxZ - minZ);
-            const position = new THREE.Vector3(x, 0, z);
-            
-            // Tạo kích thước và góc xoay ngẫu nhiên
-            const scale = minScale + Math.random() * (maxScale - minScale);
-            const rotation = Math.random() * Math.PI * 2;
-            
-            // Chọn loại đá ngẫu nhiên
-            const rockType = rockTypes[Math.floor(Math.random() * rockTypes.length)];
-            
-            // Tạo đối tượng đá mới
-            const rock = new Rock(`rock_${i}`, position, scale, rotation, rockType);
-            rocks.push(rock);
-        }
-        
-        return rocks;
     }
 }
 

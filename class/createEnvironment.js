@@ -38,7 +38,7 @@ function createCamera(scene, targetPosition, renderer) {
 
 function createLights(scene) {
     // Ánh sáng môi trường
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 5);

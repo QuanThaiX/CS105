@@ -11,6 +11,8 @@ import { ProjectilesManager } from "./ProjectilesManager.js";
 import { Bot } from "./Bot.js";
 import { Rock } from "./Rock.js";
 import { Tree } from "./Tree.js";
+import { ModelLoader } from '../loader.js';
+import { Barrel } from './Barrel.js';
 
 class Tank extends GameObject{
   tankType;               // TANKTYPE.
@@ -36,7 +38,9 @@ class Tank extends GameObject{
     this.tankType = tankType;
     this.setTankStats(this.tankType);
     // console.log("Tank stats: ", this.tankType, this.hp, this.maxHp, this.moveSpeed, this.rotateSpeed, this.shootCooldown, this.damage, this.defense);
-    loadTankModel(tankType, this.position).then((model) => {this.setModel(model)});
+    
+    // Sử dụng ModelLoader cache hoặc fallback to loadTankModel
+    this.loadTankModelFromCache();
 
     this.prevPosition = this.position.clone();
     this.prevRotation = 0;
@@ -44,6 +48,33 @@ class Tank extends GameObject{
 
     EventManager.instance.subscribe(EVENT.COLLISION, this.handleCollision.bind(this));
     EventManager.instance.subscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
+  }
+
+  /**
+   * Load tank model từ cache hoặc fallback to direct loading
+   */
+  loadTankModelFromCache() {
+    const modelLoader = new ModelLoader();
+    
+    if (modelLoader.isPreloaded) {
+      try {
+        const model = modelLoader.getTankModel(this.tankType, this.position);
+        if (model) {
+          this.setModel(model);
+          return;
+        }
+      } catch (error) {
+        console.error('Error getting tank model from cache:', error);
+      }
+    }
+    
+    // Fallback: sử dụng loadTankModel function cũ
+    console.warn(`⚠️ Tank model ${this.tankType.name} chưa được preload, đang load trực tiếp...`);
+    loadTankModel(this.tankType, this.position).then((model) => {
+      this.setModel(model);
+    }).catch((error) => {
+      console.error('Failed to load tank model:', error);
+    });
   }
 
   setTankStats(tankType, stats = null){
@@ -168,6 +199,12 @@ class Tank extends GameObject{
 
   dispose(){
     this.stopAutoShoot();
+    
+    // Play tank destruction sound if tank died from damage
+    if (this.hp <= 0) {
+      this.playDestructionSound();
+    }
+    
     super.dispose();
     if (this.faction === FACTION.ENEMY) {
       Bot.instance.removeTank(this);
@@ -178,19 +215,51 @@ class Tank extends GameObject{
       this.healthBar = null;
     }
 
+    // Enhanced tank destroyed event
     EventManager.instance.notify(EVENT.TANK_DESTROYED, { 
       tank: this,
-      pointValue: this.faction === FACTION.ENEMY ? this.pointValue || 100 : 0
+      position: this.position.clone(),
+      pointValue: this.faction === FACTION.ENEMY ? this.pointValue || 100 : 0,
+      killer: this.lastDamageSource || null,
+      explosionPosition: this.position.clone(),
+      tankType: this.tankType,
+      faction: this.faction
     });
+    
     EventManager.instance.unsubscribe(EVENT.COLLISION, this.handleCollision.bind(this));
     EventManager.instance.unsubscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
     CollisionManager.instance.remove(this);
+  }
+
+  /**
+   * Play tank destruction sound effect
+   */
+  playDestructionSound() {
+    try {
+      const audioConfig = GAMECONFIG.AUDIO.TANK_DESTRUCTION;
+      
+      EventManager.instance.notify(EVENT.AUDIO_PLAY, {
+        soundId: 'tank_destruction',
+        volume: audioConfig.VOLUME,
+        position: this.position.clone(),
+        loop: false,
+        soundPath: audioConfig.PATH,
+        distanceFalloff: audioConfig.DISTANCE_FALLOFF,
+        maxDistance: audioConfig.MAX_DISTANCE
+      });
+    } catch (error) {
+      console.error('Error playing tank destruction sound:', error);
+    }
   }
 
   takeDamage(atk, objSource){
     if (this.hp !== undefined || this.hp !== null){
       let damage = atk - this.defense > 0 ? atk - this.defense : 1;
       this.hp -= damage;
+      
+      // Store damage source for destruction sound
+      this.lastDamageSource = objSource;
+      
       EventManager.instance.notify(EVENT.OBJECT_DAMAGED, {
         object: this,
         damage: damage,
@@ -201,7 +270,13 @@ class Tank extends GameObject{
       if (this.hp <= 0){
         this.destroy();
         if (this.faction == FACTION.PLAYER){
-          EventManager.instance.notify(EVENT.PLAYER_DIE, {tank: this});
+          EventManager.instance.notify(EVENT.PLAYER_DIE, {
+            tank: this,
+            position: this.position.clone(),
+            killer: objSource,
+            deathCause: 'damage',
+            finalScore: Game.instance ? Game.instance.score : 0
+          });
         }
       }
 

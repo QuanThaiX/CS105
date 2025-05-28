@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from "./three/examples/jsm/loaders/GLTFLoader.js";
+import { ModelLoader } from './loader.js';
 
 function toRad(deg) {
     return THREE.MathUtils.degToRad(deg);
@@ -9,12 +10,32 @@ const HITBOX_SCALE = {
     TANK: { x: 0.7, y: 1.0, z: 0.7 },
     ROCK: { x: 0.6, y: 1.0, z: 0.6 },
     TREE: { x: 0.1, y: 1.0, z: 0.1 },
-    BARREL: { x: 1.0, y: 1.0, z: 1.0 },
+    BARREL: { x: 0.8, y: 1.0, z: 0.8 },
 };
 
+/**
+ * Load tank model từ cache (nếu đã preload) hoặc load trực tiếp
+ * @param {Object} tankType - TANKTYPE object
+ * @param {THREE.Vector3} position - Vị trí đặt tank
+ * @returns {Promise<THREE.Group>} - Promise resolve với tank model
+ */
 function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
-    let modelPath = tankType.assetPathGLTF;
     return new Promise((resolve, reject) => {
+        const modelLoader = new ModelLoader();
+        
+        // Nếu đã preload, lấy từ cache
+        if (modelLoader.isPreloaded) {
+            const model = modelLoader.getTankModel(tankType, position);
+            if (model) {
+                resolve(model);
+                return;
+            }
+        }
+        
+        // Fallback: Load trực tiếp nếu chưa preload (để backward compatibility)
+        console.warn(`⚠️ Tank model ${tankType.name} chưa được preload, đang load trực tiếp...`);
+        
+        let modelPath = tankType.assetPathGLTF;
         const loader = new GLTFLoader();
         loader.load(
             modelPath,
@@ -157,36 +178,247 @@ const TANKTYPE = Object.freeze({
 });
 
 const EVENT = Object.freeze({
-    COLLISION: "collision",
-
-    OBJECT_MOVED: "object_moved",
-    OBJECT_LOADED: "object_loaded",
-    OBJECT_DAMAGED: "object_damaged",
-    OBJECT_DESTROYED: "object_destroyed",
-    OBJECT_SHOOT: "object_shoot",
-
-    BULLET_EXPIRED: "bullet_expired",
-
-    PLAYER_MOVE: "player_move",
-    PLAYER_DIE: "player_die",
-    PLAYER_RESTART: "player_restart",
-
+    // =================== CORE GAME EVENTS ===================
+    /**
+     * GAME_STARTED - Fired when game starts
+     * @param {Object} data - { playerTank: Tank, score: number, highScore: number }
+     */
     GAME_STARTED: "game_started",
+    
+    /**
+     * GAME_PAUSED - Fired when game is paused
+     * @param {Object} data - { score: number, highScore: number, timestamp: number }
+     */
     GAME_PAUSED: "game_paused",
+    
+    /**
+     * GAME_RESUMED - Fired when game is resumed
+     * @param {Object} data - { score: number, highScore: number, pauseDuration: number }
+     */
     GAME_RESUMED: "game_resumed",
+    
+    /**
+     * GAME_OVER - Fired when game ends (player dies)
+     * @param {Object} data - { reason: string, score: number, highScore: number, finalStats: Object }
+     */
     GAME_OVER: "game_over",
+    
+    /**
+     * GAME_WIN - Fired when player wins (all enemies destroyed)
+     * @param {Object} data - { reason: string, score: number, highScore: number, timeToComplete: number }
+     */
     GAME_WIN: "game_win",
 
+    // =================== LEVEL & WORLD EVENTS ===================
+    /**
+     * LEVEL_LOADED - Fired when level is fully loaded
+     * @param {Object} data - { playerTank: Tank, enemies: Tank[], rocks: Rock[], trees: Tree[], barrels: Barrel[] }
+     */
     LEVEL_LOADED: "level_loaded",
+    
+    /**
+     * LEVEL_COMPLETED - Fired when level objectives are completed
+     * @param {Object} data - { levelId: string, score: number, timeToComplete: number, enemiesDestroyed: number }
+     */
     LEVEL_COMPLETED: "level_completed",
 
-    ITEM_SPAWNED: "item_spawned",
-    ITEM_COLLECTED: "item_collected",
+    // =================== OBJECT LIFECYCLE EVENTS ===================
+    /**
+     * OBJECT_MOVED - Fired when any game object moves
+     * @param {Object} data - { object: GameObject, previousPosition: Vector3, newPosition: Vector3, velocity: Vector3 }
+     */
+    OBJECT_MOVED: "object_moved",
     
+    /**
+     * OBJECT_LOADED - Fired when object model is loaded
+     * @param {Object} data - { object: GameObject, modelType: string, loadTime: number }
+     */
+    OBJECT_LOADED: "object_loaded",
+    
+    /**
+     * OBJECT_DAMAGED - Fired when object takes damage
+     * @param {Object} data - { object: GameObject, damage: number, remainingHP: number, damageSource: GameObject }
+     */
+    OBJECT_DAMAGED: "object_damaged",
+    
+    /**
+     * OBJECT_DESTROYED - Fired when object is destroyed
+     * @param {Object} data - { object: GameObject, destroyer: GameObject, position: Vector3, pointValue: number }
+     */
+    OBJECT_DESTROYED: "object_destroyed",
+    
+    /**
+     * OBJECT_SHOOT - Fired when object shoots projectile
+     * @param {Object} data - { shooter: GameObject, projectile: Bullet, direction: Vector3, damage: number }
+     */
+    OBJECT_SHOOT: "object_shoot",
+
+    // =================== COLLISION EVENTS ===================
+    /**
+     * COLLISION - Fired when objects collide
+     * @param {Object} data - { objectA: GameObject, objectB: GameObject, collisionPoint: Vector3, force: number }
+     */
+    COLLISION: "collision",
+    
+    /**
+     * COLLISION_TANK_BULLET - Fired when tank is hit by bullet
+     * @param {Object} data - { tank: Tank, bullet: Bullet, damage: number, newHP: number }
+     */
+    COLLISION_TANK_BULLET: "collision_tank_bullet",
+    
+    /**
+     * COLLISION_TANK_TANK - Fired when tanks collide
+     * @param {Object} data - { tankA: Tank, tankB: Tank, collisionForce: number }
+     */
+    COLLISION_TANK_TANK: "collision_tank_tank",
+
+    // =================== PLAYER EVENTS ===================
+    /**
+     * PLAYER_MOVE - Fired when player moves
+     * @param {Object} data - { player: Tank, direction: Vector3, speed: number, position: Vector3 }
+     */
+    PLAYER_MOVE: "player_move",
+    
+    /**
+     * PLAYER_DIE - Fired when player dies
+     * @param {Object} data - { player: Tank, killer: GameObject, deathCause: string, finalScore: number }
+     */
+    PLAYER_DIE: "player_die",
+    
+    /**
+     * PLAYER_RESTART - Fired when player restarts
+     * @param {Object} data - { previousScore: number, selectedTank: TANKTYPE }
+     */
+    PLAYER_RESTART: "player_restart",
+    
+    /**
+     * PLAYER_SHOOT - Fired when player shoots
+     * @param {Object} data - { player: Tank, bullet: Bullet, direction: Vector3, cooldownRemaining: number }
+     */
+    PLAYER_SHOOT: "player_shoot",
+
+    // =================== PROJECTILE EVENTS ===================
+    /**
+     * BULLET_CREATED - Fired when bullet is created
+     * @param {Object} data - { bullet: Bullet, shooter: GameObject, targetDirection: Vector3 }
+     */
+    BULLET_CREATED: "bullet_created",
+    
+    /**
+     * BULLET_EXPIRED - Fired when bullet expires/timeout
+     * @param {Object} data - { bullet: Bullet, reason: string, position: Vector3 }
+     */
+    BULLET_EXPIRED: "bullet_expired",
+    
+    /**
+     * BULLET_HIT - Fired when bullet hits target
+     * @param {Object} data - { bullet: Bullet, target: GameObject, damage: number, hitPoint: Vector3 }
+     */
+    BULLET_HIT: "bullet_hit",
+
+    // =================== TANK SPECIFIC EVENTS ===================
+    /**
+     * TANK_DESTROYED - Fired when tank is destroyed
+     * @param {Object} data - { tank: Tank, pointValue: number, destroyer: GameObject, explosionPosition: Vector3 }
+     */
     TANK_DESTROYED: "tank_destroyed",
     
-    SCORE_CHANGED: "score_changed"
-})
+    /**
+     * TANK_HP_CHANGED - Fired when tank HP changes
+     * @param {Object} data - { tank: Tank, previousHP: number, newHP: number, maxHP: number, cause: string }
+     */
+    TANK_HP_CHANGED: "tank_hp_changed",
+    
+    /**
+     * TANK_SPAWNED - Fired when tank spawns
+     * @param {Object} data - { tank: Tank, position: Vector3, tankType: TANKTYPE }
+     */
+    TANK_SPAWNED: "tank_spawned",
+
+    // =================== SCORING EVENTS ===================
+    /**
+     * SCORE_CHANGED - Fired when score changes
+     * @param {Object} data - { score: number, highScore: number, pointsAdded: number, reason: string }
+     */
+    SCORE_CHANGED: "score_changed",
+    
+    /**
+     * HIGH_SCORE_ACHIEVED - Fired when new high score is achieved
+     * @param {Object} data - { newHighScore: number, previousHighScore: number, achievement: string }
+     */
+    HIGH_SCORE_ACHIEVED: "high_score_achieved",
+
+    // =================== ITEM & PICKUP EVENTS ===================
+    /**
+     * ITEM_SPAWNED - Fired when item spawns
+     * @param {Object} data - { item: GameObject, itemType: string, position: Vector3, value: number }
+     */
+    ITEM_SPAWNED: "item_spawned",
+    
+    /**
+     * ITEM_COLLECTED - Fired when item is collected
+     * @param {Object} data - { item: GameObject, collector: Tank, effect: string, value: number }
+     */
+    ITEM_COLLECTED: "item_collected",
+
+    // =================== AUDIO EVENTS ===================
+    /**
+     * AUDIO_PLAY - Fired when audio should play
+     * @param {Object} data - { soundId: string, volume: number, position: Vector3, loop: boolean }
+     */
+    AUDIO_PLAY: "audio_play",
+    
+    /**
+     * AUDIO_STOP - Fired when audio should stop
+     * @param {Object} data - { soundId: string, fadeOut: boolean }
+     */
+    AUDIO_STOP: "audio_stop",
+
+    // =================== UI EVENTS ===================
+    /**
+     * UI_UPDATE_HUD - Fired when HUD needs update
+     * @param {Object} data - { playerHP: number, score: number, highScore: number, ammo: number }
+     */
+    UI_UPDATE_HUD: "ui_update_hud",
+    
+    /**
+     * UI_SHOW_MESSAGE - Fired when UI message should show
+     * @param {Object} data - { message: string, type: string, duration: number, priority: number }
+     */
+    UI_SHOW_MESSAGE: "ui_show_message",
+
+    // =================== EXPLOSION EVENTS ===================
+    /**
+     * BARREL_EXPLODED - Fired when barrel explodes
+     * @param {Object} data - { barrel: Barrel, explosion: Object, damageDealt: Array, chainReaction: boolean }
+     */
+    BARREL_EXPLODED: "barrel_exploded",
+    
+    /**
+     * EXPLOSION_DAMAGE - Fired when explosion deals damage
+     * @param {Object} data - { source: GameObject, target: GameObject, damage: number, distance: number, explosionType: string }
+     */
+    EXPLOSION_DAMAGE: "explosion_damage",
+
+    // =================== SYSTEM EVENTS ===================
+    /**
+     * SYSTEM_ERROR - Fired when system error occurs
+     * @param {Object} data - { error: Error, context: string, severity: string, timestamp: number }
+     */
+    SYSTEM_ERROR: "system_error",
+    
+    /**
+     * SYSTEM_PERFORMANCE - Fired for performance monitoring
+     * @param {Object} data - { fps: number, memory: number, loadTime: number, eventType: string }
+     */
+    SYSTEM_PERFORMANCE: "system_performance",
+    
+    /**
+     * SYSTEM_RESOURCE_LOADED - Fired when resources are loaded
+     * @param {Object} data - { resourceType: string, resourceId: string, loadTime: number, success: boolean }
+     */
+    SYSTEM_RESOURCE_LOADED: "system_resource_loaded"
+});
 
 const COLOR = Object.freeze({
     white: 0xffffff,

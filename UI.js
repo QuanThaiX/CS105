@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { Game } from './class/Game.js';
 import { EVENT, COLOR, TANKTYPE, loadTankModel } from './utils.js';
+import { ModelLoader } from './loader.js';
 
 let game = null;
 let selectedTankModel = TANKTYPE.V001; // Default selected tank
@@ -9,6 +10,8 @@ let menuScene, menuCamera, menuRenderer, menuControls;
 let tankModel = null; // Holds the 3D model in the menu
 let availableTanks = [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006];
 let currentTankIndex = 0;
+let modelLoader = null; // ModelLoader instance
+let isPreloadingModels = false; // Flag để track preload status
 
 const GAME_START_DELAY = 250; // ms, for loading simulation or DOM readiness
 
@@ -52,7 +55,74 @@ const statBarColors = {
     defense: new THREE.Color(COLOR.blue).getStyle()
 };
 
-function initMenuScene() {
+/**
+ * Preload tất cả models khi khởi động app
+ * @returns {Promise<boolean>} - Promise resolve khi preload xong
+ */
+async function preloadAllModels() {
+    if (isPreloadingModels) {
+        console.log("⏳ Models đang được preload...");
+        return false;
+    }
+    
+    if (modelLoader && modelLoader.isPreloaded) {
+        console.log("✅ Models đã được preload trước đó");
+        return true;
+    }
+    
+    isPreloadingModels = true;
+    
+    try {
+        console.log("🚀 Bắt đầu preload tất cả models...");
+        
+        // Khởi tạo ModelLoader instance
+        modelLoader = new ModelLoader();
+        
+        // Preload tất cả models
+        const success = await modelLoader.preloadAllModels();
+        
+        if (success) {
+            console.log("✅ Preload models thành công!");
+            
+            // Log cache info
+            const cacheInfo = modelLoader.getCacheInfo();
+            console.log("📊 Cache Info:", cacheInfo);
+        } else {
+            console.error("❌ Preload models thất bại!");
+        }
+        
+        return success;
+    } catch (error) {
+        console.error("❌ Lỗi khi preload models:", error);
+        return false;
+    } finally {
+        isPreloadingModels = false;
+    }
+}
+
+/**
+ * Hiển thị loading indicator khi preload
+ */
+function showPreloadingIndicator() {
+    // Removed - preload runs silently in background
+}
+
+/**
+ * Ẩn loading indicator
+ */
+function hidePreloadingIndicator() {
+    // Removed - preload runs silently in background
+}
+
+async function initMenuScene() {
+    // Preload models trước khi setup menu
+    console.log("🎯 Khởi tạo menu và preload models...");
+    
+    const preloadSuccess = await preloadAllModels();
+    if (!preloadSuccess) {
+        console.warn("⚠️ Preload models thất bại, game vẫn có thể chạy nhưng có thể lag khi load models");
+    }
+
     menuScene = new THREE.Scene();
     menuScene.background = new THREE.Color(COLOR.darkGray);
 
@@ -135,6 +205,36 @@ function loadTankForMenu(tankType) {
 
     disposeTankModel(); // Dispose previous model before loading new one
 
+    // Sử dụng ModelLoader nếu đã preload
+    if (modelLoader && modelLoader.isPreloaded) {
+        try {
+            const model = modelLoader.getTankModel(tankType, new THREE.Vector3(0, 0, 0));
+            if (model) {
+                tankModel = model;
+                tankModel.traverse(node => {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                    }
+                });
+                menuScene.add(tankModel);
+
+                document.getElementById('tank-name').textContent = tankType.name;
+                updateTankStatsUI(tankType.name);
+                selectedTankModel = tankType; // Update the globally selected tank
+                if (menuControls) {
+                    menuControls.target.set(0, 0.5, 0); // Re-center controls target
+                    menuControls.update();
+                }
+                return;
+            }
+        } catch (error) {
+            console.error('Error getting tank model from cache:', error);
+        }
+    }
+
+    // Fallback to original loadTankModel if preload failed or not available
+    console.warn(`⚠️ Falling back to direct loading for ${tankType.name}`);
     loadTankModel(tankType)
         .then(model => {
             tankModel = model;
@@ -423,7 +523,7 @@ export function startLoadingScreen() {
                         <div class="face"></div>
                     </div>
                 </div>
-                // <div class="loaderBar"></div>
+                <div class="loaderBar"></div>
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', loadingHTML);
@@ -436,9 +536,27 @@ export function hideLoadingScreen() {
     const loadingScreen = document.getElementById('loading-screen');
     if (loadingScreen) {
         loadingScreen.remove();
+        // document.body.style.overflow = ''; // Cho phép cuộn lại
     }
 }
 
-// Initialization
-initMenuScene();
-setupEndGameScreenEvents();
+// Initialize everything when DOM is loaded
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log("🎮 DOM loaded, khởi tạo Tank3D game...");
+    
+    // Setup end game screen events
+    setupEndGameScreenEvents();
+    
+    // Initialize menu scene (bao gồm preload models)
+    await initMenuScene();
+    
+    // Log memory usage if preload successful
+    if (modelLoader && modelLoader.isPreloaded) {
+        const cacheInfo = modelLoader.getCacheInfo();
+        console.log("🎯 Game initialized successfully!");
+        console.log("📊 Memory Usage:", cacheInfo.memoryUsage);
+        console.log("📦 Cached Models:", cacheInfo.modelKeys);
+    }
+    
+    console.log("✅ Tank3D ready to play!");
+});

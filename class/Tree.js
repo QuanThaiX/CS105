@@ -4,6 +4,7 @@ import { GameObject } from './GameObject.js';
 import { Game } from './Game.js';
 import { EventManager } from './EventManager.js';
 import { EVENT, HITBOX_SCALE } from '../utils.js';
+import { ModelLoader } from '../loader.js';
 
 class Tree extends GameObject {
     constructor(id, position, scale = 1, rotation = 0, treeType = 'tree01') {
@@ -16,8 +17,49 @@ class Tree extends GameObject {
     }
 
     loadModel() {
+        // Thử lấy từ ModelLoader cache trước
+        const modelLoader = new ModelLoader();
+        
+        if (modelLoader.isPreloaded) {
+            try {
+                const model = modelLoader.getTreeModel(
+                    this.treeType, 
+                    this.position, 
+                    this.scale, 
+                    this.rotation
+                );
+                
+                if (model) {
+                    // Setup shadows cho model từ cache
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    
+                    this.setModel(model);
+                    
+                    // Hiển thị box helper nếu debug mode
+                    if (Game.instance.debug) {
+                        this.createBoxHelper();
+                    }
+                    return;
+                }
+            } catch (error) {
+                console.error('Error getting tree model from cache:', error);
+            }
+        }
+
+        // Fallback: Load trực tiếp nếu chưa preload
+        console.warn(`⚠️ Tree model ${this.treeType} chưa được preload, đang load trực tiếp...`);
+        this.loadModelDirect();
+    }
+
+    loadModelDirect() {
         // Xác định đường dẫn đến model dựa trên loại cây
         let modelPath;
+        
         switch (this.treeType) {
             case 'tree01':
                 modelPath = './assets/tree01/tree01.gltf';
@@ -129,23 +171,6 @@ class Tree extends GameObject {
         if (this.boxHelper) {
             this.updateBoxHelper();
         }
-    }
-
-    // Phương thức tĩnh để tạo cây từ danh sách vị trí
-    static createTreesFromList(treeList) {
-        const trees = [];
-        
-        treeList.forEach((treeData, index) => {
-            const { position, scale = 1, rotation = 0, type = 'tree01' } = treeData;
-            
-            if (position) {
-                const treePosition = new THREE.Vector3(position.x, position.y || 0, position.z);
-                const tree = new Tree(`tree_${index}`, treePosition, scale, rotation, type);
-                trees.push(tree);
-            }
-        });
-        
-        return trees;
     }
 }
 
