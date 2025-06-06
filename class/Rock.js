@@ -35,6 +35,23 @@ class Rock extends GameObject {
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
+                            
+                            // Cải thiện material cho đá để tạo shadow và ánh sáng tốt hơn
+                            if (child.material) {
+                                if (child.material.isMeshStandardMaterial) {
+                                    child.material.roughness = 0.9; // Đá có bề mặt nhám
+                                    child.material.metalness = 0.1; // Đá không có tính kim loại
+                                } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
+                                    // Chuyển đổi sang MeshStandardMaterial để có shadow tốt hơn
+                                    const newMaterial = new THREE.MeshStandardMaterial({
+                                        map: child.material.map,
+                                        color: child.material.color,
+                                        roughness: 0.9,
+                                        metalness: 0.1
+                                    });
+                                    child.material = newMaterial;
+                                }
+                            }
                         }
                     });
                     
@@ -89,6 +106,23 @@ class Rock extends GameObject {
                     if (child.isMesh) {
                         child.castShadow = true;
                         child.receiveShadow = true;
+                        
+                        // Cải thiện material cho đá để tạo shadow và ánh sáng tốt hơn
+                        if (child.material) {
+                            if (child.material.isMeshStandardMaterial) {
+                                child.material.roughness = 0.9; // Đá có bề mặt nhám
+                                child.material.metalness = 0.1; // Đá không có tính kim loại
+                            } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
+                                // Chuyển đổi sang MeshStandardMaterial để có shadow tốt hơn
+                                const newMaterial = new THREE.MeshStandardMaterial({
+                                    map: child.material.map,
+                                    color: child.material.color,
+                                    roughness: 0.9,
+                                    metalness: 0.1
+                                });
+                                child.material = newMaterial;
+                            }
+                        }
                     }
                 });
                 

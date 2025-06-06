@@ -35,6 +35,23 @@ class Tree extends GameObject {
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
+                            
+                            // Cải thiện material cho cây để tạo shadow tốt hơn
+                            if (child.material) {
+                                if (child.material.isMeshStandardMaterial) {
+                                    child.material.roughness = 0.8; // Cây có bề mặt nhám
+                                    child.material.metalness = 0.0; // Cây không có tính kim loại
+                                } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
+                                    // Chuyển đổi sang MeshStandardMaterial để có shadow tốt hơn
+                                    const newMaterial = new THREE.MeshStandardMaterial({
+                                        map: child.material.map,
+                                        color: child.material.color,
+                                        roughness: 0.8,
+                                        metalness: 0.0
+                                    });
+                                    child.material = newMaterial;
+                                }
+                            }
                         }
                     });
                     
@@ -92,6 +109,23 @@ class Tree extends GameObject {
                     if (child.isMesh) {
                         child.castShadow = true;
                         child.receiveShadow = true;
+                        
+                        // Cải thiện material cho cây để tạo shadow tốt hơn
+                        if (child.material) {
+                            if (child.material.isMeshStandardMaterial) {
+                                child.material.roughness = 0.8; // Cây có bề mặt nhám
+                                child.material.metalness = 0.0; // Cây không có tính kim loại
+                            } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
+                                // Chuyển đổi sang MeshStandardMaterial để có shadow tốt hơn
+                                const newMaterial = new THREE.MeshStandardMaterial({
+                                    map: child.material.map,
+                                    color: child.material.color,
+                                    roughness: 0.8,
+                                    metalness: 0.0
+                                });
+                                child.material = newMaterial;
+                            }
+                        }
                     }
                 });
                 

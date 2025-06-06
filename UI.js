@@ -8,10 +8,10 @@ let game = null;
 let selectedTankModel = TANKTYPE.V001; // Default selected tank
 let menuScene, menuCamera, menuRenderer, menuControls;
 let tankModel = null; // Holds the 3D model in the menu
-let availableTanks = [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006];
+let availableTanks = [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006, TANKTYPE.V007];
 let currentTankIndex = 0;
 let modelLoader = null; // ModelLoader instance
-let isPreloadingModels = false; // Flag để track preload status
+let isPreloadingModels = false; // Flag to track preload status
 
 const GAME_START_DELAY = 250; // ms, for loading simulation or DOM readiness
 
@@ -45,6 +45,11 @@ const tankStatsData = {
         power: 100,
         speed: 30,
         defense: 100
+    },
+    [TANKTYPE.V007.name]: {
+        power: 85,
+        speed: 65,
+        defense: 75
     }
 };
 
@@ -56,85 +61,140 @@ const statBarColors = {
 };
 
 /**
- * Preload tất cả models khi khởi động app
- * @returns {Promise<boolean>} - Promise resolve khi preload xong
+ * Preload all models when starting the app
+ * @returns {Promise<boolean>} - Promise resolve when preload is complete
  */
 async function preloadAllModels() {
     if (isPreloadingModels) {
-        console.log("⏳ Models đang được preload...");
+        console.log("⏳ Models are being preloaded...");
         return false;
     }
     
     if (modelLoader && modelLoader.isPreloaded) {
-        console.log("✅ Models đã được preload trước đó");
+        console.log("✅ Models have been preloaded previously");
+        
+        // Log cache details even when already preloaded
+        const cacheInfo = modelLoader.getCacheInfo();
+        console.log("📊 Cache Info (already preloaded):", cacheInfo);
+        
         return true;
     }
     
     isPreloadingModels = true;
     
     try {
-        console.log("🚀 Bắt đầu preload tất cả models...");
+        console.log("🚀 Starting to preload all models...");
         
-        // Khởi tạo ModelLoader instance
+        // Initialize ModelLoader instance
         modelLoader = new ModelLoader();
         
-        // Preload tất cả models
-        const success = await modelLoader.preloadAllModels();
+        // Set timeout để prevent loading quá lâu
+        const preloadPromise = modelLoader.preloadAllModels();
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Preload timeout after 30 seconds')), 30000);
+        });
+        
+        // Race between preload and timeout
+        const success = await Promise.race([preloadPromise, timeoutPromise]);
         
         if (success) {
-            console.log("✅ Preload models thành công!");
+            console.log("✅ Preload models successful!");
             
             // Log cache info
             const cacheInfo = modelLoader.getCacheInfo();
             console.log("📊 Cache Info:", cacheInfo);
+            
+            // Log detailed model list in cache
+            console.log("🗂️ Cached Models List:");
+            modelLoader.logCachedModels();
         } else {
-            console.error("❌ Preload models thất bại!");
+            console.warn("⚠️ Preload models completed with some failures, but game can still run");
         }
         
         return success;
     } catch (error) {
-        console.error("❌ Lỗi khi preload models:", error);
-        return false;
+        console.error("❌ Error while preloading models:", error);
+        
+        // Nếu preload fail hoàn toàn, vẫn cho phép game chạy
+        if (error.message.includes('timeout')) {
+            console.warn("⚠️ Preload timeout - game will use direct loading");
+        }
+        
+        return false; // Game vẫn có thể chạy mà không preload
     } finally {
         isPreloadingModels = false;
     }
 }
 
 /**
- * Hiển thị loading indicator khi preload
+ * Show loading indicator when preloading
  */
 function showPreloadingIndicator() {
     // Removed - preload runs silently in background
 }
 
 /**
- * Ẩn loading indicator
+ * Hide loading indicator
  */
 function hidePreloadingIndicator() {
     // Removed - preload runs silently in background
 }
 
 async function initMenuScene() {
-    // Preload models trước khi setup menu
-    console.log("🎯 Khởi tạo menu và preload models...");
+    // Preload models before setting up menu với error handling
+    console.log("🎯 Initializing menu and preloading models...");
     
-    const preloadSuccess = await preloadAllModels();
-    if (!preloadSuccess) {
-        console.warn("⚠️ Preload models thất bại, game vẫn có thể chạy nhưng có thể lag khi load models");
+    try {
+        const preloadSuccess = await preloadAllModels();
+        if (!preloadSuccess) {
+            console.warn("⚠️ Preload models failed, game will use direct loading (may cause lag when starting)");
+        }
+    } catch (error) {
+        console.error("❌ Critical error during preload:", error);
+        // Continue với menu setup ngay cả khi preload fail
     }
 
     menuScene = new THREE.Scene();
     menuScene.background = new THREE.Color(COLOR.darkGray);
 
-    const ambientLight = new THREE.AmbientLight(COLOR.white, 0.8);
+    // Tăng độ sáng ambient light để làm sáng tổng thể scene
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.8); // Tăng từ 0.4 lên 0.8
     menuScene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(COLOR.white, 1.2);
-    directionalLight.position.set(5, 10, 7.5);
+    // Giảm cường độ directional light và shadow quality để giảm lag
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.8); // Giảm từ 2.5 xuống 1.8
+    directionalLight.position.set(5, 10, 5);
     directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 1024;
-    directionalLight.shadow.mapSize.height = 1024;
+    // Giảm shadow resolution để tăng performance
+    directionalLight.shadow.mapSize.width = 1024; // Giảm từ 2048 xuống 1024
+    directionalLight.shadow.mapSize.height = 1024; // Giảm từ 2048 xuống 1024
+    directionalLight.shadow.camera.near = 0.5;
+    directionalLight.shadow.camera.far = 30; // Giảm từ 50 xuống 30
+    directionalLight.shadow.camera.left = -8; // Giảm shadow area
+    directionalLight.shadow.camera.right = 8;
+    directionalLight.shadow.camera.top = 8;
+    directionalLight.shadow.camera.bottom = -8;
+    // Giảm shadow radius để giảm chi tiết bóng
+    directionalLight.shadow.radius = 2; // Thêm radius nhỏ
+    directionalLight.shadow.bias = -0.0005; // Tối ưu shadow bias
     menuScene.add(directionalLight);
+
+    // Tăng rim light để bù đắp cho directional light giảm
+    // const rimLight = new THREE.DirectionalLight(0x7799ff, 1.5); // Tăng từ 1.0 lên 1.5
+    // rimLight.position.set(-5, 5, -5);
+    // Không có shadow cho rim light để giảm tải
+    // menuScene.add(rimLight);
+
+    // Giảm point light và shadow quality
+    const pointLight = new THREE.PointLight(0xffffff, 1.2, 25); // Giảm intensity và distance
+    pointLight.position.set(0, 8, 0);
+    pointLight.castShadow = true;
+    // Giảm shadow resolution cho point light
+    pointLight.shadow.mapSize.width = 512; // Giảm từ 1024 xuống 512
+    pointLight.shadow.mapSize.height = 512;
+    pointLight.shadow.camera.near = 1;
+    pointLight.shadow.camera.far = 20; // Giảm shadow distance
+    menuScene.add(pointLight);
 
     const tankDisplayDiv = document.getElementById('tank-display');
     if (!tankDisplayDiv) {
@@ -148,12 +208,20 @@ async function initMenuScene() {
     menuCamera = new THREE.PerspectiveCamera(45, displayWidth / displayHeight, 0.1, 1000);
     menuCamera.position.set(0, 1.5, 6);
 
-    menuRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    menuRenderer.setSize(displayWidth, displayHeight);
-    menuRenderer.setPixelRatio(window.devicePixelRatio);
+    menuRenderer = new THREE.WebGLRenderer({ 
+        antialias: true,
+        powerPreference: "high-performance" // Tối ưu performance
+    });
+    menuRenderer.setSize(tankDisplayDiv.clientWidth, tankDisplayDiv.clientHeight);
+    menuRenderer.setClearColor(COLOR.darkGray);
     menuRenderer.shadowMap.enabled = true;
-    menuRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
+    menuRenderer.shadowMap.type = THREE.PCFShadowMap; // Chuyển từ PCFSoftShadowMap về PCFShadowMap để giảm lag
+    menuRenderer.outputColorSpace = THREE.SRGBColorSpace;
+    menuRenderer.physicallyCorrectLights = true;
+    menuRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+    menuRenderer.toneMappingExposure = 1.2; // Tăng exposure để làm sáng hơn
+    // Thêm các tối ưu renderer
+    menuRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Giới hạn pixel ratio
     tankDisplayDiv.appendChild(menuRenderer.domElement);
 
     menuControls = new OrbitControls(menuCamera, menuRenderer.domElement);
@@ -165,7 +233,7 @@ async function initMenuScene() {
 
     const groundGeometry = new THREE.PlaneGeometry(100, 100);
     const groundMaterial = new THREE.MeshStandardMaterial({
-        color: COLOR.gray,
+        color: 0x606060, // Làm sáng ground color
         roughness: 0.7,
         metalness: 0.3
     });
@@ -181,31 +249,52 @@ async function initMenuScene() {
 
 function disposeTankModel() {
     if (tankModel) {
+        // Proper disposal của tank model trong menu
         tankModel.traverse(object => {
             if (object.isMesh) {
+                // Dispose geometry
                 if (object.geometry) {
                     object.geometry.dispose();
                 }
+                
+                // Dispose materials
                 if (object.material) {
                     if (Array.isArray(object.material)) {
-                        object.material.forEach(material => material.dispose());
+                        object.material.forEach(material => {
+                            if (material.map) material.map.dispose();
+                            if (material.normalMap) material.normalMap.dispose();
+                            if (material.roughnessMap) material.roughnessMap.dispose();
+                            if (material.metalnessMap) material.metalnessMap.dispose();
+                            material.dispose();
+                        });
                     } else {
+                        if (object.material.map) object.material.map.dispose();
+                        if (object.material.normalMap) object.material.normalMap.dispose();
+                        if (object.material.roughnessMap) object.material.roughnessMap.dispose();
+                        if (object.material.metalnessMap) object.material.metalnessMap.dispose();
                         object.material.dispose();
                     }
                 }
             }
         });
+        
+        // Remove từ scene
         menuScene.remove(tankModel);
         tankModel = null;
+        
+        // Force garbage collection hint
+        if (window.gc) {
+            window.gc();
+        }
     }
 }
 
 function loadTankForMenu(tankType) {
-    document.getElementById('tank-name').textContent = `Đang tải ${tankType.name}...`;
+    document.getElementById('tank-name').textContent = `Loading ${tankType.name}...`;
 
     disposeTankModel(); // Dispose previous model before loading new one
 
-    // Sử dụng ModelLoader nếu đã preload
+    // Use ModelLoader if already preloaded với better error handling
     if (modelLoader && modelLoader.isPreloaded) {
         try {
             const model = modelLoader.getTankModel(tankType, new THREE.Vector3(0, 0, 0));
@@ -215,6 +304,13 @@ function loadTankForMenu(tankType) {
                     if (node.isMesh) {
                         node.castShadow = true;
                         node.receiveShadow = true;
+                        
+                        // Đảm bảo material properties cho hiệu ứng metal trong menu
+                        if (node.material && node.material.isMeshStandardMaterial) {
+                            node.material.metalness = 0.6;
+                            node.material.roughness = 0.4;
+                            node.material.envMapIntensity = 1.0;
+                        }
                     }
                 });
                 menuScene.add(tankModel);
@@ -227,13 +323,15 @@ function loadTankForMenu(tankType) {
                     menuControls.update();
                 }
                 return;
+            } else {
+                console.warn('Failed to get tank model from cache, falling back to direct load');
             }
         } catch (error) {
             console.error('Error getting tank model from cache:', error);
         }
     }
-
-    // Fallback to original loadTankModel if preload failed or not available
+    
+    // Fallback: load directly if preload failed hoặc model không có
     console.warn(`⚠️ Falling back to direct loading for ${tankType.name}`);
     loadTankModel(tankType)
         .then(model => {
@@ -242,6 +340,13 @@ function loadTankForMenu(tankType) {
                 if (node.isMesh) {
                     node.castShadow = true;
                     node.receiveShadow = true;
+                        
+                    // Đảm bảo material properties cho hiệu ứng metal trong menu
+                    if (node.material && node.material.isMeshStandardMaterial) {
+                        node.material.metalness = 0.6;
+                        node.material.roughness = 0.4;
+                        node.material.envMapIntensity = 1.0;
+                    }
                 }
             });
             menuScene.add(tankModel);
@@ -255,8 +360,8 @@ function loadTankForMenu(tankType) {
             }
         })
         .catch(error => {
-            console.error('Error loading tank model for menu:', error);
-            document.getElementById('tank-name').textContent = `Lỗi tải ${tankType.name}`;
+            console.error('Failed to load tank model:', error);
+            document.getElementById('tank-name').textContent = `Error loading ${tankType.name}`;
         });
 }
 
@@ -342,15 +447,29 @@ function disposeCurrentGame() {
         if (game.renderer && game.renderer.domElement && gameCanvasContainer.contains(game.renderer.domElement)) {
             gameCanvasContainer.removeChild(game.renderer.domElement);
         }
+        
+        // Enhanced game disposal
         if (typeof game.dispose === 'function') {
             game.dispose();
         }
+        
+        // Clear references
         game = null;
+        
+        // Force garbage collection hint
+        if (window.gc) {
+            window.gc();
+        }
     }
 }
 
 function startNewGame(tankTypeToUse) {
-    // document.getElementById('loading-message').style.display = 'block';
+    // Clear any existing loading screens
+    const existingLoadingScreen = document.getElementById('loading-screen');
+    if (existingLoadingScreen) {
+        existingLoadingScreen.remove();
+    }
+    
     document.getElementById('menu-container').style.display = 'none';
     document.getElementById('game-container').style.display = 'none';
     document.getElementById('game-over-screen').style.display = 'none';
@@ -358,21 +477,36 @@ function startNewGame(tankTypeToUse) {
 
     disposeCurrentGame(); // Ensure any old game is cleaned up
 
-    game = new Game({ tankType: tankTypeToUse });
+    try {
+        game = new Game({ tankType: tankTypeToUse });
 
-    setTimeout(() => {
-        if (!game) return; // Game might have been disposed if user navigated away quickly
+        setTimeout(() => {
+            if (!game) {
+                console.error("Game instance was disposed during initialization");
+                returnToMainMenu(false);
+                return;
+            }
 
-        game.start();
-        setupGameRendererDOM(game);
+            try {
+                game.start();
+                setupGameRendererDOM(game);
 
-        document.getElementById('game-container').style.display = 'block';
-        // document.getElementById('loading-message').style.display = 'none';
-        document.getElementById('continue-button').disabled = !(game && game.canResume());
+                document.getElementById('game-container').style.display = 'block';
+                document.getElementById('continue-button').disabled = !(game && game.canResume());
 
-        startHUDUpdates();
-        onWindowResize(); // Resize after DOM is visible
-    }, GAME_START_DELAY);
+                startHUDUpdates();
+                onWindowResize(); // Resize after DOM is visible
+            } catch (error) {
+                console.error("Error starting game:", error);
+                alert("Error starting game. Please try again.");
+                returnToMainMenu(false);
+            }
+        }, GAME_START_DELAY);
+    } catch (error) {
+        console.error("Error creating game instance:", error);
+        alert("Error initializing game. Please try again.");
+        returnToMainMenu(false);
+    }
 }
 
 function returnToMainMenu(preserveGameInstanceForPause = false) {
@@ -416,11 +550,11 @@ document.getElementById('continue-button').addEventListener('click', () => {
 });
 
 document.getElementById('settings-button').addEventListener('click', () => {
-    alert('Chức năng cài đặt sẽ được phát triển trong tương lai!');
+    alert('Settings feature will be developed in the future!');
 });
 
 document.getElementById('exit-button').addEventListener('click', () => {
-    if (confirm('Bạn có chắc muốn thoát game không?')) {
+    if (confirm('Are you sure you want to exit the game?')) {
         if (game) {
             game.stop(); // Or disposeCurrentGame() if full cleanup desired
         }
@@ -429,7 +563,7 @@ document.getElementById('exit-button').addEventListener('click', () => {
             window.close(); // May not work in all browser contexts
         } catch (e) {
             // Fallback for browsers that block window.close
-            document.body.innerHTML = "<div style='text-align:center; padding-top: 50px; font-size: 24px; color: white;'>Cảm ơn đã chơi! Bạn có thể đóng tab này.</div>";
+            document.body.innerHTML = "<div style='text-align:center; padding-top: 50px; font-size: 24px; color: white;'>Thank you for playing! You can close this tab.</div>";
         }
     }
 });
@@ -446,7 +580,29 @@ document.getElementById('next-tank').addEventListener('click', () => {
 
 document.getElementById('select-button').addEventListener('click', () => {
     // selectedTankModel is already updated by prev/next. This button is more of a visual confirmation.
-    alert(`Đã chọn ${selectedTankModel.name}`);
+    // Show success message
+    const successMessage = document.createElement('div');
+    successMessage.classList.add('tank-selection-success');
+    successMessage.textContent = `Đã chọn ${selectedTankModel.name} thành công!`;
+    successMessage.style.position = 'absolute';
+    successMessage.style.top = '20%';
+    successMessage.style.left = '50%';
+    successMessage.style.transform = 'translate(-50%, -50%)';
+    successMessage.style.padding = '15px 25px';
+    successMessage.style.backgroundColor = 'rgba(0, 200, 0, 0.8)';
+    successMessage.style.color = 'white';
+    successMessage.style.borderRadius = '10px';
+    successMessage.style.fontWeight = 'bold';
+    successMessage.style.zIndex = '1000';
+    document.body.appendChild(successMessage);
+    
+    // Remove the message after 2 seconds
+    setTimeout(() => {
+        successMessage.style.opacity = '0';
+        successMessage.style.transition = 'opacity 0.5s';
+        setTimeout(() => document.body.removeChild(successMessage), 500);
+    }, 2000);
+    
     // The actual tank used is `selectedTankModel` when 'start-button' is pressed.
 });
 
@@ -460,10 +616,10 @@ function updateHUD() {
             if (hpEl) hpEl.innerText = `HP: ${data.playerHP}`;
             
             const scoreEl = document.getElementById('score');
-            if (scoreEl) scoreEl.innerText = `Điểm: ${data.score}`;
+            if (scoreEl) scoreEl.innerText = `Score: ${data.score}`;
 
             const highScoreEl = document.getElementById('high-score');
-            if (highScoreEl) highScoreEl.innerText = `Điểm cao: ${data.highScore}`;
+            if (highScoreEl) highScoreEl.innerText = `High Score: ${data.highScore}`;
         }
     }
     hudUpdateRequestId = requestAnimationFrame(updateHUD);
@@ -513,17 +669,42 @@ export function startLoadingScreen() {
     if (!document.getElementById('loading-screen')) {
         const loadingHTML = `
             <div id="loading-screen">
-                <div class="loader">
-                    <div class="cube">
-                        <div class="face"></div>
-                        <div class="face"></div>
-                        <div class="face"></div>
-                        <div class="face"></div>
-                        <div class="face"></div>
-                        <div class="face"></div>
+                <div class="loading-content">
+                    <div class="loader">
+                        <div class="cube">
+                            <div class="face"></div>
+                            <div class="face"></div>
+                            <div class="face"></div>
+                            <div class="face"></div>
+                            <div class="face"></div>
+                            <div class="face"></div>
+                        </div>
+                    </div>
+                    <div class="loaderBar"></div>
+                    
+                    <div class="game-info">
+                        <h2 class="objective-title">OBJECTIVE</h2>
+                        <p class="objective-text">Destroy all enemy tanks to achieve victory!</p>
+                        
+                        <div class="controls-section">
+                            <h3 class="controls-title">CONTROLS</h3>
+                            <div class="controls-grid">
+                                <div class="control-item">
+                                    <span class="control-key">WASD</span>
+                                    <span class="control-description">Move Tank</span>
+                                </div>
+                                <div class="control-item">
+                                    <span class="control-key">SPACE</span>
+                                    <span class="control-description">Shoot</span>
+                                </div>
+                                <div class="control-item">
+                                    <span class="control-key">MOUSE</span>
+                                    <span class="control-description">Camera Control</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="loaderBar"></div>
             </div>
         `;
         document.body.insertAdjacentHTML('beforeend', loadingHTML);
@@ -540,23 +721,102 @@ export function hideLoadingScreen() {
     }
 }
 
-// Initialize everything when DOM is loaded
+// Initialize everything when DOM is loaded với better error handling
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("🎮 DOM loaded, khởi tạo Tank3D game...");
+    console.log("🎮 DOM loaded, initializing Tank3D game...");
     
-    // Setup end game screen events
-    setupEndGameScreenEvents();
+    try {
+        // Setup end game screen events
+        setupEndGameScreenEvents();
+        
+        // Initialize menu scene (including preload models) với timeout
+        await Promise.race([
+            initMenuScene(),
+            new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Menu initialization timeout')), 45000);
+            })
+        ]);
+        
+        // Log memory usage if preload successful
+        if (modelLoader && modelLoader.isPreloaded) {
+            const cacheInfo = modelLoader.getCacheInfo();
+            console.log("🎯 Game initialized successfully!");
+            console.log("📊 Memory Usage:", cacheInfo.memoryUsage);
+            console.log("📦 Cached Models:", cacheInfo.modelKeys);
+        } else {
+            console.warn("🎯 Game initialized with fallback mode (no preload)");
+        }
+        
+        console.log("✅ Tank3D ready to play!");
+    } catch (error) {
+        console.error("❌ Critical error during game initialization:", error);
+        
+        // Hiển thị error message cho user
+        const errorMessage = document.createElement('div');
+        errorMessage.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #ff4444;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 9999;
+        `;
+        errorMessage.innerHTML = `
+            <h3>Game Initialization Error</h3>
+            <p>Failed to load game resources. Please refresh the page and try again.</p>
+            <button onclick="location.reload()" style="margin-top: 10px; padding: 5px 10px;">Refresh Page</button>
+        `;
+        document.body.appendChild(errorMessage);
+    }
+});
+
+// Thêm cleanup khi rời khỏi trang
+window.addEventListener('beforeunload', () => {
+    console.log("🧹 Cleaning up resources before page unload...");
     
-    // Initialize menu scene (bao gồm preload models)
-    await initMenuScene();
+    // Dispose menu resources
+    disposeTankModel();
     
-    // Log memory usage if preload successful
-    if (modelLoader && modelLoader.isPreloaded) {
-        const cacheInfo = modelLoader.getCacheInfo();
-        console.log("🎯 Game initialized successfully!");
-        console.log("📊 Memory Usage:", cacheInfo.memoryUsage);
-        console.log("📦 Cached Models:", cacheInfo.modelKeys);
+    // Dispose game resources
+    disposeCurrentGame();
+    
+    // Clear ModelLoader cache
+    if (modelLoader) {
+        modelLoader.dispose();
+        modelLoader = null;
     }
     
-    console.log("✅ Tank3D ready to play!");
+    // Dispose menu renderer
+    if (menuRenderer) {
+        menuRenderer.dispose();
+        menuRenderer = null;
+    }
+    
+    // Clear scene
+    if (menuScene) {
+        menuScene.clear();
+        menuScene = null;
+    }
 });
+
+// Thêm memory monitoring (chỉ trong development)
+if (Game.debug && performance && performance.memory) {
+    setInterval(() => {
+        const memInfo = performance.memory;
+        const used = Math.round(memInfo.usedJSHeapSize / 1048576);
+        const total = Math.round(memInfo.totalJSHeapSize / 1048576);
+        
+        if (used > 150) { // Warning khi > 150MB
+            console.warn(`⚠️ High memory usage: ${used}MB / ${total}MB`);
+        }
+        
+        // Log memory info mỗi 30 giây
+        if (Date.now() % 30000 < 1000) {
+            console.log(`📊 Memory: ${used}MB / ${total}MB`);
+        }
+    }, 5000);
+}

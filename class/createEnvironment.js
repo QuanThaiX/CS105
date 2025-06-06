@@ -5,10 +5,14 @@ import { GAMECONFIG } from '../config.js';
 import { toRad } from '../utils.js';
 
 function createRenderer() {
-    const renderer = new THREE.WebGLRenderer();
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.physicallyCorrectLights = true; // More realistic lighting
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2; // Tăng exposure để scene sáng hơn
     document.body.appendChild(renderer.domElement);
     return renderer;
 }
@@ -37,25 +41,55 @@ function createCamera(scene, targetPosition, renderer) {
 }
 
 function createLights(scene) {
-    // Ánh sáng môi trường
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Ánh sáng môi trường - tăng lên một chút để tank có thể phản chiếu ánh sáng
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.8); // Tăng cường độ
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 5);
+    // Ánh sáng chính - directional light
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5); // Giảm cường độ để bớt chói
     directionalLight.position.set(200, 400, 200);
     directionalLight.target.position.set(0, 0, 0);
     directionalLight.castShadow = true;
 
+    // Cải thiện shadow quality
     directionalLight.shadow.camera.left = -100;
     directionalLight.shadow.camera.right = 100;
     directionalLight.shadow.camera.top = 100;
     directionalLight.shadow.camera.bottom = -100;
     directionalLight.shadow.camera.near = 1;
     directionalLight.shadow.camera.far = 1000;
-    directionalLight.shadow.mapSize.width = 4096;
-    directionalLight.shadow.mapSize.height = 4096;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
     directionalLight.shadow.bias = -0.0001;
+    directionalLight.shadow.radius = 3; // Tăng độ mềm của shadow
+    directionalLight.shadow.normalBias = 0.02; // Giúp tránh shadow acne
     scene.add(directionalLight);
+
+    // Thêm ánh sáng phụ để tạo hiệu ứng phản chiếu tốt hơn (rim light)
+    const rimLight = new THREE.DirectionalLight(0x7799ff, 1.0);
+    rimLight.position.set(-100, 200, -100);
+    rimLight.target.position.set(0, 0, 0);
+    scene.add(rimLight);
+
+    // Ánh sáng điểm để tạo highlights trên metal
+    const pointLight = new THREE.PointLight(0xffffcc, 0.8, 100);
+    pointLight.position.set(0, 40, 0);
+    pointLight.castShadow = true;
+    pointLight.shadow.mapSize.width = 1024;
+    pointLight.shadow.mapSize.height = 1024;
+    pointLight.shadow.camera.near = 1;
+    pointLight.shadow.camera.far = 100;
+    pointLight.shadow.bias = -0.001;
+    scene.add(pointLight);
+
+    // Thêm vài ánh sáng điểm xung quanh để tank có độ phản xạ tốt hơn
+    const pointLight2 = new THREE.PointLight(0xccccff, 0.5, 80);
+    pointLight2.position.set(30, 20, 30);
+    scene.add(pointLight2);
+
+    const pointLight3 = new THREE.PointLight(0xffcccc, 0.5, 80);
+    pointLight3.position.set(-30, 20, -30);
+    scene.add(pointLight3);
 
     let shadowHelper;
     if (GAMECONFIG.DEBUG === true) {
@@ -63,7 +97,15 @@ function createLights(scene) {
         scene.add(shadowHelper);
     }
 
-    return { ambientLight, directionalLight, shadowHelper };
+    return { 
+        ambientLight, 
+        directionalLight, 
+        rimLight, 
+        pointLight,
+        pointLight2,
+        pointLight3,
+        shadowHelper 
+    };
 }
 
 function updateShadowArea(directionalLight, targetPosition) {
@@ -84,7 +126,7 @@ function createSky(scene) {
 
     // Mặt trời
     const sun = new THREE.Vector3();
-    const phi = THREE.MathUtils.degToRad(120);
+    const phi = THREE.MathUtils.degToRad(45);
     const theta = THREE.MathUtils.degToRad(60);   
     sun.setFromSphericalCoords(1, phi, theta);
     skyUniforms['sunPosition'].value.copy(sun);

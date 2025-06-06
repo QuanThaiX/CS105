@@ -55,30 +55,44 @@ class Generator {
      * @param {number} scaleMax - Maximum scale
      * @param {number} maxSpawnRadius - Maximum spawn radius
      * @param {number} minSpawnRadius - Minimum spawn radius
+     * @param {number} playerSafeRadius - Safe radius around player spawn (0,0,0)
      * @returns {Array} Array of object definitions
      */
-    generateScatteredObjects(count, types, scaleMin, scaleMax, maxSpawnRadius, minSpawnRadius = 0) {
+    generateScatteredObjects(count, types, scaleMin, scaleMax, maxSpawnRadius, minSpawnRadius = 0, playerSafeRadius = 35) {
         const objects = [];
         if (!types || types.length === 0) {
             console.warn("generateScatteredObjects: No types provided, cannot generate objects.");
             return objects;
         }
 
-        for (let i = 0; i < count; i++) {
+        const maxAttempts = count * 20; // Increase attempts to find valid positions
+        let attempts = 0;
+
+        while (objects.length < count && attempts < maxAttempts) {
+            attempts++;
+            
             const angle = Math.random() * Math.PI * 2;
-            const effectiveMinRadius = Math.min(minSpawnRadius, maxSpawnRadius);
+            const effectiveMinRadius = Math.max(minSpawnRadius, playerSafeRadius);
             const radius = this.getRandomInRange(effectiveMinRadius, maxSpawnRadius);
 
             const x = radius * Math.cos(angle);
             const z = radius * Math.sin(angle);
 
-            objects.push({
-                position: { x, y: 0, z },
-                scale: this.getRandomInRange(scaleMin, scaleMax),
-                rotation: Math.random() * Math.PI * 2,
-                type: this.getRandomElement(types),
-            });
+            const distanceFromPlayer = Math.sqrt(x * x + z * z);
+            if (distanceFromPlayer >= (playerSafeRadius + 5)) {
+                objects.push({
+                    position: { x, y: 0, z },
+                    scale: this.getRandomInRange(scaleMin, scaleMax),
+                    rotation: Math.random() * Math.PI * 2,
+                    type: this.getRandomElement(types),
+                });
+            }
         }
+
+        if (objects.length < count) {
+            console.warn(`Generated ${objects.length}/${count} objects. Some positions were too close to player spawn.`);
+        }
+
         return objects;
     }
 
@@ -434,10 +448,11 @@ class Generator {
         } = config;
 
         const worldBoundaryHalf = worldBoundary / 2;
+        const playerSafeRadius = 35; // Safe zone around player spawn
 
         // Generate enemy definitions
         const maxEnemySpawnRadius = worldBoundaryHalf * enemyConfig.MAX_SPAWN_RADIUS_FACTOR;
-        const minEnemySpawnRadius = enemyConfig.MIN_SPAWN_RADIUS;
+        const minEnemySpawnRadius = Math.max(enemyConfig.MIN_SPAWN_RADIUS, playerSafeRadius); // Keep enemies away from player
 
         const enemyDefinitions = this.generateEnemyDefinitions(
             enemyConfig.NUM_ENEMIES,
@@ -448,9 +463,9 @@ class Generator {
             minEnemySpawnRadius
         );
 
-        // Generate scenery definitions
+        // Generate scenery definitions with player safe zone
         const maxScenerySpawnRadius = worldBoundaryHalf * sceneryConfig.MAX_SPAWN_RADIUS_FACTOR;
-        const minScenerySpawnRadius = sceneryConfig.MIN_SPAWN_RADIUS;
+        const minScenerySpawnRadius = Math.max(sceneryConfig.MIN_SPAWN_RADIUS, playerSafeRadius);
 
         const rockDefinitions = this.generateScatteredObjects(
             sceneryConfig.NUM_ROCKS,
@@ -458,7 +473,8 @@ class Generator {
             sceneryConfig.ROCK_SCALE_MIN,
             sceneryConfig.ROCK_SCALE_MAX,
             maxScenerySpawnRadius,
-            minScenerySpawnRadius
+            minScenerySpawnRadius,
+            playerSafeRadius
         );
 
         const treeDefinitions = this.generateScatteredObjects(
@@ -467,7 +483,8 @@ class Generator {
             sceneryConfig.TREE_SCALE_MIN,
             sceneryConfig.TREE_SCALE_MAX,
             maxScenerySpawnRadius,
-            minScenerySpawnRadius
+            minScenerySpawnRadius,
+            playerSafeRadius
         );
 
         const barrelDefinitions = this.generateScatteredObjects(
@@ -476,8 +493,12 @@ class Generator {
             sceneryConfig.BARREL_SCALE_MIN || 0.8,
             sceneryConfig.BARREL_SCALE_MAX || 1.5,
             maxScenerySpawnRadius,
-            minScenerySpawnRadius
+            minScenerySpawnRadius,
+            playerSafeRadius + 10 // Extra safe distance for explosive barrels
         );
+
+        console.log(`🎯 Generated level with player safe zone of ${playerSafeRadius} units`);
+        console.log(`📊 Objects: ${enemyDefinitions.length} enemies, ${rockDefinitions.length} rocks, ${treeDefinitions.length} trees, ${barrelDefinitions.length} barrels`);
 
         return {
             enemyDefinitions,

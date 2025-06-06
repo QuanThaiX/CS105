@@ -14,28 +14,67 @@ const HITBOX_SCALE = {
 };
 
 /**
- * Load tank model từ cache (nếu đã preload) hoặc load trực tiếp
+ * Load tank model from cache (if preloaded) or load directly
  * @param {Object} tankType - TANKTYPE object
- * @param {THREE.Vector3} position - Vị trí đặt tank
- * @returns {Promise<THREE.Group>} - Promise resolve với tank model
+ * @param {THREE.Vector3} position - Tank position
+ * @returns {Promise<THREE.Group>} - Promise resolve with tank model
  */
 function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
     return new Promise((resolve, reject) => {
         const modelLoader = new ModelLoader();
         
-        // Nếu đã preload, lấy từ cache
+        // If preloaded, get from cache
         if (modelLoader.isPreloaded) {
             const model = modelLoader.getTankModel(tankType, position);
-            if (model) {
+            if (model instanceof Promise) {
+                // Xử lý trường hợp getTankModel trả về Promise (cho custom JS tank)
+                model.then(resolvedModel => {
+                    if (resolvedModel) {
+                        resolve(resolvedModel);
+                    } else {
+                        reject(new Error(`Failed to load JS tank model: ${tankType.name}`));
+                    }
+                }).catch(reject);
+                return;
+            } else if (model) {
                 resolve(model);
                 return;
             }
         }
         
-        // Fallback: Load trực tiếp nếu chưa preload (để backward compatibility)
-        console.warn(`⚠️ Tank model ${tankType.name} chưa được preload, đang load trực tiếp...`);
+        // Fallback: Load directly if not preloaded (for backward compatibility)
+        console.warn(`⚠️ Tank model ${tankType.name} not preloaded, loading directly...`);
         
+        // Xử lý custom tank từ JavaScript
+        if (tankType.useCustomRenderer && tankType.assetPathJS) {
+            import(tankType.assetPathJS)
+                .then(module => {
+                    const model = module.createTank();
+                    
+                    if (tankType == TANKTYPE.V007) {
+                        model.position.copy(position);
+                        // Giảm scale của V007 xuống còn 1.2 (từ 1.5)
+                        model.scale.set(1.2, 1.2, 1.2);
+                        // Điều chỉnh vị trí y để phù hợp với các tank khác và tăng thêm 0.3
+                        model.position.y = position.y - 1 + 0.3;
+                    }
+                    
+                    resolve(model);
+                })
+                .catch(error => {
+                    console.error(`Failed to load JS tank model ${tankType.name}:`, error);
+                    reject(error);
+                });
+            return;
+        }
+        
+        // Load GLTF model
         let modelPath = tankType.assetPathGLTF;
+        if (!modelPath) {
+            reject(new Error(`No model path defined for tank type: ${tankType.name}`));
+            return;
+        }
+        
         const loader = new GLTFLoader();
         loader.load(
             modelPath,
@@ -69,6 +108,27 @@ function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
                     if (child.isMesh) {
                         child.castShadow = true;
                         child.receiveShadow = true;
+
+                        // Cải thiện material properties cho hiệu ứng metal
+                        if (child.material) {
+                            // Nếu là MeshStandardMaterial hoặc có thể chuyển đổi
+                            if (child.material.isMeshStandardMaterial) {
+                                // Giữ nguyên texture hiện có nhưng cải thiện material properties
+                                child.material.metalness = 0.3; // Tăng metalness cho hiệu ứng kim loại
+                                child.material.roughness = 0.2; // Giảm roughness để tăng phản chiếu
+                                child.material.envMapIntensity = 1.0; // Tăng cường environment mapping nếu có
+                            } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
+                                // Chuyển đổi sang MeshStandardMaterial để có hiệu ứng tốt hơn
+                                const newMaterial = new THREE.MeshStandardMaterial({
+                                    map: child.material.map,
+                                    color: child.material.color,
+                                    metalness: 0.3,
+                                    roughness: 0.2,
+                                    envMapIntensity: 1.0
+                                });
+                                child.material = newMaterial;
+                            }
+                        }
 
                         if (child.material.map) {
                             console.log("Texture loaded:", child.material.map);
@@ -146,6 +206,15 @@ const TANK_STATS = Object.freeze({
         shootCooldown: 3000,
         damage: 200,
         defense: 100,
+    },
+    V007: {
+        hp: 850,
+        maxHp: 850,
+        moveSpeed: 0.09,
+        rotateSpeed: 0.03,
+        shootCooldown: 1800,
+        damage: 130,
+        defense: 75,
     }
 });
 
@@ -174,6 +243,11 @@ const TANKTYPE = Object.freeze({
     V006: {
         name: "V006",
         assetPathGLTF: "./assets/tankv006/tankv006.gltf",
+    },
+    V007: {
+        name: "V007",
+        assetPathJS: "./tankv007.js",
+        useCustomRenderer: true
     }
 });
 

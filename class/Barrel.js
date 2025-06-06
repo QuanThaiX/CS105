@@ -48,6 +48,23 @@ class Barrel extends GameObject {
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
+                            
+                            // Cải thiện material cho thùng để tạo shadow và hiệu ứng metal nhẹ
+                            if (child.material) {
+                                if (child.material.isMeshStandardMaterial) {
+                                    child.material.roughness = 0.6; // Thùng có bề mặt hơi nhám
+                                    child.material.metalness = 0.3; // Thùng có một chút kim loại
+                                } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
+                                    // Chuyển đổi sang MeshStandardMaterial để có shadow tốt hơn
+                                    const newMaterial = new THREE.MeshStandardMaterial({
+                                        map: child.material.map,
+                                        color: child.material.color,
+                                        roughness: 0.6,
+                                        metalness: 0.3
+                                    });
+                                    child.material = newMaterial;
+                                }
+                            }
                         }
                     });
                     
@@ -99,6 +116,23 @@ class Barrel extends GameObject {
                     if (child.isMesh) {
                         child.castShadow = true;
                         child.receiveShadow = true;
+                        
+                        // Cải thiện material cho thùng để tạo shadow và hiệu ứng metal nhẹ
+                        if (child.material) {
+                            if (child.material.isMeshStandardMaterial) {
+                                child.material.roughness = 0.6; // Thùng có bề mặt hơi nhám
+                                child.material.metalness = 0.3; // Thùng có một chút kim loại
+                            } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
+                                // Chuyển đổi sang MeshStandardMaterial để có shadow tốt hơn
+                                const newMaterial = new THREE.MeshStandardMaterial({
+                                    map: child.material.map,
+                                    color: child.material.color,
+                                    roughness: 0.6,
+                                    metalness: 0.3
+                                });
+                                child.material = newMaterial;
+                            }
+                        }
                     }
                 });
                 

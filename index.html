@@ -12,10 +12,10 @@
         <!-- Left Menu -->
         <div id="menu-left">
             <h1 class="menu-title">TANK3D</h1>
-            <button id="start-button" class="menu-button">Bắt Đầu Game</button>
-            <button id="continue-button" class="menu-button" disabled>Tiếp Tục Game</button>
-            <button id="settings-button" class="menu-button">Cài Đặt</button>
-            <button id="exit-button" class="menu-button">Thoát Game</button>
+            <button id="start-button" class="menu-button">Start Game</button>
+            <button id="continue-button" class="menu-button" disabled>Continue Game</button>
+            <button id="settings-button" class="menu-button">Settings</button>
+            <button id="exit-button" class="menu-button">Exit Game</button>
         </div>
         
         <!-- Right Menu - Tank Selection -->
@@ -35,19 +35,19 @@
                         <div id="tank-name">Tank v001</div>
                         <div id="tank-stats">
                             <div class="stat-container">
-                                <div class="stat-label">Sức mạnh</div>
+                                <div class="stat-label">Power</div>
                                 <div class="stat-bar">
                                     <div id="power-stat" class="stat-fill" style="width: 80%; background-color: #ff0000;"></div>
                                 </div>
                             </div>
                             <div class="stat-container">
-                                <div class="stat-label">Tốc độ</div>
+                                <div class="stat-label">Speed</div>
                                 <div class="stat-bar">
                                     <div id="speed-stat" class="stat-fill" style="width: 60%; background-color: #00ff00;"></div>
                                 </div>
                             </div>
                             <div class="stat-container">
-                                <div class="stat-label">Phòng thủ</div>
+                                <div class="stat-label">Defense</div>
                                 <div class="stat-bar">
                                     <div id="defense-stat" class="stat-fill" style="width: 70%; background-color: #0000ff;"></div>
                                 </div>
@@ -57,7 +57,7 @@
                     
                     <div id="next-tank" class="nav-button">></div>
                 </div>
-                <button id="select-button">Chọn Tank</button>
+                <button id="select-button">Select Tank</button>
             </div>
         </div>
     </div>
@@ -66,8 +66,8 @@
     <div id="game-container">
         <div id="hud">
             <div id="hp">HP: 0</div>
-            <div id="score">Điểm: 0</div>
-            <div id="high-score">Điểm cao: 0</div>
+            <div id="score">Score: 0</div>
+            <div id="high-score">High Score: 0</div>
         </div>
     </div>
 
@@ -76,12 +76,12 @@
         <div class="endgame-content">
             <h2 id="gameover-title">GAME OVER</h2>
             <div id="gameover-score-info">
-                <p>Điểm số: <span id="gameover-score">0</span></p>
-                <p>Điểm cao: <span id="gameover-highscore">0</span></p>
+                <p>Score: <span id="gameover-score">0</span></p>
+                <p>High Score: <span id="gameover-highscore">0</span></p>
             </div>
             <div class="endgame-buttons">
-                <button id="gameover-menu-button" class="endgame-button">Trở Về Menu</button>
-                <button id="gameover-restart-button" class="endgame-button">Chơi Lại</button>
+                <button id="gameover-menu-button" class="endgame-button">Back to Menu</button>
+                <button id="gameover-restart-button" class="endgame-button">Play Again</button>
             </div>
         </div>
     </div>
@@ -89,14 +89,14 @@
     <!-- Win Screen -->
     <div id="win-screen" class="endgame-screen">
         <div class="endgame-content">
-            <h2 id="win-title">CHIẾN THẮNG!</h2>
+            <h2 id="win-title">VICTORY!</h2>
             <div id="win-score-info">
-                <p>Điểm số: <span id="win-score">0</span></p>
-                <p>Điểm cao: <span id="win-highscore">0</span></p>
+                <p>Score: <span id="win-score">0</span></p>
+                <p>High Score: <span id="win-highscore">0</span></p>
             </div>
             <div class="endgame-buttons">
-                <button id="win-menu-button" class="endgame-button">Trở Về Menu</button>
-                <button id="win-restart-button" class="endgame-button">Chơi Lại</button>
+                <button id="win-menu-button" class="endgame-button">Back to Menu</button>
+                <button id="win-restart-button" class="endgame-button">Play Again</button>
             </div>
         </div>
     </div>

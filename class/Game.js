@@ -16,6 +16,7 @@ import { Barrel } from './Barrel.js';
 import { SoundManager } from './SoundManager.js';
 import { Generator } from './Generator.js';
 import { GameStateManager } from './GameStateManager.js';
+import { ModelLoader } from '../loader.js';
 
 const DEFAULT_SCENERY_CONFIG = {
   NUM_ROCKS: 15,
@@ -80,6 +81,11 @@ class Game {
   boundHandleTankDestroyed;
   boundOnWindowResize;
 
+  // Respawn tracking
+  totalEnemiesSpawned = 0;
+  enemiesKilled = 0;
+  nextSpawnId = 1;
+
   constructor(options = {}) {
     if (Game.instance) {
       return Game.instance;
@@ -103,6 +109,11 @@ class Game {
 
     this.highScore = this.loadHighScore();
     this.selectedTankType = this.setSelectedTank(options.tankType);
+
+    // Respawn tracking
+    this.totalEnemiesSpawned = 0;
+    this.enemiesKilled = 0;
+    this.nextSpawnId = 1;
 
     this.boundHandlePlayerDie = this.handlePlayerDie.bind(this);
     this.boundHandleGameOver = this.handleGameOver.bind(this);
@@ -174,6 +185,16 @@ class Game {
     try {
       console.log('🎯 Starting async level generation...');
       
+      // Log current model cache status
+      const modelLoader = new ModelLoader();
+      if (modelLoader.isPreloaded) {
+        console.log("🔄 Using preloaded models for level generation");
+        const cacheInfo = modelLoader.getCacheInfo();
+        console.log("📊 Cache status before level generation:", cacheInfo);
+      } else {
+        console.warn("⚠️ Models not preloaded, level generation may be slower");
+      }
+      
       const levelData = await this.generator.generateLevel({
         worldBoundary: this.gameConfig.WORLD_BOUNDARY,
         sceneryConfig: this.gameConfig.SCENERY,
@@ -193,6 +214,18 @@ class Game {
       this.barrels = await this.generator.createBarrels(levelData.barrelDefinitions, this.collisionManager);
 
       console.log('✅ Async level generation completed!');
+      
+      // Log enemy types generated
+      if (this.enemies.length > 0) {
+        const enemyTypes = this.enemies.map(enemy => enemy.tankType.name);
+        const typeCounts = {};
+        enemyTypes.forEach(type => {
+          typeCounts[type] = (typeCounts[type] || 0) + 1;
+        });
+        console.log("🚙 Enemy tanks generated:", Object.entries(typeCounts)
+          .map(([type, count]) => `${type}: ${count}`)
+          .join(", "));
+      }
 
       // Notify with enhanced event data
       EventManager.instance.notify(EVENT.LEVEL_LOADED, {
@@ -302,6 +335,8 @@ class Game {
 
     if (tank && tank.faction === FACTION.ENEMY && pointValue !== undefined) {
       this.addScore(pointValue);
+      this.enemiesKilled++; // Track total kills
+      
       const index = this.enemies.indexOf(tank);
       if (index !== -1) {
         this.enemies.splice(index, 1);
@@ -312,9 +347,33 @@ class Game {
         score: this.score,
         highScore: this.highScore,
         pointsAdded: pointValue,
-        reason: `Enemy tank ${tank.id} destroyed`
+        reason: `Enemy tank ${tank.id} destroyed`,
+        enemiesKilled: this.enemiesKilled,
+        totalSpawned: this.totalEnemiesSpawned
       });
 
+      // Respawn system với configuration
+      const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
+      if (respawnConfig.ENABLED && this.enemies.length < respawnConfig.MAX_ENEMIES_ALIVE) {
+        const respawnDelay = this.generator.getRandomInRange(
+          respawnConfig.MIN_DELAY, 
+          respawnConfig.MAX_DELAY
+        );
+        
+        // Tạo visual warning trước khi spawn tank
+        const warningTime = Math.min(respawnDelay * 0.3, 2000); // 30% của delay time hoặc 2s max
+        setTimeout(() => {
+          this.showSpawnWarning();
+        }, respawnDelay - warningTime);
+        
+        setTimeout(() => {
+          this.spawnNewEnemyTank();
+        }, respawnDelay);
+        
+        console.log(`⏰ New enemy tank will spawn in ${(respawnDelay/1000).toFixed(1)}s (Killed: ${this.enemiesKilled}, Active: ${this.enemies.length})`);
+      }
+
+      // Check win condition - disable for infinite gameplay
       if (this.isWin()) {
         setTimeout(() => {
           EventManager.instance.notify(EVENT.GAME_WIN, {
@@ -328,7 +387,291 @@ class Game {
     }
   }
 
+  /**
+   * Spawn tank địch mới tại vị trí an toàn với progressive difficulty
+   */
+  async spawnNewEnemyTank() {
+    try {
+      const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
+      
+      // Check if respawn is still enabled and within limits
+      if (!respawnConfig.ENABLED || this.enemies.length >= respawnConfig.MAX_ENEMIES_ALIVE) {
+        console.log("🚫 Respawn cancelled: disabled or too many enemies alive");
+        return;
+      }
+
+      console.log("🚗 Spawning new enemy tank...");
+      
+      // Tạo position an toàn cho tank mới
+      const safePosition = await this.findSafeTankSpawnPosition();
+      if (!safePosition) {
+        console.warn("⚠️ Could not find safe spawn position for new enemy tank");
+        return;
+      }
+
+      // Chọn tank type ngẫu nhiên
+      const availableTankTypes = this.gameConfig.ENEMY_CONFIG.ENEMY_TYPES;
+      const randomTankType = this.generator.getRandomElement(availableTankTypes);
+      
+      // Tạo enemy tank mới
+      const newEnemyId = `enemy-respawn-${this.nextSpawnId++}`;
+      const newEnemyTank = new Tank(newEnemyId, FACTION.ENEMY, safePosition, true, randomTankType);
+      
+      // Progressive difficulty scaling
+      const difficultyMultiplier = this.calculateDifficultyMultiplier();
+      
+      // Set stats cho tank mới với scaling
+      const basePointValue = this.gameConfig.ENEMY_CONFIG.ENEMY_POINT_VALUE;
+      const baseHp = this.gameConfig.ENEMY_CONFIG.ENEMY_HP;
+      
+      const scaledHp = Math.floor((typeof baseHp === 'function' ? baseHp(randomTankType) : baseHp) * difficultyMultiplier.hp);
+      const scaledPointValue = Math.floor((typeof basePointValue === 'function' ? basePointValue(randomTankType) : basePointValue) * difficultyMultiplier.points);
+      
+      newEnemyTank.setTankHP(scaledHp);
+      newEnemyTank.pointValue = scaledPointValue;
+      
+      // Track spawned enemies
+      this.totalEnemiesSpawned++;
+      
+      // Add vào game systems
+      this.enemies.push(newEnemyTank);
+      this.bot.addTank(newEnemyTank);
+      this.collisionManager.add(newEnemyTank);
+      
+      // Create spawn visual effect
+      this.createSpawnEffect(safePosition);
+      
+      // Notify spawn event
+      EventManager.instance.notify(EVENT.TANK_SPAWNED, {
+        tank: newEnemyTank,
+        position: newEnemyTank.position,
+        tankType: randomTankType,
+        totalSpawned: this.totalEnemiesSpawned,
+        enemiesKilled: this.enemiesKilled
+      });
+      
+      console.log(`✅ Spawned enemy tank #${this.totalEnemiesSpawned}: ${randomTankType.name} (HP: ${scaledHp}, Points: ${scaledPointValue}) at position (${safePosition.x.toFixed(1)}, ${safePosition.z.toFixed(1)})`);
+      
+    } catch (error) {
+      console.error("❌ Error spawning new enemy tank:", error);
+    }
+  }
+
+  /**
+   * Tạo hiệu ứng visual khi tank spawn
+   * @param {Object} position - Vị trí spawn {x, y, z}
+   */
+  createSpawnEffect(position) {
+    try {
+      // Tạo spawn explosion effect
+      EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
+        position: new THREE.Vector3(position.x, position.y + 2, position.z),
+        direction: new THREE.Vector3(0, 1, 0),
+        effectType: 'spawn'
+      });
+
+      // Play spawn sound
+      EventManager.instance.notify(EVENT.AUDIO_PLAY, {
+        soundId: 'tank_spawn',
+        volume: 0.5,
+        position: new THREE.Vector3(position.x, position.y, position.z),
+        loop: false,
+        soundPath: './assets/audio/tank-spawn.wav',
+        distanceFalloff: true,
+        maxDistance: 80
+      });
+
+      console.log("✨ Spawn effects created");
+      
+    } catch (error) {
+      console.error("Error creating spawn effects:", error);
+    }
+  }
+
+  /**
+   * Hiển thị cảnh báo khi tank mới sắp spawn
+   */
+  showSpawnWarning() {
+    try {
+      // Audio warning
+      EventManager.instance.notify(EVENT.AUDIO_PLAY, {
+        soundId: 'spawn_warning',
+        volume: 0.6,
+        loop: false,
+        soundPath: './assets/audio/warning-beep.wav'
+      });
+
+      // Visual warning - hiển thị message trên UI
+      EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
+        message: "⚠️ ENEMY TANK INCOMING!",
+        duration: 2000,
+        type: 'warning',
+        position: 'top-center'
+      });
+
+      console.log("⚠️ Spawn warning displayed");
+      
+    } catch (error) {
+      console.error("Error showing spawn warning:", error);
+    }
+  }
+
+  /**
+   * Tính toán difficulty multiplier dựa trên score hiện tại
+   * @returns {Object} Multiplier cho HP và points
+   */
+  calculateDifficultyMultiplier() {
+    const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
+    
+    if (!respawnConfig.PROGRESSIVE_DIFFICULTY) {
+      return { hp: 1.0, points: 1.0 };
+    }
+    
+    const scaling = respawnConfig.DIFFICULTY_SCALING;
+    const difficultyLevel = Math.floor(this.score / scaling.SCORE_THRESHOLD);
+    
+    return {
+      hp: Math.pow(scaling.HP_MULTIPLIER, difficultyLevel),
+      points: Math.pow(scaling.POINT_MULTIPLIER, difficultyLevel)
+    };
+  }
+
+  /**
+   * Tìm vị trí spawn an toàn cho tank mới
+   * @returns {Promise<Object|null>} Safe spawn position hoặc null nếu không tìm được
+   */
+  async findSafeTankSpawnPosition() {
+    const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
+    const worldBoundary = this.gameConfig.WORLD_BOUNDARY;
+
+    for (let attempt = 0; attempt < respawnConfig.MAX_SPAWN_ATTEMPTS; attempt++) {
+      // Generate random position trong world boundary
+      const angle = Math.random() * Math.PI * 2;
+      const radius = this.generator.getRandomInRange(
+        respawnConfig.MIN_DISTANCE_FROM_PLAYER, 
+        worldBoundary / 2 * 0.8
+      );
+      
+      const x = radius * Math.cos(angle);
+      const z = radius * Math.sin(angle);
+      const candidatePosition = { x, y: 1, z };
+
+      // Check collision với tất cả objects hiện tại
+      if (await this.isPositionSafeForTank(candidatePosition, respawnConfig.TANK_SIZE, respawnConfig.MIN_DISTANCE_FROM_OBSTACLES)) {
+        return candidatePosition;
+      }
+    }
+
+    // Nếu không tìm được position an toàn, thử tạo ở vị trí backup
+    console.warn("⚠️ Could not find safe position, trying backup positions");
+    const backupPositions = [
+      { x: -100, y: 1, z: -100 },
+      { x: 100, y: 1, z: -100 },
+      { x: -100, y: 1, z: 100 },
+      { x: 100, y: 1, z: 100 },
+      { x: 0, y: 1, z: -150 },
+      { x: 0, y: 1, z: 150 },
+      { x: -150, y: 1, z: 0 },
+      { x: 150, y: 1, z: 0 }
+    ];
+
+    const respawnConfigLocal = this.gameConfig.ENEMY_CONFIG.RESPAWN;
+    for (const backupPos of backupPositions) {
+      if (await this.isPositionSafeForTank(backupPos, respawnConfigLocal.TANK_SIZE, respawnConfigLocal.MIN_DISTANCE_FROM_OBSTACLES)) {
+        console.log("✅ Using backup position for tank spawn");
+        return backupPos;
+      }
+    }
+
+    return null; // Không tìm được vị trí nào an toàn
+  }
+
+  /**
+   * Kiểm tra xem vị trí có an toàn cho tank spawn không
+   * @param {Object} position - Position to check {x, y, z}
+   * @param {number} tankSize - Tank size for collision checking
+   * @param {number} minDistance - Minimum distance from obstacles
+   * @returns {Promise<boolean>} True nếu position an toàn
+   */
+  async isPositionSafeForTank(position, tankSize, minDistance) {
+    const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
+    const posVector = new THREE.Vector3(position.x, position.y, position.z);
+
+    // Check distance from player
+    if (this.playerTank) {
+      const playerPos = this.playerTank.position;
+      const distanceFromPlayer = posVector.distanceTo(playerPos);
+      if (distanceFromPlayer < respawnConfig.MIN_DISTANCE_FROM_PLAYER) {
+        return false;
+      }
+    }
+
+    // Check distance from other enemy tanks
+    for (const enemy of this.enemies) {
+      if (enemy && !enemy.disposed) {
+        const distanceFromEnemy = posVector.distanceTo(enemy.position);
+        if (distanceFromEnemy < minDistance * 2) { // Double distance cho tanks
+          return false;
+        }
+      }
+    }
+
+    // Check distance from rocks
+    if (this.rocks) {
+      for (const rock of this.rocks) {
+        if (rock && !rock.disposed) {
+          const distanceFromRock = posVector.distanceTo(rock.position);
+          if (distanceFromRock < minDistance) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // Check distance from trees
+    if (this.trees) {
+      for (const tree of this.trees) {
+        if (tree && !tree.disposed) {
+          const distanceFromTree = posVector.distanceTo(tree.position);
+          if (distanceFromTree < minDistance) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // Check distance from barrels
+    if (this.barrels) {
+      for (const barrel of this.barrels) {
+        if (barrel && !barrel.disposed) {
+          const distanceFromBarrel = posVector.distanceTo(barrel.position);
+          if (distanceFromBarrel < minDistance) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // Check world boundaries
+    const boundary = this.gameConfig.WORLD_BOUNDARY / 2;
+    if (Math.abs(position.x) > boundary - tankSize || 
+        Math.abs(position.z) > boundary - tankSize) {
+      return false;
+    }
+
+    return true; // Position an toàn
+  }
+
+  // Modify isWin to account for respawning
   isWin() {
+    // Disable win condition cho infinite gameplay với respawn
+    const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
+    
+    if (respawnConfig.ENABLED) {
+      return false; // Infinite gameplay khi respawn enabled
+    }
+    
+    // Original win condition khi respawn disabled
     return this.isRunning && this.enemies.length === 0;
   }
 
@@ -358,7 +701,11 @@ class Game {
     return {
       playerHP: this.playerTank ? this.playerTank.hp || 0 : 0,
       score: this.score,
-      highScore: this.highScore
+      highScore: this.highScore,
+      enemiesAlive: this.enemies.length,
+      enemiesKilled: this.enemiesKilled,
+      totalSpawned: this.totalEnemiesSpawned,
+      difficultyLevel: Math.floor(this.score / (this.gameConfig.ENEMY_CONFIG.RESPAWN?.DIFFICULTY_SCALING?.SCORE_THRESHOLD || 500))
     }
   }
 
@@ -425,6 +772,11 @@ class Game {
   resetGame() {
     this.stop();
     this.unregisterEventListeners();
+
+    // Reset respawn counters
+    this.enemiesKilled = 0;
+    this.totalEnemiesSpawned = 0;
+    this.nextSpawnId = 1;
 
     if (this.rocks) {
       this.rocks.forEach(rock => {
@@ -537,7 +889,7 @@ class Game {
         
         this._animate();
         hideLoadingScreen();
-      }, 2500);
+      }, 5500);
     }
   }
 

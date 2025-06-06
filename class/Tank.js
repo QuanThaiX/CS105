@@ -159,12 +159,45 @@ class Tank extends GameObject{
     }
 
     if (this.model) {
+      // Lấy vị trí gốc của đạn từ vị trí tank
       const bulletPosition = this.model.position.clone();
-      bulletPosition.y += 1.2;
+      
+      // Thiết lập offset cho vị trí đạn dựa vào loại tank
+      let bulletOffsetY = 1.2; // Offset Y mặc định
+      let bulletOffsetZ = 4;   // Offset Z mặc định (phía trước tank)
+      
+      // Thiết lập offset riêng cho từng loại tank
+      if (this.tankType === TANKTYPE.V001) {
+        bulletOffsetY = 1.2;
+        bulletOffsetZ = 4;
+      } else if (this.tankType === TANKTYPE.V002) {
+        bulletOffsetY = 1.4;
+        bulletOffsetZ = 4.2;
+      } else if (this.tankType === TANKTYPE.V003) {
+        bulletOffsetY = 1.3;
+        bulletOffsetZ = 4.1;
+      } else if (this.tankType === TANKTYPE.V004) {
+        bulletOffsetY = 1.0;
+        bulletOffsetZ = 3.5;
+      } else if (this.tankType === TANKTYPE.V005) {
+        bulletOffsetY = 0.9;
+        bulletOffsetZ = 3.2;
+      } else if (this.tankType === TANKTYPE.V006) {
+        bulletOffsetY = 1.5;
+        bulletOffsetZ = 4.5;
+      } else if (this.tankType === TANKTYPE.V007) {
+        bulletOffsetY = 1.0;
+        bulletOffsetZ = 3.0;
+      }
+      
+      // Áp dụng offset Y
+      bulletPosition.y += bulletOffsetY;
+      
+      // Tính toán hướng và áp dụng offset Z
       const forward = new THREE.Vector3(0, 0, 1)
         .applyQuaternion(this.model.quaternion)
         .normalize();
-      bulletPosition.add(forward.clone().multiplyScalar(4));
+      bulletPosition.add(forward.clone().multiplyScalar(bulletOffsetZ));
       
       this.lastShotTime = currentTime;
       EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
