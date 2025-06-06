@@ -14,6 +14,7 @@ import { Effect } from './EffectManager.js';
 import { Tree } from './Tree.js';
 import { Barrel } from './Barrel.js';
 import { SoundManager } from './SoundManager.js';
+import { SpawnManager } from './SpawnManager.js';
 import { Generator } from './Generator.js';
 import { GameStateManager } from './GameStateManager.js';
 import { ModelLoader } from '../loader.js';
@@ -67,7 +68,8 @@ class Game {
   soundManager;
   generator;
   gameStateManager;
-
+  spawnManager;
+  updatabledObjects = [];
   score = 0;
   highScore = 0;
   enemies = [];
@@ -126,7 +128,7 @@ class Game {
 
   initGame() {
     this.score = 0;
-
+    this.spawnManager = new SpawnManager(this.gameConfig.WORLD_BOUNDARY, 20)
     this.collisionManager = new CollisionManager();
     this.eventManager = new EventManager();
     this.projectilesManager = new ProjectilesManager();
@@ -143,7 +145,7 @@ class Game {
     this.rocks = [];
     this.trees = [];
     this.barrels = [];
-
+    this.updatableObjects = [];
     this.scene = createScene();
     this.renderer = createRenderer();
     this.lights = createLights(this.scene);
@@ -212,9 +214,13 @@ class Game {
       this.rocks = await this.generator.createRocks(levelData.rockDefinitions, this.collisionManager);
       this.trees = await this.generator.createTrees(levelData.treeDefinitions, this.collisionManager);
       this.barrels = await this.generator.createBarrels(levelData.barrelDefinitions, this.collisionManager);
-
+      this.updatableObjects.push(this.playerTank, ...this.enemies, ...this.trees, ...this.rocks, ...this.barrels);
       console.log('✅ Async level generation completed!');
-      
+
+      this.rocks.forEach(rock => this.spawnManager.markOccupied(rock.position, 5));
+      this.trees.forEach(tree => this.spawnManager.markOccupied(tree.position, 3));
+      this.barrels.forEach(barrel => this.spawnManager.markOccupied(barrel.position, 2));
+
       // Log enemy types generated
       if (this.enemies.length > 0) {
         const enemyTypes = this.enemies.map(enemy => enemy.tankType.name);
@@ -336,7 +342,7 @@ class Game {
     if (tank && tank.faction === FACTION.ENEMY && pointValue !== undefined) {
       this.addScore(pointValue);
       this.enemiesKilled++; // Track total kills
-      
+      tank.isDestroyed = true; 
       const index = this.enemies.indexOf(tank);
       if (index !== -1) {
         this.enemies.splice(index, 1);
@@ -354,22 +360,17 @@ class Game {
 
       // Respawn system với configuration
       const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
-      if (respawnConfig.ENABLED && this.enemies.length < respawnConfig.MAX_ENEMIES_ALIVE) {
-        const respawnDelay = this.generator.getRandomInRange(
-          respawnConfig.MIN_DELAY, 
-          respawnConfig.MAX_DELAY
-        );
-        
-        // Tạo visual warning trước khi spawn tank
-        const warningTime = Math.min(respawnDelay * 0.3, 2000); // 30% của delay time hoặc 2s max
-        setTimeout(() => {
-          this.showSpawnWarning();
-        }, respawnDelay - warningTime);
-        
-        setTimeout(() => {
-          this.spawnNewEnemyTank();
-        }, respawnDelay);
-        
+      if (respawnConfig.ENABLED && (this.enemies.length - 1) < respawnConfig.MAX_ENEMIES_ALIVE) {
+          const respawnDelay = this.generator.getRandomInRange(respawnConfig.MIN_DELAY, respawnConfig.MAX_DELAY);
+          
+          setTimeout(() => {
+              this.showSpawnWarning();
+          }, respawnDelay - 2000); // Show warning 2s before spawn
+          
+          setTimeout(() => {
+              this.spawnNewEnemyTank();
+          }, respawnDelay);
+
         console.log(`⏰ New enemy tank will spawn in ${(respawnDelay/1000).toFixed(1)}s (Killed: ${this.enemiesKilled}, Active: ${this.enemies.length})`);
       }
 
@@ -393,27 +394,23 @@ class Game {
   async spawnNewEnemyTank() {
     try {
       const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
-      
-      // Check if respawn is still enabled and within limits
       if (!respawnConfig.ENABLED || this.enemies.length >= respawnConfig.MAX_ENEMIES_ALIVE) {
-        console.log("🚫 Respawn cancelled: disabled or too many enemies alive");
         return;
       }
 
-      console.log("🚗 Spawning new enemy tank...");
-      
-      // Tạo position an toàn cho tank mới
-      const safePosition = await this.findSafeTankSpawnPosition();
+      // Use the SpawnManager to find a position instantly
+      const safePosition = this.spawnManager.findSafeSpawnPosition(
+          this.playerTank.position,
+          respawnConfig.MIN_DISTANCE_FROM_PLAYER
+      );
+
       if (!safePosition) {
-        console.warn("⚠️ Could not find safe spawn position for new enemy tank");
+        console.warn("⚠️ Could not find safe spawn position for new enemy tank via SpawnManager.");
         return;
       }
-
-      // Chọn tank type ngẫu nhiên
+      
       const availableTankTypes = this.gameConfig.ENEMY_CONFIG.ENEMY_TYPES;
       const randomTankType = this.generator.getRandomElement(availableTankTypes);
-      
-      // Tạo enemy tank mới
       const newEnemyId = `enemy-respawn-${this.nextSpawnId++}`;
       const newEnemyTank = new Tank(newEnemyId, FACTION.ENEMY, safePosition, true, randomTankType);
       
@@ -435,10 +432,10 @@ class Game {
       
       // Add vào game systems
       this.enemies.push(newEnemyTank);
+      this.updatableObjects.push(newEnemyTank); 
       this.bot.addTank(newEnemyTank);
       this.collisionManager.add(newEnemyTank);
       
-      // Create spawn visual effect
       this.createSpawnEffect(safePosition);
       
       // Notify spawn event
@@ -728,29 +725,26 @@ class Game {
     this.bot.update();
     this.collisionManager.update();
     this.projectilesManager.update();
-    this.playerTank.update();
+    this.playerTank.update();    for (let i = this.updatableObjects.length - 1; i >= 0; i--) {
+        const obj = this.updatableObjects[i];
+        
+        if (obj.isDestroyed) {
+            if (obj instanceof Tank && obj.faction === FACTION.ENEMY) {
+                const enemyIndex = this.enemies.indexOf(obj);
+                if (enemyIndex > -1) this.enemies.splice(enemyIndex, 1);
+            }
+            this.updatableObjects.splice(i, 1);
+            continue; 
+        }
 
-    this.enemies.forEach(enemy => {
-      if (enemy && !enemy.disposed) enemy.update();
-    });
-
-    if (this.trees) {
-      this.trees.forEach(tree => {
-        if (tree && !tree.disposed) tree.update();
-      });
+        if (obj && !obj.disposed && typeof obj.update === 'function') {
+            obj.update();
+        }
     }
 
-    if (this.rocks) {
-      this.rocks.forEach(rock => {
-        if (rock && !rock.disposed && rock.update) rock.update();
-      });
-    }
-
-    if (this.barrels) {
-      this.barrels.forEach(barrel => {
-        if (barrel && !barrel.disposed && barrel.update) barrel.update();
-      });
-    }
+    this.bot.update();
+    this.collisionManager.update();
+    this.projectilesManager.update();
 
     const newPlayerPos = this.playerTank.position.clone();
     const delta = new THREE.Vector3().subVectors(newPlayerPos, prevPlayerPos);
