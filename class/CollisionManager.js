@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { GAMECONFIG } from '../config.js'
+import { GAMECONFIG } from '../config.js';
 import { Game } from './Game.js';
 import { EventManager } from './EventManager.js';
 import { EVENT, HITBOX_SCALE } from '../utils.js';
@@ -8,46 +8,92 @@ import { Rock } from './Rock.js';
 import { Tree } from './Tree.js';
 import { Barrel } from './Barrel.js';
 import { Bullet } from './Bullet.js';
+// Import the new Octree class
+import { Octree } from './Octree.js';
 
 class CollisionManager {
   static instance;
-  objects;
+
+  // Lists to manage different types of objects
+  dynamicObjects;
+  staticObjects;
+
+  // The Octree for high-performance spatial partitioning
+  octree;
+
+  // Caching and helpers
+  bboxCache;
+  hitboxScaleMap;
   boxHelpers;
   
   constructor() {
-    if (CollisionManager.instance){
+    if (CollisionManager.instance) {
       return CollisionManager.instance;
     }
     CollisionManager.instance = this;
-    this.objects = [];
+    
+    this.dynamicObjects = [];
+    this.staticObjects = [];
+    this.bboxCache = new WeakMap();
     this.boxHelpers = new Map();
+    
+    const worldSize = GAMECONFIG.WORLD_BOUNDARY || 500;
+    const worldBounds = new THREE.Box3(
+        new THREE.Vector3(-worldSize, -worldSize, -worldSize),
+        new THREE.Vector3(worldSize, worldSize, worldSize)
+    );
+    // Initialize the Octree with world bounds, max objects per node, and max depth.
+    this.octree = new Octree(worldBounds, 8, 8);
+
+    // Use a Map for efficient hitbox scale lookups.
+    this.hitboxScaleMap = new Map([
+        [Tank, HITBOX_SCALE.TANK],
+        [Rock, HITBOX_SCALE.ROCK],
+        [Tree, HITBOX_SCALE.TREE],
+        [Barrel, HITBOX_SCALE.BARREL],
+    ]);
   }
   
+  /**
+   * Adds a game object to the appropriate collision list.
+   */
   add(gameObject) {
-    if (!this.objects.includes(gameObject) && gameObject.isCollision == true) {
-      this.objects.push(gameObject);
+    if (!gameObject.isCollision) return;
+
+    if (this.isStaticObject(gameObject)) {
+      if (!this.staticObjects.includes(gameObject)) {
+        this.staticObjects.push(gameObject);
+      }
+    } else {
+      if (!this.dynamicObjects.includes(gameObject)) {
+        this.dynamicObjects.push(gameObject);
+      }
     }
   }
   
+  /**
+   * Removes a game object from the collision lists and cleans up its debug helper.
+   */
   remove(gameObject) {
-    const index = this.objects.indexOf(gameObject);
+    let index = this.dynamicObjects.indexOf(gameObject);
     if (index !== -1) {
-      this.objects.splice(index, 1);
+      this.dynamicObjects.splice(index, 1);
+    } else {
+      index = this.staticObjects.indexOf(gameObject);
+      if (index !== -1) {
+        this.staticObjects.splice(index, 1);
+      }
     }
 
-    if (GAMECONFIG.DEBUG === true && this.boxHelpers.has(gameObject.id)) {
+    if (GAMECONFIG.DEBUG && this.boxHelpers.has(gameObject.id)) {
       const boxHelper = this.boxHelpers.get(gameObject.id);
-      if (boxHelper) {
-          Game.instance.scene.remove(boxHelper);
-      }
+      Game.instance.scene.remove(boxHelper);
       this.boxHelpers.delete(gameObject.id);
     }
   }
 
   /**
-   * Check if object is static (non-movable) for optimization
-   * @param {GameObject} obj - Object to check
-   * @returns {boolean} True if object is static
+   * Checks if an object is static (non-movable).
    */
   isStaticObject(obj) {
     return obj instanceof Rock || 
@@ -56,57 +102,28 @@ class CollisionManager {
   }
 
   /**
-   * Check if object can move for game logic optimization
-   * @param {GameObject} obj - Object to check
-   * @returns {boolean} True if object can move
-   */
-  canMove(obj) {
-    return obj instanceof Tank || 
-           obj instanceof Bullet ||
-           (obj instanceof Barrel && !obj.hasExploded);
-  }
-
-  /**
-   * Get appropriate hitbox scale for object type
-   * @param {GameObject} obj - Object to get scale for
-   * @returns {Object} Scale object with x, y, z properties
+   * Gets the appropriate hitbox scale for an object type using the map.
    */
   getHitboxScale(obj) {
-    if (obj instanceof Tank) {
-      return HITBOX_SCALE.TANK;
-    } else if (obj instanceof Rock) {
-      return HITBOX_SCALE.ROCK;
-    } else if (obj instanceof Tree) {
-      return HITBOX_SCALE.TREE;
-    } else if (obj instanceof Barrel) {
-      return HITBOX_SCALE.BARREL;
-    }
-    return { x: 1.0, y: 1.0, z: 1.0 };
+    return this.hitboxScaleMap.get(obj.constructor) || { x: 1.0, y: 1.0, z: 1.0 };
   }
 
   /**
-   * Create scaled bounding box for object
-   * @param {GameObject} obj - Object to create box for
-   * @returns {THREE.Box3} Scaled bounding box
+   * Creates a scaled bounding box for an object.
    */
   createScaledBoundingBox(obj) {
     if (!obj.model) return null;
     
-    const scale = this.getHitboxScale(obj);
     const box = new THREE.Box3().setFromObject(obj.model);
+    const scale = this.getHitboxScale(obj);
     
-    // Apply scaling if needed
     if (scale.x !== 1.0 || scale.y !== 1.0 || scale.z !== 1.0) {
       const center = new THREE.Vector3();
-      box.getCenter(center);
       const size = new THREE.Vector3();
+      box.getCenter(center);
       box.getSize(size);
       
-      const newSize = new THREE.Vector3(
-        size.x * scale.x,
-        size.y * scale.y,
-        size.z * scale.z
-      );
+      const newSize = new THREE.Vector3(size.x * scale.x, size.y * scale.y, size.z * scale.z);
       box.setFromCenterAndSize(center, newSize);
     }
     
@@ -114,77 +131,87 @@ class CollisionManager {
   }
 
   /**
-   * Handle specific collision types with custom logic
-   * @param {GameObject} objA - First object
-   * @param {GameObject} objB - Second object
+   * Handles the collision logic for a pair of objects.
    */
-  handleSpecialCollisions(objA, objB) {
-    // Handle bullet-barrel collisions
-    if ((objA instanceof Bullet && objB instanceof Barrel) ||
-        (objA instanceof Barrel && objB instanceof Bullet)) {
+  handleCollisionPair(objA, objB) {
+    // Handle specific bullet-barrel collisions
+    if ((objA instanceof Bullet && objB instanceof Barrel && !objB.hasExploded) ||
+        (objA instanceof Barrel && !objA.hasExploded && objB instanceof Bullet)) {
       
       const bullet = objA instanceof Bullet ? objA : objB;
       const barrel = objA instanceof Barrel ? objA : objB;
       
-      if (!barrel.hasExploded && bullet.faction !== 'neutral') {
+      if (bullet.faction !== 'neutral') {
         barrel.onBulletHit(bullet);
-        
-        // Notify bullet-barrel collision
         EventManager.instance.notify(EVENT.COLLISION_TANK_BULLET, {
           tank: barrel,
           bullet: bullet,
           damage: bullet.damage || 25,
           newHP: barrel.hp
         });
-        
-        return true; // Collision handled specifically
       }
+    } else {
+      // Notify default collision for all other pairs
+      EventManager.instance.notify(EVENT.COLLISION, { objA, objB });
     }
-    
-    return false; // Use default collision handling
   }
 
   /**
-   * Check collision between all objects (for Generator placement)
-   * @param {Object} options - { includeStatic: boolean, includeDisposed: boolean }
-   * @returns {Array} Array of collision pairs
+   * The main update loop, using the Octree for highly optimized collision detection.
    */
-  checkAllCollisions(options = {}) {
-    const { includeStatic = true, includeDisposed = false } = options;
-    const collisions = [];
+  update() {
+    // 1. Clear the Octree for the new frame.
+    this.octree.clear();
     
-    const objectsToCheck = this.objects.filter(obj => {
-      if (!obj.model) return false;
-      if (!includeDisposed && obj.disposed) return false;
-      if (!includeStatic && this.isStaticObject(obj)) return false;
-      return true;
-    });
-    
-    for (let i = 0; i < objectsToCheck.length; i++) {
-      const objA = objectsToCheck[i];
-      const boxA = this.createScaledBoundingBox(objA);
-      if (!boxA) continue;
-      
-      for (let j = i + 1; j < objectsToCheck.length; j++) {
-        const objB = objectsToCheck[j];
-        const boxB = this.createScaledBoundingBox(objB);
-        if (!boxB) continue;
-        
-        if (boxA.intersectsBox(boxB)) {
-          collisions.push({ objA, objB });
+    // 2. Populate the Octree with all objects (static and dynamic).
+    // Also, cache their bounding boxes for this frame.
+    const allObjects = [...this.dynamicObjects, ...this.staticObjects];
+    for (const obj of allObjects) {
+      if (obj.model && !obj.disposed) {
+        const bbox = this.createScaledBoundingBox(obj);
+        if (bbox) {
+          this.bboxCache.set(obj, bbox);
+          this.octree.insert(obj, bbox);
         }
       }
     }
-    
-    return collisions;
+
+    // 3. Perform collision checks.
+    const processedPairs = new Set(); // Prevents checking A-B and then B-A.
+
+    // Iterate through DYNAMIC objects only. Static objects don't initiate collisions.
+    for (const objA of this.dynamicObjects) {
+      if (objA.disposed) continue;
+
+      const boxA = this.bboxCache.get(objA);
+      if (!boxA) continue;
+
+      // Retrieve only potential colliders from the Octree. This is the key optimization!
+      const potentialColliders = this.octree.retrieve(objA, boxA);
+
+      for (const objB of potentialColliders) {
+        // Skip self-collision and checks with disposed objects.
+        if (objA === objB || objB.disposed) continue;
+
+        // Prevent duplicate pair checks (e.g., Tank1-Tank2 and later Tank2-Tank1).
+        const pairKey = objA.id < objB.id ? `${objA.id}-${objB.id}` : `${objB.id}-${objA.id}`;
+        if (processedPairs.has(pairKey)) continue;
+        processedPairs.add(pairKey);
+
+        const boxB = this.bboxCache.get(objB);
+        if (!boxB) continue;
+
+        // Final, precise intersection test
+        if (boxA.intersectsBox(boxB)) {
+          this.handleCollisionPair(objA, objB);
+        }
+      }
+    }
   }
 
   /**
-   * Check if position is valid for object placement (Generator use)
-   * @param {THREE.Vector3} position - Position to check
-   * @param {Object} objectSize - { width, height, depth }
-   * @param {Array} excludeObjects - Objects to ignore in check
-   * @returns {boolean} True if position is valid
+   * Checks if a potential position is valid (not colliding with anything).
+   * Used primarily for procedural generation where performance is less critical.
    */
   isPositionValid(position, objectSize, excludeObjects = []) {
     const testBox = new THREE.Box3().setFromCenterAndSize(
@@ -192,7 +219,8 @@ class CollisionManager {
       new THREE.Vector3(objectSize.width, objectSize.height, objectSize.depth)
     );
     
-    for (const obj of this.objects) {
+    const allObjects = [...this.dynamicObjects, ...this.staticObjects];
+    for (const obj of allObjects) {
       if (excludeObjects.includes(obj) || !obj.model || obj.disposed) continue;
       
       const objBox = this.createScaledBoundingBox(obj);
@@ -204,126 +232,23 @@ class CollisionManager {
     return true;
   }
 
-  drawBoxHelpers() {
-    this.objects.forEach((obj) => {
-        if (obj.model && !this.boxHelpers.has(obj.id)) {
-            const boxHelper = new THREE.BoxHelper(obj.model, 0xffff00);
-            Game.instance.scene.add(boxHelper);
-            this.boxHelpers.set(obj.id, boxHelper);
-        }
-    });
-    this.boxHelpers.forEach((boxHelper, objId) => {
-        let obj = this.objects.find(o => o.id === objId);
-        if (obj && obj.model) {
-            boxHelper.update();
-        }
-    });
-  }
-  
   /**
-   * Optimized update for game logic (skips static objects in first loop)
-   */
-  update() {
-    if (GAMECONFIG.DEBUG === true){
-      this.drawBoxHelpers();
-    }
-
-    // Optimized collision detection for game logic
-    // First loop: only check movable objects against each other and static objects
-    for (let i = 0; i < this.objects.length; i++) {
-      const objA = this.objects[i];
-      if (!objA.model || objA.disposed) continue;
-      
-      // Skip static objects in first loop for optimization
-      if (this.isStaticObject(objA)) continue;
-      
-      const boxA = this.createScaledBoundingBox(objA);
-      if (!boxA) continue;
-      
-      for (let j = 0; j < this.objects.length; j++) {
-        if (i === j) continue; // Skip self
-        
-        const objB = this.objects[j];
-        if (!objB.model || objB.disposed) continue;
-        
-        const boxB = this.createScaledBoundingBox(objB);
-        if (!boxB) continue;
-        
-        if (boxA.intersectsBox(boxB)) {
-          // Handle special collisions first
-          const specialHandled = this.handleSpecialCollisions(objA, objB);
-          
-          if (!specialHandled) {
-            // Default collision notification
-            EventManager.instance.notify(EVENT.COLLISION, {objA, objB});
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * Force full collision check (for Generator or debugging)
-   * @param {boolean} isForGenerate - Whether this is for generation purposes
-   */
-  updateAll(isForGenerate = false) {
-    if (GAMECONFIG.DEBUG === true && !isForGenerate){
-      this.drawBoxHelpers();
-    }
-
-    const collisions = this.checkAllCollisions({ 
-      includeStatic: true, 
-      includeDisposed: false 
-    });
-    
-    collisions.forEach(({ objA, objB }) => {
-      if (isForGenerate) {
-        // For generation, just return collision data without events
-        return { objA, objB };
-      } else {
-        // For game logic, fire events
-        const specialHandled = this.handleSpecialCollisions(objA, objB);
-        
-        if (!specialHandled) {
-          EventManager.instance.notify(EVENT.COLLISION, {objA, objB});
-        }
-      }
-    });
-    
-    return isForGenerate ? collisions : null;
-  }
-
-  /**
-   * Get all objects within radius of position
-   * @param {THREE.Vector3} position - Center position
-   * @param {number} radius - Search radius
-   * @param {Array} excludeTypes - Object types to exclude
-   * @returns {Array} Objects within radius
-   */
-  getObjectsInRadius(position, radius, excludeTypes = []) {
-    return this.objects.filter(obj => {
-      if (!obj.model || obj.disposed) return false;
-      if (excludeTypes.some(type => obj instanceof type)) return false;
-      
-      const distance = position.distanceTo(obj.position);
-      return distance <= radius;
-    });
-  }
-
-  /**
-   * Dispose collision manager
+   * Dispose collision manager and clean up resources.
    */
   dispose() {
-    this.objects = [];
+    this.dynamicObjects = [];
+    this.staticObjects = [];
     
-    // Clean up box helpers
-    if (GAMECONFIG.DEBUG === true) {
-      this.boxHelpers.forEach((boxHelper) => {
+    // Clear the octree and all caches
+    this.octree.clear();
+    this.bboxCache = new WeakMap();
+
+    // Clean up debug box helpers
+    this.boxHelpers.forEach((boxHelper) => {
         if (boxHelper && Game.instance?.scene) {
           Game.instance.scene.remove(boxHelper);
         }
-      });
-    }
+    });
     this.boxHelpers.clear();
     
     CollisionManager.instance = null;

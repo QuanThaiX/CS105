@@ -3,6 +3,7 @@ import { TANKTYPE } from './utils.js';
 export const GAMECONFIG = Object.freeze({
     DEBUG: false,
     WORLD_BOUNDARY: 500,
+    
     SCENERY: {
         NUM_ROCKS: 60,
         ROCK_TYPES: ['rock09', 'rock13'],
