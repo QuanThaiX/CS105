@@ -32,7 +32,7 @@ class SoundManager {
         this.sounds.tankMoving.volume = 0.05;
         this.sounds.tankShot.volume = 1.0;
         this.sounds.barrelExplosion.volume = 1;
-        this.sounds.tankDestruction.volume = 1;
+        this.sounds.tankDestruction.volume = 0.2;
 
         // Preload all sounds
         Object.values(this.sounds).forEach(sound => {
@@ -97,12 +97,12 @@ class SoundManager {
             
             // Simple distance-based volume adjustment
             if (position) {
-                const adjustedVolume = this.calculateDistanceVolume(position, 0.7, 150);
+                const adjustedVolume = this.calculateDistanceVolume(position, 0.1, 150);
                 audio.volume = adjustedVolume;
             } else {
-                audio.volume = 0.7;
+                audio.volume = 0.1;
             }
-            
+            console.log(audio.volume)
             audio.play().catch(error => {
                 console.error('Error playing tank destruction sound:', error);
             });
