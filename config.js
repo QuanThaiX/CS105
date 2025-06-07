@@ -1,15 +1,75 @@
 import { TANKTYPE } from './utils.js';
+import * as THREE from 'three';
+
+export const QUALITY = Object.freeze({
+    LOW: 'LOW',
+    MEDIUM: 'MEDIUM',
+    HIGH: 'HIGH',
+});
+
+const QUALITY_SETTINGS_PROFILES = {
+    [QUALITY.LOW]: {
+        antialias: false,
+        pixelRatio: 1,
+        shadowMapSize: 512,
+        shadowType: THREE.PCFShadowMap,
+        shadowRadius: 1,
+        toneMapping: THREE.NoToneMapping,
+        exposure: 1.0,
+        extraLights: false,
+        useSky: false,
+    },
+    [QUALITY.MEDIUM]: {
+        antialias: true,
+        pixelRatio: Math.min(window.devicePixelRatio, 1.5),
+        shadowMapSize: 2048,
+        shadowType: THREE.PCFSoftShadowMap,
+        shadowRadius: 3,
+        toneMapping: THREE.ACESFilmicToneMapping,
+        exposure: 1.2,
+        extraLights: true,
+        useSky: true,
+    },
+    [QUALITY.HIGH]: {
+        antialias: true,
+        pixelRatio: window.devicePixelRatio,
+        shadowMapSize: 4096,
+        shadowType: THREE.PCFSoftShadowMap,
+        shadowRadius: 5,
+        toneMapping: THREE.ACESFilmicToneMapping,
+        exposure: 1.2,
+        extraLights: true,
+        useSky: true,
+    }
+};
+
+export const gameSettings = {
+    quality: QUALITY.MEDIUM, // Default quality
+};
+export function loadSettings() {
+    const savedQuality = localStorage.getItem('tankGame_quality');
+    if (savedQuality && Object.values(QUALITY).includes(savedQuality)) {
+        gameSettings.quality = savedQuality;
+        console.log(`Loaded quality setting: ${savedQuality}`);
+    }
+}
+
+// Function to save settings to localStorage. Call this when the setting is changed.
+export function saveSettings() {
+    localStorage.setItem('tankGame_quality', gameSettings.quality);
+    console.log(`Saved quality setting: ${gameSettings.quality}`);
+}
 
 export const GAMECONFIG = Object.freeze({
     DEBUG: false,
     WORLD_BOUNDARY: 500,
-    
+    QUALITY_PROFILES: QUALITY_SETTINGS_PROFILES,
     SCENERY: {
         NUM_ROCKS: 60,
         ROCK_TYPES: ['rock09', 'rock13'],
         ROCK_SCALE_MIN: 3.0,
         ROCK_SCALE_MAX: 14,
-        NUM_TREES: 40,
+        NUM_TREES: 80,
         TREE_TYPES: ['tree01'],
         TREE_SCALE_MIN: 0.9,
         TREE_SCALE_MAX: 2.9,
@@ -30,7 +90,7 @@ export const GAMECONFIG = Object.freeze({
         MAX_SPAWN_RADIUS_FACTOR: 0.95, // Scenery will spawn up to this factor of (WORLD_BOUNDARY / 2)
     },
     ENEMY_CONFIG: {
-        NUM_ENEMIES: 8,
+        NUM_ENEMIES: 3,
         ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V003],
         ENEMY_POINT_VALUE: (type) => {
             switch(type) {
@@ -59,7 +119,7 @@ export const GAMECONFIG = Object.freeze({
         
         // =================== RESPAWN CONFIGURATION ===================
         RESPAWN: {
-            ENABLED: true,                    // Bật/tắt respawn system
+            ENABLED: false,                    // Bật/tắt respawn system
             MIN_DELAY: 2000,                  // Thời gian tối thiểu trước khi spawn (ms)
             MAX_DELAY: 5000,                  // Thời gian tối đa trước khi spawn (ms)
             MIN_DISTANCE_FROM_PLAYER: 50,    // Khoảng cách tối thiểu từ player

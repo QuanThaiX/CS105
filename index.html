@@ -29,7 +29,7 @@
             <div id="bottom-panel">
                 <!-- Container for prev button, tank info, next button in a row -->
                 <div id="tank-selection-controls">
-                    <div id="prev-tank" class="nav-button"></div>
+                    <div id="prev-tank" class="nav-button"><</div>
                     
                     <div id="tank-info-center"> <!-- Groups tank name and stats -->
                         <div id="tank-name">Tank v001</div>
@@ -37,19 +37,19 @@
                             <div class="stat-container">
                                 <div class="stat-label">Power</div>
                                 <div class="stat-bar">
-                                    <div id="power-stat" class="stat-fill" style="width: 80%; background-color: #ff0000;"></div>
+                                    <div id="power-stat" class="stat-fill-power" style="width: 80%; background-color: #ff0000;"></div>
                                 </div>
                             </div>
                             <div class="stat-container">
                                 <div class="stat-label">Speed</div>
                                 <div class="stat-bar">
-                                    <div id="speed-stat" class="stat-fill" style="width: 60%; background-color: #00ff00;"></div>
+                                    <div id="speed-stat" class="stat-fill-speed" style="width: 60%; background-color: #00ff00;"></div>
                                 </div>
                             </div>
                             <div class="stat-container">
                                 <div class="stat-label">Defense</div>
                                 <div class="stat-bar">
-                                    <div id="defense-stat" class="stat-fill" style="width: 70%; background-color: #0000ff;"></div>
+                                    <div id="defense-stat" class="stat-fill-defense" style="width: 70%; background-color: #0000ff;"></div>
                                 </div>
                             </div>
                         </div>
@@ -98,6 +98,33 @@
                 <button id="win-menu-button" class="endgame-button">Back to Menu</button>
                 <button id="win-restart-button" class="endgame-button">Play Again</button>
             </div>
+        </div>
+    </div>
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span id="close-settings-button" class="close-button">×</span>
+            <h2>Settings</h2>
+            
+            <div class="setting-item">
+                <h3>Graphics Quality</h3>
+                <p class="setting-description">Changes require a restart to take effect.</p>
+                <div id="quality-options" class="options-group">
+                    <label>
+                        <input type="radio" name="quality" value="LOW">
+                        <span>Low</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="quality" value="MEDIUM">
+                        <span>Medium</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="quality" value="HIGH">
+                        <span>High</span>
+                    </label>
+                </div>
+            </div>
+
+            <button id="apply-settings-button" class="menu-button">Apply & Restart</button>
         </div>
     </div>
 
