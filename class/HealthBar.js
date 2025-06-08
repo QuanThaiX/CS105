@@ -1,13 +1,13 @@
-import * as THREE from 'three'
-import { Game } from './Game.js'
-import { GAMECONFIG } from '../config.js'
+import * as THREE from 'three';
+import { Game } from './Game.js';
 
 class HealthBar {
     constructor(parent, maxHp) {
         this.parent = parent;
         this.maxHp = maxHp;
         this.currentHP = maxHp;
-        
+        this.isReady = false;
+
         this.barWidth = 2.0;
         this.barHeight = 0.25;
         this.yOffset = 2.5;
@@ -23,20 +23,26 @@ class HealthBar {
             map: this.texture,
             transparent: true,
             depthTest: true,
-            sizeAttenuation: true // Đảm bảo thanh máu thay đổi kích thước theo khoảng cách
+            sizeAttenuation: true
         });
         
         this.sprite = new THREE.Sprite(material);
         this.sprite.scale.set(this.barWidth, this.barHeight, 1);
         
-        Game.instance.scene.add(this.sprite);
+        this.sprite.visible = false; 
         
+        Game.instance.scene.add(this.sprite);
         this.updateBar();
     }
     
+    setReady() {
+        this.isReady = true;
+        this.sprite.visible = true;
+        this.update(); 
+    }
+
     updateHP(hp) {
         this.currentHP = Math.max(0, Math.min(hp, this.maxHp));
-        this.sprite.scale.set(this.barWidth, this.barHeight, 1);
         this.updateBar();
     }
     
@@ -61,28 +67,34 @@ class HealthBar {
     }
     
     update() {
-        if (this.parent && this.parent.position && this.sprite) {
-            let yOffset = this.yOffset;
-            
-            if (this.parent.tankType && this.parent.tankType.name === "V007") {
-                yOffset = 3.5;
-            }
-            
-            this.sprite.position.set(
-                this.parent.position.x,
-                this.parent.position.y + yOffset,
-                this.parent.position.z
-            );
-            
-            this.sprite.renderOrder = 100;
+        if (!this.isReady || !this.parent || !this.parent.position || !this.sprite) {
+            return;
         }
+        
+        
+        let yOffset = this.yOffset;
+        if (this.parent.tankType && this.parent.tankType.name === "V003") {
+            yOffset = 4.5;
+        }
+        if (this.parent.tankType && this.parent.tankType.name === "V007") {
+            yOffset = 3.5;
+        }
+        
+        this.sprite.position.set(
+            this.parent.position.x,
+            this.parent.position.y + yOffset,
+            this.parent.position.z
+        );
+        this.sprite.renderOrder = 100;
     }
     
     remove() {
         if (this.sprite) {
             Game.instance.scene.remove(this.sprite);
             this.sprite.material.dispose();
-            this.sprite.material.map.dispose();
+            if (this.sprite.material.map) {
+                this.sprite.material.map.dispose();
+            }
             this.sprite = null;
         }
     }

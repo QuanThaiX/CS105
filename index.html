@@ -8,6 +8,31 @@
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
+<div id="enter-screen">
+    <div class="enter-overlay"></div>
+
+    <div class="enter-content">
+
+        <header class="game-intro">
+            <h1 class="game-title">Tank Annihilation</h1>
+            <p class="game-subtitle">Enter the arena of 3D tank combat.</p>
+        </header>
+
+        <main class="call-to-action">
+            <button id="enter-game-button" class="enter-button">
+                <span class="button-text">Enter the battle field</span>
+                <span class="button-icon">►</span>
+            </button>
+        </main>
+
+        <footer class="game-credits">
+            <p>A Game by <strong>NULL</strong></p>
+            <a href="https://github.com/QuanThaiX/CS105" target="_blank" rel="noopener noreferrer">
+                Find this project on GitHub
+            </a>
+        </footer>
+    </div>
+</div>
     <div id="menu-container">
         <!-- Left Menu -->
         <div id="menu-left">
@@ -61,7 +86,7 @@
             </div>
         </div>
     </div>
-
+    <div id="message-container"></div>
     <!-- Game Container -->
     <div id="game-container">
         <div id="hud">
@@ -100,33 +125,70 @@
             </div>
         </div>
     </div>
-    <div id="settings-modal" class="modal-overlay">
-        <div class="modal-content">
-            <span id="close-settings-button" class="close-button">×</span>
-            <h2>Settings</h2>
-            
-            <div class="setting-item">
-                <h3>Graphics Quality</h3>
-                <p class="setting-description">Changes require a restart to take effect.</p>
-                <div id="quality-options" class="options-group">
-                    <label>
-                        <input type="radio" name="quality" value="LOW">
-                        <span>Low</span>
-                    </label>
-                    <label>
-                        <input type="radio" name="quality" value="MEDIUM">
-                        <span>Medium</span>
-                    </label>
-                    <label>
-                        <input type="radio" name="quality" value="HIGH">
-                        <span>High</span>
-                    </label>
-                </div>
+ <div id="settings-modal" class="modal-overlay">
+    <div class="modal-content">
+        <span id="close-settings-button" class="close-button">×</span>
+        <h2>Settings</h2>
+        
+        <div class="setting-item">
+            <h3>Graphics Quality</h3>
+            <p class="setting-description"></p>
+            <div id="quality-options" class="options-group">
+                <label>
+                    <input type="radio" name="quality" value="LOW">
+                    <span>Low</span>
+                </label>
+                <label>
+                    <input type="radio" name="quality" value="MEDIUM">
+                    <span>Medium</span>
+                </label>
+                <label>
+                    <input type="radio" name="quality" value="HIGH">
+                    <span>High</span>
+                </label>
             </div>
-
-            <button id="apply-settings-button" class="menu-button">Apply & Restart</button>
         </div>
+
+        <!-- ADDED: Fog Toggle Setting -->
+        <div class="setting-item">
+            <h3>Enable Fog</h3>
+            <p class="setting-description">Adds atmospheric fog for depth. Can be toggled on/off instantly during gameplay.</p>
+            <div class="options-group">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="fog-toggle">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+
+        <h3 class="settings-subtitle">Volume</h3>
+
+        <div class="setting-item">
+            <label for="master-volume-slider">Master Volume</label>
+            <div class="slider-container">
+                <input type="range" id="master-volume-slider" min="0" max="100" value="100">
+                <span id="master-volume-value">100%</span>
+            </div>
+        </div>
+
+        <div class="setting-item">
+            <label for="music-volume-slider">Music</label>
+            <div class="slider-container">
+                <input type="range" id="music-volume-slider" min="0" max="100" value="80">
+                <span id="music-volume-value">80%</span>
+            </div>
+        </div>
+
+        <div class="setting-item">
+            <label for="sfx-volume-slider">Sound Effects (SFX)</label>
+            <div class="slider-container">
+                <input type="range" id="sfx-volume-slider" min="0" max="100" value="100">
+                <span id="sfx-volume-value">100%</span>
+            </div>
+        </div>
+        <button id="apply-settings-button" class="menu-button">Apply Changes</button>
     </div>
+</div>
 
     <script type="importmap">
         {

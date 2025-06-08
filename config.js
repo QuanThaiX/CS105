@@ -18,6 +18,7 @@ const QUALITY_SETTINGS_PROFILES = {
         exposure: 1.0,
         extraLights: false,
         useSky: false,
+        useFog: false, // ADDED: Fog setting for LOW
     },
     [QUALITY.MEDIUM]: {
         antialias: true,
@@ -29,6 +30,7 @@ const QUALITY_SETTINGS_PROFILES = {
         exposure: 1.2,
         extraLights: true,
         useSky: true,
+        useFog: true, // ADDED: Fog setting for MEDIUM
     },
     [QUALITY.HIGH]: {
         antialias: true,
@@ -40,24 +42,56 @@ const QUALITY_SETTINGS_PROFILES = {
         exposure: 1.2,
         extraLights: true,
         useSky: true,
+        useFog: true, // ADDED: Fog setting for HIGH
     }
 };
 
 export const gameSettings = {
-    quality: QUALITY.MEDIUM, // Default quality
+    quality: QUALITY.MEDIUM,
+    fog: true, 
+    volumeMaster: 1.0,
+    volumeMusic: 0.8,
+    volumeSfx: 1.0,
 };
+
 export function loadSettings() {
-    const savedQuality = localStorage.getItem('tankGame_quality');
-    if (savedQuality && Object.values(QUALITY).includes(savedQuality)) {
-        gameSettings.quality = savedQuality;
-        console.log(`Loaded quality setting: ${savedQuality}`);
+    try {
+        const savedSettings = localStorage.getItem('tankGameSettings');
+        if (savedSettings) {
+            const parsed = JSON.parse(savedSettings);
+
+            // Load quality with a fallback
+            if (parsed.quality && Object.values(QUALITY).includes(parsed.quality)) {
+                gameSettings.quality = parsed.quality;
+            }
+
+            gameSettings.fog = parsed.fog ?? QUALITY_SETTINGS_PROFILES[gameSettings.quality].useFog;
+            gameSettings.volumeMaster = parsed.volumeMaster ?? 1.0;
+            gameSettings.volumeMusic = parsed.volumeMusic ?? 0.8;
+            gameSettings.volumeSfx = parsed.volumeSfx ?? 1.0;
+            
+            console.log('⚙️ Settings loaded:', gameSettings);
+        } else {
+            // No saved settings, so apply defaults from the current quality profile
+            const qualityProfile = QUALITY_SETTINGS_PROFILES[gameSettings.quality];
+            gameSettings.fog = qualityProfile.useFog;
+            console.log('⚙️ No saved settings found, using defaults for MEDIUM quality.');
+        }
+    } catch (e) {
+        console.error('Failed to load settings from localStorage', e);
+        // If loading fails, the defaults in gameSettings will be used
     }
 }
 
 // Function to save settings to localStorage. Call this when the setting is changed.
 export function saveSettings() {
-    localStorage.setItem('tankGame_quality', gameSettings.quality);
-    console.log(`Saved quality setting: ${gameSettings.quality}`);
+    try {   
+        // We now save the entire gameSettings object as a single JSON string
+        localStorage.setItem('tankGameSettings', JSON.stringify(gameSettings));
+        console.log('⚙️ Settings saved.');
+    } catch (e) {
+        console.error('Failed to save settings to localStorage', e);
+    }
 }
 
 export const GAMECONFIG = Object.freeze({

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { createGround, createSky, createCamera, createDebugHelpers, createLights, createRenderer, createScene, updateShadowArea } from './createEnvironment.js';
+import { createGround, createSky, createCamera, createDebugHelpers, createLights, createRenderer, createScene, updateShadowArea, updateSceneFog } from './createEnvironment.js';
 import { startLoadingScreen, hideLoadingScreen } from '../UI.js';
-import { GAMECONFIG } from '../config.js';
+import { QUALITY, GAMECONFIG, gameSettings, loadSettings, saveSettings } from '../config.js';
 import { FACTION, EVENT, TANKTYPE } from '../utils.js';
 import { Tank } from './Tank.js';
 import { PlayerControl } from './PlayerControl.js';
@@ -81,6 +81,7 @@ class Game {
   boundHandleGameOver;
   boundHandleGameWin;
   boundHandleTankDestroyed;
+  boundHandleFogSettingChanged;;
   boundOnWindowResize;
 
   // Respawn tracking
@@ -94,7 +95,6 @@ class Game {
     }
     Game.instance = this;
 
-    // Use GAMECONFIG from the end of the file, falling back to local defaults
     this.gameConfig = {
       ...LOCAL_GAMECONFIG_DEFAULTS,
       ...(typeof GAMECONFIG !== 'undefined' ? GAMECONFIG : {}), // GAMECONFIG is exported later
@@ -117,12 +117,12 @@ class Game {
     this.enemiesKilled = 0;
     this.nextSpawnId = 1;
 
+    this.boundHandleFogSettingChanged = this.handleFogSettingChanged.bind(this);
     this.boundHandlePlayerDie = this.handlePlayerDie.bind(this);
     this.boundHandleGameOver = this.handleGameOver.bind(this);
     this.boundHandleGameWin = this.handleGameWin.bind(this);
     this.boundHandleTankDestroyed = this.handleTankDestroyed.bind(this);
     this.boundOnWindowResize = this.onWindowResize.bind(this);
-
     this.initGame();
   }
 
@@ -130,7 +130,7 @@ class Game {
     this.score = 0;
     this.spawnManager = new SpawnManager(this.gameConfig.WORLD_BOUNDARY, 20)
     this.collisionManager = new CollisionManager();
-    this.eventManager = new EventManager();
+    // this.eventManager = new EventManager();
     this.projectilesManager = new ProjectilesManager();
     this.effectManager = new Effect();
     this.soundManager = new SoundManager();
@@ -156,7 +156,7 @@ class Game {
     if (Game.debug) {
       this.debugHelpers = createDebugHelpers(this.scene);
     }
-
+    this.updateFog();
     this.registerEventListeners();
     this.loadLevel();
   }
@@ -256,7 +256,21 @@ class Game {
       });
     }
   }
-
+  updateFog() {
+      if (!this.scene) return;
+      const qualityProfile = this.gameConfig.QUALITY_PROFILES[gameSettings.quality];
+      const settings = {
+          enabled: gameSettings.fog,
+          useSky: qualityProfile.useSky
+      };
+      updateSceneFog(this.scene, settings);
+  }
+  
+  // ADDED: New handler for when the fog setting is changed in the UI
+  handleFogSettingChanged() {
+    console.log('Fog setting updated. Applying changes to the scene.');
+    this.updateFog();
+  }
   registerEventListeners() {
     window.addEventListener('resize', this.boundOnWindowResize, false);
     
@@ -340,15 +354,50 @@ class Game {
     const { tank, pointValue } = data;
 
     if (tank && tank.faction === FACTION.ENEMY && pointValue !== undefined) {
-      this.addScore(pointValue);
-      this.enemiesKilled++; // Track total kills
-      tank.isDestroyed = true; 
-      const index = this.enemies.indexOf(tank);
-      if (index !== -1) {
-        this.enemies.splice(index, 1);
-      }
+        this.addScore(pointValue);
+        this.enemiesKilled++; // Track total kills
+        tank.isDestroyed = true;
+        const index = this.enemies.indexOf(tank);
+        if (index !== -1) {
+            this.enemies.splice(index, 1);
+        }
 
-      // Enhanced event notification
+        if (this.playerTank && !this.playerTank.isDestroyed && tank.maxHp > 0) {
+            const healAmount = tank.maxHp * 1.0;
+            
+            const actualHealAmount = this.playerTank.heal(healAmount);
+
+            if (actualHealAmount > 0) {
+                const healPosition = this.playerTank.position.clone();
+
+                const healLight = new THREE.PointLight(0x50ff50, 250, 30, 2);
+                healLight.position.copy(healPosition).add(new THREE.Vector3(0, 1.5, 0)); 
+                this.scene.add(healLight);
+
+                setTimeout(() => {
+                    if (this.scene) { 
+                        this.scene.remove(healLight);
+                        healLight.dispose();
+                    }
+                }, 600);
+
+                EventManager.instance.notify(EVENT.AUDIO_PLAY, {
+                    soundId: `heal_effect_${Date.now()}`, 
+                    soundPath: './assets/sound/heal.mp3', 
+                    volume: 0.7,
+                    position: healPosition,
+                    loop: false,
+                });
+                
+                EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
+                    message: `+${Math.round(actualHealAmount)} HP`,
+                    duration: 1500,
+                    type: 'heal',
+                });
+            }
+        }
+
+      // Enhanced event notification for score
       EventManager.instance.notify(EVENT.SCORE_CHANGED, {
         score: this.score,
         highScore: this.highScore,
@@ -358,14 +407,17 @@ class Game {
         totalSpawned: this.totalEnemiesSpawned
       });
 
-      // Respawn system với configuration
+      // Respawn system logic
       const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
-      if (respawnConfig.ENABLED && (this.enemies.length - 1) < respawnConfig.MAX_ENEMIES_ALIVE) {
+      // The enemy has already been removed, so we check current length
+      if (respawnConfig.ENABLED && this.enemies.length < respawnConfig.MAX_ENEMIES_ALIVE) {
           const respawnDelay = this.generator.getRandomInRange(respawnConfig.MIN_DELAY, respawnConfig.MAX_DELAY);
           
-          setTimeout(() => {
-              this.showSpawnWarning();
-          }, respawnDelay - 2000); // Show warning 2s before spawn
+          if (respawnDelay > 2000) {
+              setTimeout(() => {
+                  this.showSpawnWarning();
+              }, respawnDelay - 2000); // Show warning 2s before spawn
+          }
           
           setTimeout(() => {
               this.spawnNewEnemyTank();

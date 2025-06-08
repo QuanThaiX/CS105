@@ -168,8 +168,8 @@ function createSky(scene) {
     skyUniforms['mieDirectionalG'].value = 0.8;
 
     const sun = new THREE.Vector3();
-    const phi = THREE.MathUtils.degToRad(45);
-    const theta = THREE.MathUtils.degToRad(60);
+    const phi = toRad(45);
+    const theta = toRad(60);
     sun.setFromSphericalCoords(1, phi, theta);
     skyUniforms['sunPosition'].value.copy(sun);
 
@@ -192,7 +192,7 @@ function createGround(scene, { width = 500, height = 500, repeatX = 20, repeatY 
     const texturePaths = {
         map: './assets/ground/rocky_terrain_02_diff_1k.jpg',
         normalMap: './assets/ground/rocky_terrain_02_nor_gl_1k.jpg',
-        metalnessMap: './assets/ground/rocky_terrain_02_spec_1k.jpg', // Often spec map can be used for metalness
+        metalnessMap: './assets/ground/rocky_terrain_02_spec_1k.jpg',
         aoMap: './assets/ground/rocky_terrain_02_arm_1k.jpg',
     };
 
@@ -206,8 +206,8 @@ function createGround(scene, { width = 500, height = 500, repeatX = 20, repeatY 
 
     const material = new THREE.MeshStandardMaterial({
         ...textures,
-        metalness: 0.5,
-        roughness: 0.8,
+        metalness: 0.0,
+        roughness: 0.6,
     });
 
     const geometry = new THREE.PlaneGeometry(width, height, 1, 1);
@@ -217,6 +217,7 @@ function createGround(scene, { width = 500, height = 500, repeatX = 20, repeatY 
     const plane = new THREE.Mesh(geometry, material);
     plane.rotation.x = toRad(-90);
     plane.receiveShadow = true;
+    plane.castShadow = true;
     scene.add(plane);
     
     return plane;
@@ -257,6 +258,36 @@ function handleWindowResize(camera, renderer) {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+/**
+ * ADDED: Applies or removes fog from a scene based on settings.
+ * @param {THREE.Scene} scene The scene to apply fog to.
+ * @param {object} settings An object containing fog and sky settings.
+ * @param {boolean} settings.enabled Whether to enable or disable fog.
+ * @param {boolean} settings.useSky Whether a skybox is being used.
+ */
+function updateSceneFog(scene, { enabled, useSky }) {
+    if (enabled) {
+        if (!scene.fog) {
+            const fogColor = 0x9fb8d1;
+            const nearDistance = 10;
+            const farDistance = 150;
+            scene.fog = new THREE.Fog(fogColor, nearDistance, farDistance);
+
+            if (!useSky) {
+                scene.background = new THREE.Color(fogColor);
+            }
+        }
+    } else {
+        if (scene.fog) {
+            scene.fog = null;
+            if (!useSky) {
+                scene.background = new THREE.Color(0x123456);
+            }
+        }
+    }
+}
+
+
 export {
     createRenderer,
     createCamera,
@@ -266,5 +297,6 @@ export {
     createDebugHelpers,
     createScene,
     handleWindowResize,
-    updateShadowArea
+    updateShadowArea,
+    updateSceneFog // EXPORTED the new function
 };

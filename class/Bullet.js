@@ -37,14 +37,20 @@ class Bullet extends GameObject{
 
     Bullet.count++;
     CollisionManager.instance.add(this);
-    this.boundHandleCollision = this.handleCollision.bind(this);
-    EventManager.instance.subscribe(EVENT.COLLISION, this.boundHandleCollision);
+    // this.boundHandleCollision = this.handleCollision.bind(this);
+    // EventManager.instance.subscribe(EVENT.COLLISION, this.boundHandleCollision);
   }
 
   setVelocity(velocityVector) {
     this.velocity.copy(velocityVector);
   }
+  onHit(otherObject) {
+    if (this.hasCollided) return;
 
+    this.hasCollided = true;
+    this.createImpactEffect();
+    this.dispose();
+  }
   createTracerHead() {
     const geometry = new THREE.SphereGeometry(0.2, 8, 8);
     const material = new THREE.MeshStandardMaterial({ 
@@ -137,7 +143,6 @@ class Bullet extends GameObject{
       const otherObject = objA === this ? objB : objA;
       
       if ((otherObject instanceof Tank && this.faction !== otherObject.faction) || otherObject instanceof Rock || otherObject instanceof Tree) {
-        console.log(`Log_${EVENT.COLLISION}: ${this.id} -- ${otherObject.id}`);
         this.hasCollided = true;
         
 

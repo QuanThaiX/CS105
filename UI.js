@@ -2,9 +2,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { Game } from './class/Game.js';
+import { UIManager } from './class/UIManager.js'; // Import the new UIManager
 import { EVENT, COLOR, TANKTYPE, loadTankModel } from './utils.js';
 import { ModelLoader } from './loader.js';
+import { EventManager } from './class/EventManager.js'; // Adjust path if needed
+import { SoundManager } from './class/SoundManager.js'; // Adjust path if needed
 import { QUALITY, GAMECONFIG, gameSettings, loadSettings, saveSettings } from './config.js';
+
+const eventManager = new EventManager();
+const soundManager = new SoundManager();
+const uiManager = new UIManager();
 
 let game = null;
 let selectedTankModel = TANKTYPE.V001; // Default selected tank
@@ -71,8 +78,9 @@ async function initMenuScene() {
 
     menuScene = new THREE.Scene();
     menuScene.background = new THREE.Color(0x111827); 
-    menuScene.fog = new THREE.Fog(0x111827, 10, 30);
-
+    if (gameSettings.fog) {
+        menuScene.fog = new THREE.Fog(0x111827, 1, 300);
+    }
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
     hemiLight.position.set(0, 20, 0);
     menuScene.add(hemiLight);
@@ -349,6 +357,8 @@ function returnToMainMenu(preserveGameInstanceForPause = false) {
     document.getElementById('game-container').style.display = 'none';
     document.getElementById('menu-container').style.display = 'flex';
 
+    eventManager.notify(EVENT.ENTER_LOBBY);
+
     document.getElementById('continue-button').disabled = !(game && game.canResume());
     onWindowResize();
 }
@@ -375,34 +385,83 @@ const openSettingsButton = document.getElementById('settings-button');
 const closeSettingsButton = document.getElementById('close-settings-button');
 const applySettingsButton = document.getElementById('apply-settings-button');
 
+const masterVolumeSlider = document.getElementById('master-volume-slider');
+const musicVolumeSlider = document.getElementById('music-volume-slider');
+const sfxVolumeSlider = document.getElementById('sfx-volume-slider');
+const fogToggle = document.getElementById('fog-toggle');
+const masterVolumeValue = document.getElementById('master-volume-value');
+const musicVolumeValue = document.getElementById('music-volume-value');
+const sfxVolumeValue = document.getElementById('sfx-volume-value');
 openSettingsButton.addEventListener('click', () => {
+    // Quality settings
     const currentQuality = gameSettings.quality;
     const radioToCheck = document.querySelector(`#quality-options input[value="${currentQuality}"]`);
     if (radioToCheck) {
         radioToCheck.checked = true;
     }
+
+    // Set slider positions and text based on current gameSettings
+    fogToggle.checked = gameSettings.fog;
+    masterVolumeSlider.value = gameSettings.volumeMaster * 100;
+    musicVolumeSlider.value = gameSettings.volumeMusic * 100;
+    sfxVolumeSlider.value = gameSettings.volumeSfx * 100;
+    masterVolumeValue.textContent = `${Math.round(masterVolumeSlider.value)}%`;
+    musicVolumeValue.textContent = `${Math.round(musicVolumeSlider.value)}%`;
+    sfxVolumeValue.textContent = `${Math.round(sfxVolumeSlider.value)}%`;
+
     settingsModal.style.display = 'flex';
 });
 
+// Real-time update listeners for sliders
+function createVolumeUpdater(slider, valueLabel, settingKey) {
+    slider.addEventListener('input', () => {
+        const volumePercentage = Math.round(slider.value);
+        const volumeDecimal = volumePercentage / 100;
+
+        valueLabel.textContent = `${volumePercentage}%`;
+
+        gameSettings[settingKey] = volumeDecimal;
+        eventManager.notify(EVENT.SETTINGS_UPDATED);
+    });
+}
+
+createVolumeUpdater(masterVolumeSlider, masterVolumeValue, 'volumeMaster');
+createVolumeUpdater(musicVolumeSlider, musicVolumeValue, 'volumeMusic');
+createVolumeUpdater(sfxVolumeSlider, sfxVolumeValue, 'volumeSfx');
+
+
+applySettingsButton.addEventListener('click', () => {
+    const selectedQuality = document.querySelector('#quality-options input:checked').value;
+    const newFogSetting = fogToggle.checked;
+    let reloadNeeded = false;
+    if (selectedQuality && selectedQuality !== gameSettings.quality) {
+        gameSettings.quality = selectedQuality;
+        reloadNeeded = true;
+    }
+    
+    if (newFogSetting !== gameSettings.fog) {
+        gameSettings.fog = newFogSetting;
+        eventManager.notify('FOG_SETTING_CHANGED', { enabled: newFogSetting });
+    }
+
+    saveSettings();
+    
+    settingsModal.style.display = 'none';
+    
+    if (reloadNeeded) {
+        alert("Graphics quality has been changed. The page will now reload to apply the new settings.");
+        location.reload();
+    }
+});
+
+
+// Listeners to close the modal
 closeSettingsButton.addEventListener('click', () => {
     settingsModal.style.display = 'none';
 });
 
 window.addEventListener('click', (event) => {
     if (event.target == settingsModal) {
-        settingsModal.style.display = 'none';
-    }
-});
-
-applySettingsButton.addEventListener('click', () => {
-    const selectedQuality = document.querySelector('#quality-options input:checked').value;
-    
-    if (selectedQuality && selectedQuality !== gameSettings.quality) {
-        gameSettings.quality = selectedQuality;
-        saveSettings();
-        settingsModal.style.display = 'none';
-        location.reload();
-    } else {
         settingsModal.style.display = 'none';
     }
 });
@@ -545,30 +604,45 @@ export function hideLoadingScreen() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
-    console.log("🎮 DOM loaded, initializing Tank3D game...");
-    try {
-        setupEndGameScreenEvents();
-        await Promise.race([
-            initMenuScene(),
-            new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Menu initialization timeout')), 45000);
-            })
-        ]);
-        if (modelLoader && modelLoader.isPreloaded) {
-            const cacheInfo = modelLoader.getCacheInfo();
-            console.log("🎯 Game initialized successfully!");
-        } else {
-            console.warn("🎯 Game initialized with fallback mode (no preload)");
-        }
-    } catch (error) {
+    console.log("🎮 DOM loaded, waiting for user interaction...");
+
+    const enterButton = document.getElementById('enter-game-button');
+    const enterScreen = document.getElementById('enter-screen');
+    const menuContainer = document.getElementById('menu-container');
+
+    // Make the whole screen clickable as a fallback
+    enterButton.addEventListener('click', handleGameEntry);     
+   async function handleGameEntry() {
+        // Prevent this from running more than once
+        enterButton.removeEventListener('click', handleGameEntry);
+        enterButton.disabled = true; // Also good practice to disable it
+        enterButton.textContent = 'Loading...';
+
+        enterScreen.style.opacity = '0';
+        setTimeout(() => {
+            enterScreen.style.display = 'none';
+        }, 500);
+
+        menuContainer.style.display = 'flex';
+
+        console.log("🚀 User interaction detected. Initializing game systems...");
+        try {
+            setupEndGameScreenEvents();
+            await initMenuScene();
+
+            console.log("🎵 Firing event to play lobby music.");
+            eventManager.notify(EVENT.ENTER_LOBBY); 
+
+        } catch (error) {
         console.error("❌ Critical error during game initialization:", error);
         const errorMessage = document.createElement('div');
         errorMessage.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#ff4444;color:white;padding:20px;border-radius:10px;text-align:center;z-index:9999;`;
         errorMessage.innerHTML = `<h3>Game Initialization Error</h3><p>Failed to load game resources. Please refresh the page and try again.</p><button onclick="location.reload()" style="margin-top:10px;padding:5px 10px;">Refresh Page</button>`;
         document.body.appendChild(errorMessage);
     }
+}
 });
 
 window.addEventListener('beforeunload', () => {

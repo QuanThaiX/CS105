@@ -5,6 +5,7 @@ import { Bullet } from "./Bullet.js";
 import { CollisionManager } from "./CollisionManager.js";
 import { Game } from './Game.js'
 import { HealthBar } from "./HealthBar.js";
+import { ReloadBar } from "./ReloadBar.js"; 
 import { GameObject } from './GameObject.js'
 import { EventManager } from "./EventManager.js";
 import { ProjectilesManager } from "./ProjectilesManager.js";
@@ -32,24 +33,117 @@ class Tank extends GameObject{
   prevRotation;
 
   HealthBar;
+  reloadBar;
+  enemyIndicator; 
+  indicatorLight;
 
   constructor(id, faction, position, isCollision, tankType = TANKTYPE.V001) {
-    super(id, faction, position, isCollision);
-    this.tankType = tankType;
-    this.setTankStats(this.tankType);
-    // console.log("Tank stats: ", this.tankType, this.hp, this.maxHp, this.moveSpeed, this.rotateSpeed, this.shootCooldown, this.damage, this.defense);
-    
-    // Sử dụng ModelLoader cache hoặc fallback to loadTankModel
-    this.loadTankModelFromCache();
+      super(id, faction, position, isCollision);
+      this.tankType = tankType;
+      this.setTankStats(this.tankType);
+      
+      this.healthBar = new HealthBar(this, this.hp); 
 
-    this.prevPosition = this.position.clone();
-    this.prevRotation = 0;
-    this.healthBar = new HealthBar(this, this.hp);
+      this.loadTankModelFromCache();
 
-    EventManager.instance.subscribe(EVENT.COLLISION, this.handleCollision.bind(this));
-    EventManager.instance.subscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
+      this.prevPosition = this.position.clone();
+      this.prevRotation = 0;
+      
+
+      if (this.faction === FACTION.PLAYER) {
+          this.reloadBar = new ReloadBar(this);
+      }
+      
+      EventManager.instance.subscribe(EVENT.COLLISION, this.handleCollision.bind(this));
+      EventManager.instance.subscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
+      EventManager.instance.subscribe(EVENT.OBJECT_HEALED, this.handleHeal.bind(this)); 
   }
 
+  setModel(model) {
+    // --- DEBUG LOG ---
+    console.log(`%c[Tank] SET_MODEL called for: ${this.id} (Faction: ${this.faction})`, 'color: lightblue');
+    super.setModel(model); 
+
+    if (this.healthBar) {
+        // --- DEBUG LOG ---
+        console.log(`%c[Tank] Calling healthBar.setReady() for ${this.id}`, 'color: lightblue; font-weight: bold;');
+        this.healthBar.setReady();
+    }
+
+    if (this.faction === FACTION.ENEMY) {
+      this.createEnemyIndicator();
+    }
+  }
+
+  createEnemyIndicator() {
+    if (!this.model) return; // Can't add indicator if there's no model to attach to
+
+    // --- 1. Create the Arrow (Indicator) ---
+    const arrowGeometry = new THREE.ConeGeometry(0.3, 0.6, 8); // Small cone
+    const arrowMaterial = new THREE.MeshBasicMaterial({ color: 0xff4444 }); // Bright red
+    this.enemyIndicator = new THREE.Mesh(arrowGeometry, arrowMaterial);
+
+    // Position the arrow above the tank model
+    this.enemyIndicator.position.set(0, 3.5, 0); // Adjust Y value as needed
+    this.enemyIndicator.rotation.x = Math.PI; // Point it downwards
+
+    // --- 2. Create the Red Light ---
+    this.indicatorLight = new THREE.PointLight(0xff0000, 100, 8); // Red light, intensity 2, range 8
+    this.indicatorLight.position.set(0, 1.5, 0); // Position it in the middle of the tank
+
+    // --- 3. Attach them to the tank model ---
+    // This makes them move and rotate along with the parent tank model automatically!
+    this.model.add(this.enemyIndicator);
+    this.model.add(this.indicatorLight);
+  }
+
+  // We need to override dispose to clean up the new objects
+  dispose() {
+    // --- Clean up indicator and light ---
+    if (this.model) {
+        if (this.enemyIndicator) {
+            this.model.remove(this.enemyIndicator);
+            this.enemyIndicator.geometry.dispose();
+            this.enemyIndicator.material.dispose();
+            this.enemyIndicator = null;
+        }
+        if (this.indicatorLight) {
+            this.model.remove(this.indicatorLight);
+            this.indicatorLight.dispose();
+            this.indicatorLight = null;
+        }
+    }
+
+    this.stopAutoShoot();
+    
+    if (this.hp <= 0) {
+      this.playDestructionSound();
+    }
+    
+    super.dispose(); // Call parent dispose AFTER removing our custom objects
+    if (this.faction === FACTION.ENEMY) {
+      Bot.instance.removeTank(this);
+    }
+    
+    if (this.healthBar) {
+      this.healthBar.remove();
+      this.healthBar = null;
+    }
+
+    EventManager.instance.notify(EVENT.TANK_DESTROYED, { 
+      tank: this,
+      position: this.position.clone(),
+      pointValue: this.faction === FACTION.ENEMY ? this.pointValue || 100 : 0,
+      killer: this.lastDamageSource || null,
+      explosionPosition: this.position.clone(),
+      tankType: this.tankType,
+      faction: this.faction
+    });
+    
+    EventManager.instance.unsubscribe(EVENT.COLLISION, this.handleCollision.bind(this));
+    EventManager.instance.unsubscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
+    CollisionManager.instance.remove(this);
+  }
   /**
    * Load tank model từ cache hoặc fallback to direct loading
    */
@@ -89,12 +183,17 @@ class Tank extends GameObject{
     this.defense = tankStats.defense;
   }
 
-  setTankHP(hp){
+setTankHP(hp) {
     this.hp = hp;
     this.maxHp = hp;
-    this.healthBar = new HealthBar(this, this.hp);
 
-  }
+    if (this.healthBar) {
+        this.healthBar.maxHp = this.maxHp; 
+        this.healthBar.updateHP(this.hp);
+    } else {
+        this.healthBar = new HealthBar(this, this.hp);
+    }
+}
 
 // MOVE --------------------------------------------------------------------------------------------------------------------------------
 
@@ -200,6 +299,9 @@ class Tank extends GameObject{
       bulletPosition.add(forward.clone().multiplyScalar(bulletOffsetZ));
       
       this.lastShotTime = currentTime;
+      if (this.reloadBar) {
+        this.reloadBar.startReload();
+      }
       EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
         tank: this,
         position: bulletPosition,
@@ -230,15 +332,28 @@ class Tank extends GameObject{
     }
   }
 
-  dispose(){
+  dispose() {
+    if (this.model) {
+        if (this.enemyIndicator) {
+            this.model.remove(this.enemyIndicator);
+            this.enemyIndicator.geometry.dispose();
+            this.enemyIndicator.material.dispose();
+            this.enemyIndicator = null;
+        }
+        if (this.indicatorLight) {
+            this.model.remove(this.indicatorLight);
+            this.indicatorLight.dispose();
+            this.indicatorLight = null;
+        }
+    }
+
     this.stopAutoShoot();
     
-    // Play tank destruction sound if tank died from damage
     if (this.hp <= 0) {
       this.playDestructionSound();
     }
     
-    super.dispose();
+    super.dispose(); // Call parent dispose AFTER removing our custom objects
     if (this.faction === FACTION.ENEMY) {
       Bot.instance.removeTank(this);
     }
@@ -247,8 +362,10 @@ class Tank extends GameObject{
       this.healthBar.remove();
       this.healthBar = null;
     }
-
-    // Enhanced tank destroyed event
+    if (this.reloadBar) {
+        this.reloadBar.remove();
+        this.reloadBar = null;
+    }
     EventManager.instance.notify(EVENT.TANK_DESTROYED, { 
       tank: this,
       position: this.position.clone(),
@@ -261,8 +378,10 @@ class Tank extends GameObject{
     
     EventManager.instance.unsubscribe(EVENT.COLLISION, this.handleCollision.bind(this));
     EventManager.instance.unsubscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
+    EventManager.instance.unsubscribe(EVENT.OBJECT_HEALED, this.handleHeal.bind(this));
     CollisionManager.instance.remove(this);
   }
+
 
   /**
    * Play tank destruction sound effect
@@ -284,7 +403,30 @@ class Tank extends GameObject{
       console.error('Error playing tank destruction sound:', error);
     }
   }
+  /**
+   * Heals the tank by a given amount, up to its max HP.
+   * @param {number} amount The amount of HP to restore.
+   * @returns {number} The actual amount of HP that was restored.
+   */
+  heal(amount) {
+    if (this.hp <= 0 || amount <= 0) {
+        return 0;
+    }
 
+    const oldHp = this.hp;
+    this.hp = Math.min(this.maxHp, this.hp + amount);
+    const actualHealAmount = this.hp - oldHp;
+
+    if (actualHealAmount > 0) {
+        EventManager.instance.notify(EVENT.OBJECT_HEALED, {
+            object: this,
+            amount: actualHealAmount,
+            newHp: this.hp
+        });
+    }
+
+    return actualHealAmount;
+  }
   takeDamage(atk, objSource){
     if (this.hp !== undefined || this.hp !== null){
       let damage = atk - this.defense > 0 ? atk - this.defense : 1;
@@ -317,7 +459,11 @@ class Tank extends GameObject{
     }
     return false;
   }
-
+  handleHeal({ object, newHp }) {
+    if (object === this && this.healthBar) {
+      this.healthBar.updateHP(newHp);
+    }
+  }
   handleDamage({ object, damage, objSource, remainingHp }) {
     if (object === this) {
       if (this.healthBar) {
@@ -327,14 +473,17 @@ class Tank extends GameObject{
     }
   }
 
-  handleCollision({ objA, objB }) {
+handleCollision({ objA, objB }) {
+    if (this.disposed) {
+        return;
+    }
+
     if (objA === this || objB === this) {
       const otherObject = objA === this ? objB : objA;
-      //console.log("collision: " + this.constructor.name + "---" + otherObject.constructor.name);
 
       if (otherObject instanceof Tank || otherObject instanceof Rock || otherObject instanceof Tree) {
         if (this.prevPosition) {
-          this.model.position.copy(this.prevPosition);
+          this.model.position.copy(this.prevPosition); // This is also good!
           this.position.copy(this.prevPosition);
           
           if (this.model.rotation.y !== this.prevRotation) {
@@ -342,16 +491,26 @@ class Tank extends GameObject{
           }
         }
       }
-
-      if (otherObject instanceof Bullet && this.faction !== otherObject.faction) {
-        this.takeDamage(otherObject.damage, otherObject);
-      }
     }
-  }
+}
 
   update() {
+    if (this.model) {
+        this.position.copy(this.model.position);
+    }
+
     if (this.healthBar) {
-      this.healthBar.update();
+        this.healthBar.update();
+    }
+    if (this.reloadBar) {
+        this.reloadBar.update();
+    }
+
+
+    if (this.enemyIndicator) {
+        // Create a simple bobbing motion using a sine wave based on time
+        const time = performance.now() * 0.002; // Speed of the bobbing
+        this.enemyIndicator.position.y = 3.5 + Math.sin(time) * 0.25; // Base height + bob amount
     }
 
     const currentTime = Date.now();

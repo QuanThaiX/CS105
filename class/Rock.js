@@ -11,7 +11,7 @@ class Rock extends GameObject {
         super(id, 'neutral', position, true);
         this.scale = scale;
         this.rockType = rockType;
-        this.rotation = rotation; // Góc xoay theo trục y (radians)
+        this.rotation = rotation; 
         this.hitBoxScale = HITBOX_SCALE.ROCK;
         this.loadModel();
     }
@@ -161,7 +161,6 @@ class Rock extends GameObject {
     }
 
     createFallbackModel() {
-        // Tạo hình khối đơn giản thay thế nếu không tải được model
         const geometry = new THREE.BoxGeometry(2 * this.scale, 2 * this.scale, 2 * this.scale);
         const material = new THREE.MeshStandardMaterial({ 
             color: 0x888888,
@@ -178,19 +177,15 @@ class Rock extends GameObject {
         model.add(mesh);
         this.setModel(model);
         
-        // Hiển thị box helper nếu debug mode
         if (Game.instance.debug) {
             this.createBoxHelper();
         }
     }
 
-    // Phương thức này được gọi khi Rock bị phá hủy
     destroy() {
-        // Có thể thêm hiệu ứng khi đá bị phá hủy ở đây nếu cần
         super.destroy();
     }
 
-    // Phương thức này được gọi khi Rock bị loại bỏ khỏi scene
     dispose() {
         if (this.boxHelper) {
             Game.instance.scene.remove(this.boxHelper);

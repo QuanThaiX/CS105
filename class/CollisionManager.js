@@ -42,10 +42,8 @@ class CollisionManager {
         new THREE.Vector3(-worldSize, -worldSize, -worldSize),
         new THREE.Vector3(worldSize, worldSize, worldSize)
     );
-    // Initialize the Octree with world bounds, max objects per node, and max depth.
     this.octree = new Octree(worldBounds, 8, 8);
 
-    // Use a Map for efficient hitbox scale lookups.
     this.hitboxScaleMap = new Map([
         [Tank, HITBOX_SCALE.TANK],
         [Rock, HITBOX_SCALE.ROCK],
@@ -133,27 +131,39 @@ class CollisionManager {
   /**
    * Handles the collision logic for a pair of objects.
    */
-  handleCollisionPair(objA, objB) {
-    // Handle specific bullet-barrel collisions
-    if ((objA instanceof Bullet && objB instanceof Barrel && !objB.hasExploded) ||
-        (objA instanceof Barrel && !objA.hasExploded && objB instanceof Bullet)) {
-      
-      const bullet = objA instanceof Bullet ? objA : objB;
-      const barrel = objA instanceof Barrel ? objA : objB;
-      
-      if (bullet.faction !== 'neutral') {
-        barrel.onBulletHit(bullet);
-        EventManager.instance.notify(EVENT.COLLISION_TANK_BULLET, {
-          tank: barrel,
-          bullet: bullet,
-          damage: bullet.damage || 25,
-          newHP: barrel.hp
-        });
-      }
-    } else {
-      // Notify default collision for all other pairs
-      EventManager.instance.notify(EVENT.COLLISION, { objA, objB });
+   handleCollisionPair(objA, objB) {
+    let bullet = null;
+    let target = null;
+
+    // Identify which object is the bullet and which is the target
+    if (objA instanceof Bullet) {
+      bullet = objA;
+      target = objB;
+    } else if (objB instanceof Bullet) {
+      bullet = objB;
+      target = objA;
     }
+    
+    if (bullet) {
+      if (bullet.hasCollided) return;
+      if (target instanceof Tank && bullet.faction !== target.faction) {
+        target.takeDamage(bullet.damage, bullet);
+        bullet.onHit(target);
+      }
+      else if (target instanceof Rock || target instanceof Tree) {
+        bullet.onHit(target);
+      }
+      else if (target instanceof Barrel && !target.hasExploded) {
+          if (bullet.faction !== 'neutral') {
+              target.onBulletHit(bullet);
+          }
+          bullet.onHit(target);
+      }
+
+      return;
+    }
+
+    EventManager.instance.notify(EVENT.COLLISION, { objA, objB });
   }
 
   /**

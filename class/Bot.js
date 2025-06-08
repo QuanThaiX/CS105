@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FACTION, EVENT } from "../utils.js";
 import { Game } from './Game.js';
 import { GAMECONFIG } from '../config.js';
+import { Tank } from './Tank.js'; 
 
 /**
  * Simplified Bot AI với FSM và intelligent distance management
@@ -165,7 +166,6 @@ class Bot {
         // State entry actions
         switch (newState) {
             case BotState.ATTACK:
-                // Start continuous shooting
                 tank.startAutoShoot(Math.max(800, bot.shootCooldown * 0.6));
                 bot.debugInfo.isShooting = true;
                 break;
@@ -260,15 +260,12 @@ class Bot {
         
         // Distance management
         if (distanceToPlayer > bot.optimalAttackRange * 1.3) {
-            // Too far - move closer
             this.moveWithObstacleAvoidance(tank, bot.playerTank.position, 0.6);
             bot.debugInfo.currentAction = 'Attacking - moving closer';
         } else if (distanceToPlayer < bot.optimalAttackRange * 0.7) {
-            // Too close - back away
-            this.moveAwayWithObstacleAvoidance(tank, bot.playerTank.position, 0.4);
+            this.moveWithObstacleAvoidance(tank, bot.playerTank.position, 0.4);
             bot.debugInfo.currentAction = 'Attacking - backing away';
         } else {
-            // In optimal range - just face and shoot
             bot.debugInfo.currentAction = 'Attacking - in optimal range';
         }
     }
@@ -292,9 +289,9 @@ class Bot {
         
         bot.patrolTarget = new THREE.Vector3(clampedX, 1, clampedZ);
     }
-
     /**
-     * Move toward target with intelligent obstacle avoidance
+     * Move toward target with intelligent obstacle avoidance.
+     * This version adds a "panic" mode for when obstacles are too close.
      * @param {Tank} tank - Tank to move
      * @param {THREE.Vector3} targetPosition - Target to move toward
      * @param {number} speedMultiplier - Speed multiplier
@@ -302,79 +299,88 @@ class Bot {
     moveWithObstacleAvoidance(tank, targetPosition, speedMultiplier = 1) {
         const bot = tank.bot;
         
-        // Check for nearby obstacles
-        const avoidanceVector = this.calculateObstacleAvoidance(tank);
-        
-        if (avoidanceVector.length() > 0) {
-            // Obstacle detected - move away from it
-            const avoidanceTarget = tank.position.clone().add(avoidanceVector);
-            this.moveTowardTarget(tank, avoidanceTarget, speedMultiplier * 0.7);
+        // Check for nearby obstacles and get the closest one's distance
+        const { avoidanceVector, nearestObstacleDistance } = this.calculateObstacleAvoidance(tank);
+
+        const panicDistance = 4.0;
+        if (nearestObstacleDistance < panicDistance) {
             bot.debugInfo.isAvoidingObstacle = true;
+            bot.debugInfo.currentAction = "Evasive Maneuver!";
+
+            tank.moveBackward(bot.moveSpeed * 0.75);
+
+            const directionToAvoidance = new THREE.Vector3().subVectors(avoidanceVector, tank.position).normalize();
+            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(tank.model.quaternion);
+            
+            const cross = new THREE.Vector3().crossVectors(forward, directionToAvoidance);
+            
+            if (cross.y > 0) {
+                tank.rotateLeft(bot.rotateSpeed * 1.5);
+            } else {
+                tank.rotateRight(bot.rotateSpeed * 1.5);
+            }
+            return; // Don't do anything else this frame. Just evade.
+        }
+
+        if (avoidanceVector.length() > 0.1) {
+            bot.debugInfo.isAvoidingObstacle = true;
+            bot.debugInfo.currentAction = "Steering...";
+            
+            const directionToTarget = new THREE.Vector3().subVectors(targetPosition, tank.position).normalize();
+            const steeredDirection = new THREE.Vector3()
+                .addVectors(directionToTarget, avoidanceVector.normalize())
+                .normalize();
+
+            const avoidanceTarget = tank.position.clone().add(steeredDirection.multiplyScalar(20));
+            this.moveTowardTarget(tank, avoidanceTarget, speedMultiplier * 0.8);
         } else {
-            // No obstacles - move toward target
-            this.moveTowardTarget(tank, targetPosition, speedMultiplier);
+            // No obstacles detected, proceed as normal.
             bot.debugInfo.isAvoidingObstacle = false;
+            bot.debugInfo.currentAction = "Moving to target";
+            this.moveTowardTarget(tank, targetPosition, speedMultiplier);
         }
     }
 
     /**
-     * Move away from target with obstacle avoidance
-     * @param {Tank} tank - Tank to move
-     * @param {THREE.Vector3} targetPosition - Target to move away from
-     * @param {number} speedMultiplier - Speed multiplier
-     */
-    moveAwayWithObstacleAvoidance(tank, targetPosition, speedMultiplier = 1) {
-        const bot = tank.bot;
-        
-        // Calculate away direction
-        const awayDirection = new THREE.Vector3()
-            .subVectors(tank.position, targetPosition)
-            .normalize()
-            .multiplyScalar(30);
-        
-        const awayTarget = tank.position.clone().add(awayDirection);
-        
-        // Use normal obstacle avoidance
-        this.moveWithObstacleAvoidance(tank, awayTarget, speedMultiplier);
-    }
-
-    /**
-     * Calculate obstacle avoidance vector
+     * Calculate obstacle avoidance vector.
      * @param {Tank} tank - Tank to calculate avoidance for
-     * @returns {THREE.Vector3} Avoidance vector
+     * @returns {object} { avoidanceVector, nearestObstacleDistance }
      */
     calculateObstacleAvoidance(tank) {
         const bot = tank.bot;
         const game = Game.instance;
         const avoidanceVector = new THREE.Vector3();
         
-        if (!game) return avoidanceVector;
+        if (!game) return { avoidanceVector, nearestObstacleDistance: Infinity };
         
         let nearestObstacleDistance = Infinity;
         
-        // Check all obstacles
         const obstacles = [
             ...(game.rocks || []),
             ...(game.trees || []),
             ...(game.barrels?.filter(b => !b.hasExploded) || []),
+            game.playerTank, 
             ...(game.enemies?.filter(t => t !== tank) || [])
         ].filter(obj => obj && !obj.disposed && obj.position);
         
         for (const obstacle of obstacles) {
             const distance = tank.position.distanceTo(obstacle.position);
-            nearestObstacleDistance = Math.min(nearestObstacleDistance, distance);
             
-            const minDistance = obstacle === tank.bot.playerTank ? 
-                bot.minDistanceToTanks : 
-                (obstacle.faction === FACTION.ALLY ? bot.minDistanceToTanks : bot.minDistanceToObstacles);
+            if (distance < nearestObstacleDistance) {
+                nearestObstacleDistance = distance;
+            }
+            
+            // Adjust min distance for different object types
+            let minDistance = bot.minDistanceToObstacles;
+            if (obstacle instanceof Tank) {
+                minDistance = bot.minDistanceToTanks;
+            }
             
             if (distance < minDistance) {
-                // Calculate avoidance direction (away from obstacle)
                 const avoidDirection = new THREE.Vector3()
                     .subVectors(tank.position, obstacle.position)
                     .normalize();
                 
-                // Stronger avoidance for closer obstacles
                 const avoidanceStrength = (minDistance - distance) / minDistance;
                 avoidDirection.multiplyScalar(avoidanceStrength);
                 
@@ -384,7 +390,7 @@ class Bot {
         
         bot.debugInfo.nearestObstacleDistance = nearestObstacleDistance;
         
-        return avoidanceVector.normalize().multiplyScalar(20);
+        return { avoidanceVector, nearestObstacleDistance };
     }
 
     /**

@@ -412,39 +412,131 @@ class Barrel extends GameObject {
     /**
      * Create visual explosion effects
      */
+// In Barrel.js
+
+    /**
+     * Create visually engaging explosion effects with particles, light, and a shockwave.
+     */
     createExplosionEffects() {
-        // TODO: Integrate with EffectManager for particle effects
-        // For now, create simple visual indicators
-        
-        if (Game.instance && Game.instance.scene) {
-            // Create temporary explosion sphere for visual feedback
-            const explosionGeometry = new THREE.SphereGeometry(this.explosionRadius, 16, 16);
-            const explosionMaterial = new THREE.MeshBasicMaterial({
-                color: 0xff6600,
-                transparent: true,
-                opacity: 0.3
-            });
-            const explosionSphere = new THREE.Mesh(explosionGeometry, explosionMaterial);
-            explosionSphere.position.copy(this.position);
-            
-            Game.instance.scene.add(explosionSphere);
-            
-            // Animate and remove explosion sphere
-            const animateExplosion = () => {
-                explosionSphere.scale.multiplyScalar(1.1);
-                explosionMaterial.opacity *= 0.9;
-                
-                if (explosionMaterial.opacity > 0.01) {
-                    requestAnimationFrame(animateExplosion);
-                } else {
-                    Game.instance.scene.remove(explosionSphere);
-                    explosionGeometry.dispose();
-                    explosionMaterial.dispose();
-                }
-            };
-            
-            animateExplosion();
+        const scene = Game.instance.scene;
+        if (!scene) return;
+
+        const explosionPosition = this.position.clone();
+        const clock = new THREE.Clock();
+
+        const flashLight = new THREE.PointLight(0xffa500, 500, 100, 2); 
+        flashLight.position.copy(explosionPosition);
+        scene.add(flashLight);
+
+
+        const particleCount = 1000;
+        const particlesGeometry = new THREE.BufferGeometry();
+        const posArray = new Float32Array(particleCount * 3);
+        const velocities = [];
+        const particleColors = new Float32Array(particleCount * 3);
+
+        const coreColor = new THREE.Color(0xff4500); // Fiery orange-red
+        const sparkColor = new THREE.Color(0xffff00); // Bright yellow
+
+        for (let i = 0; i < particleCount; i++) {
+            // All particles start at the center
+            posArray[i * 3 + 0] = 0;
+            posArray[i * 3 + 1] = 0;
+            posArray[i * 3 + 2] = 0;
+
+            // Give each particle a random outward velocity.
+            // Using a sphere distribution for a nice round explosion.
+            const theta = 2 * Math.PI * Math.random();
+            const phi = Math.acos(2 * Math.random() - 1);
+            const x = Math.sin(phi) * Math.cos(theta);
+            const y = Math.sin(phi) * Math.sin(theta);
+            const z = Math.cos(phi);
+
+            const velocity = new THREE.Vector3(x, y, z);
+            velocity.multiplyScalar(Math.random() * 15 + 5); // Random speed between 5 and 20
+            velocities.push(velocity);
+
+            const color = Math.random() > 0.7 ? sparkColor : coreColor;
+            particleColors[i * 3 + 0] = color.r;
+            particleColors[i * 3 + 1] = color.g;
+            particleColors[i * 3 + 2] = color.b;
         }
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        particlesGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+
+        const particleMaterial = new THREE.PointsMaterial({
+            size: 0.9,
+            vertexColors: true,
+            blending: THREE.AdditiveBlending,
+            transparent: true,
+            sizeAttenuation: true,
+            opacity: 0.9
+        });
+
+        const sparks = new THREE.Points(particlesGeometry, particleMaterial);
+        sparks.position.copy(explosionPosition);
+        scene.add(sparks);
+
+
+
+        const shockwaveGeometry = new THREE.RingGeometry(1, 10, 64);
+        const shockwaveMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffd700,
+            transparent: true,
+            opacity: 0.8,
+            side: THREE.DoubleSide
+        });
+        const shockwave = new THREE.Mesh(shockwaveGeometry, shockwaveMaterial);
+        shockwave.position.copy(explosionPosition).add(new THREE.Vector3(0, 0.1, 0));
+        shockwave.rotation.x = -Math.PI / 2;
+        scene.add(shockwave);
+
+
+        let duration = 1.2;
+        let elapsed = 0;
+
+        const animateExplosion = () => {
+            const dt = clock.getDelta();
+            elapsed += dt;
+
+            if (elapsed > duration) {
+                scene.remove(sparks);
+                scene.remove(flashLight);
+                scene.remove(shockwave);
+                sparks.geometry.dispose();
+                sparks.material.dispose();
+                shockwave.geometry.dispose();
+                shockwave.material.dispose();
+                flashLight.dispose();
+                return;
+            }
+
+            const progress = elapsed / duration;
+            const easeOutQuad = (t) => t * (2 - t); 
+            const easedProgress = easeOutQuad(progress);
+
+            flashLight.intensity = 500 * (1 - easedProgress);
+
+            particleMaterial.opacity = 1.0 - progress;
+            const positions = sparks.geometry.attributes.position.array;
+            for (let i = 0; i < particleCount; i++) {
+                // Apply a bit of gravity
+                velocities[i].y -= 9.8 * dt * 0.5;
+
+                positions[i * 3 + 0] += velocities[i].x * dt;
+                positions[i * 3 + 1] += velocities[i].y * dt;
+                positions[i * 3 + 2] += velocities[i].z * dt;
+            }
+            sparks.geometry.attributes.position.needsUpdate = true;
+            
+            const shockwaveRadius = this.explosionRadius * easedProgress;
+            shockwave.scale.set(shockwaveRadius, shockwaveRadius, 1);
+            shockwave.material.opacity = 0.8 * (1 - progress);
+
+            requestAnimationFrame(animateExplosion);
+        };
+
+        animateExplosion();
     }
 
     /**

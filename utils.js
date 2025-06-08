@@ -154,7 +154,7 @@ const FACTION = Object.freeze({
 
 const TANK_STATS = Object.freeze({
     V001: {
-        hp: 1000,
+        hp: 500,
         maxHp: 500,
         moveSpeed: 0.1,
         rotateSpeed: 0.03,
@@ -326,6 +326,11 @@ const EVENT = Object.freeze({
      * @param {Object} data - { shooter: GameObject, projectile: Bullet, direction: Vector3, damage: number }
      */
     OBJECT_SHOOT: "object_shoot",
+    /**
+     * OBJECT_SHOOT - Fired when object healed
+     * @param {Object} data - { shooter: GameObject, projectile: Bullet, direction: Vector3, damage: number }
+     */
+    OBJECT_HEALED: 'objectHealed', 
 
     // =================== COLLISION EVENTS ===================
     /**
@@ -435,10 +440,10 @@ const EVENT = Object.freeze({
      */
     ITEM_COLLECTED: "item_collected",
 
-    // =================== AUDIO EVENTS ===================
+    // =================== AUDIO EVENTS (CRITICAL FOR HEALING EFFECT) ===================
     /**
      * AUDIO_PLAY - Fired when audio should play
-     * @param {Object} data - { soundId: string, volume: number, position: Vector3, loop: boolean }
+     * @param {Object} data - { soundId: string, soundPath: string, volume: number, position?: Vector3, loop: boolean }
      */
     AUDIO_PLAY: "audio_play",
     
@@ -448,7 +453,7 @@ const EVENT = Object.freeze({
      */
     AUDIO_STOP: "audio_stop",
 
-    // =================== UI EVENTS ===================
+    // =================== UI EVENTS (CRITICAL FOR HEALING EFFECT) ===================
     /**
      * UI_UPDATE_HUD - Fired when HUD needs update
      * @param {Object} data - { playerHP: number, score: number, highScore: number, ammo: number }
@@ -457,7 +462,7 @@ const EVENT = Object.freeze({
     
     /**
      * UI_SHOW_MESSAGE - Fired when UI message should show
-     * @param {Object} data - { message: string, type: string, duration: number, priority: number }
+     * @param {Object} data - { message: string, type: string, duration: number, position?: string }
      */
     UI_SHOW_MESSAGE: "ui_show_message",
 
@@ -491,7 +496,19 @@ const EVENT = Object.freeze({
      * SYSTEM_RESOURCE_LOADED - Fired when resources are loaded
      * @param {Object} data - { resourceType: string, resourceId: string, loadTime: number, success: boolean }
      */
-    SYSTEM_RESOURCE_LOADED: "system_resource_loaded"
+    SYSTEM_RESOURCE_LOADED: "system_resource_loaded",
+    
+    // =================== LOBBY & SETTINGS EVENTS ===================
+    /**
+     * ENTER_LOBBY - Fired when enter the lobby
+     */
+    ENTER_LOBBY: "enter_lobby",
+    
+    /**
+     * SETTINGS_UPDATED - Fired when game settings are changed
+     */
+    SETTINGS_UPDATED: 'settings:updated', 
+
 });
 
 const COLOR = Object.freeze({

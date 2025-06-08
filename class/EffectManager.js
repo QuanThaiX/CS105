@@ -22,7 +22,7 @@ class Effect {
     
     handleTankDestroyed(data) {
         const { tank } = data;
-        this.createExplosion(tank.position, 0.7, { particleCount: 1000 });
+        this.createExplosion(tank.position, 0.7, { particleCount: 800 });
     }
     
     handleObjectShoot(data) {
@@ -42,19 +42,23 @@ class Effect {
 }
 
 const EXPLOSION_DEFAULTS = {
-    particleCount: 500,   // Number of particles
+    // General
+    particleCount: 500,   
     maxLife: 1.5,         // Maximum particle lifetime (seconds)
     baseSpeed: 15,        // Base particle speed
     gravity: -9.8,        // Gravity (negative pulls down)
-    particleBaseSize: 0.5,// Base particle size on screen
+    particleBaseSize: 0.5,// Base particle size
     colors: [             // Array of possible particle colors
         new THREE.Color(0xffa000), // Orange
         new THREE.Color(0xff4000), // Red-Orange
         new THREE.Color(0xffc040), // Yellow-Orange
-        new THREE.Color(0x444444), // Dark Gray (smoke)
-        new THREE.Color(0x888888), // Gray (smoke)
     ],
-    texture: createParticleTexture() // Particle texture (soft circle)
+    // Light
+    addLight: true,       // Whether to add a light flash
+    lightColor: 0xffa000, // Bright orange-yellow
+    lightIntensity: 2000,  // Very bright initially
+    lightDistance: 50,    // How far the light reaches
+    texture: createParticleTexture()
 };
 
 function createParticleTexture(size = 64) {
@@ -98,54 +102,62 @@ class EffectInstance {
 class Explosion extends EffectInstance {
     constructor(scene, originPosition, size = 1, options = {}) {
         super(scene);
-        this.origin = originPosition.clone(); // Explosion start position
-        this.size = size;                     // Scale factor (affects radius/speed)
-        this.options = { ...EXPLOSION_DEFAULTS, ...options }; // Merge default and custom options
+        this.origin = originPosition.clone();
+        this.size = size;
+        this.options = { ...EXPLOSION_DEFAULTS, ...options };
 
+        this.light = null;
         this.particlesData = [];
-        this.geometry = null; // Will be created in _createParticles
-        this.material = null; // Will be created in _createParticles
-        this.points = null;   // Will be created in _createParticles
+        this.geometry = null;
+        this.material = null;
+        this.points = null;
+        
         this.clock = new THREE.Clock();
-        this._animationFrameId = null; // To store the requestAnimationFrame ID
+        this._animationFrameId = null;
 
         // --- Setup ---
-        this._createParticles();    // Create geometry, material, points object
-        this._initializeParticles(); // Set initial particle properties (position, velocity, color, life)
+        if (this.options.addLight) {
+            this._createLight();
+        }
+        this._createParticles();
+        this._initializeParticles();
 
-        // Add the particle system to the scene immediately
-        this.scene.add(this.points);
+        // Add created objects to the scene
+        if (this.light) this.scene.add(this.light);
+        if (this.points) this.scene.add(this.points);
 
-        // Bind the _animate function to ensure 'this' context is correct
         this._animate = this._animate.bind(this);
-
-        // Start the animation loop
         this._animate();
+    }
+
+    _createLight() {
+        this.light = new THREE.PointLight(
+            this.options.lightColor,
+            this.options.lightIntensity * this.size,
+            this.options.lightDistance * this.size
+        );
+        this.light.position.copy(this.origin);
     }
 
     _createParticles() {
         const particleCount = this.options.particleCount;
-        const positions = new Float32Array(particleCount * 3);
-        const colors = new Float32Array(particleCount * 3);
-        const alphas = new Float32Array(particleCount); // For controlling fade-out
-
         this.geometry = new THREE.BufferGeometry();
-        this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        this.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        this.geometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1)); // Add alpha attribute
+        this.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(particleCount * 3), 3));
+        this.geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(particleCount * 3), 3));
+        this.geometry.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(particleCount), 1));
 
         this.material = new THREE.PointsMaterial({
-            size: this.options.particleBaseSize,
+            size: this.options.particleBaseSize * this.size,
             map: this.options.texture,
-            vertexColors: true,     // Use colors from 'color' attribute
-            transparent: true,      // Allow transparency
-            depthWrite: false,      // Disable writing to depth buffer for better blending
-            blending: THREE.AdditiveBlending, // Bright effect when particles overlap
-            sizeAttenuation: true   // Particle size changes with distance
+            vertexColors: true,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending, // Glowing effect
+            sizeAttenuation: true
         });
 
         this.points = new THREE.Points(this.geometry, this.material);
-        this.points.position.copy(this.origin); // Set the initial position of the Points object
+        this.points.position.copy(this.origin);
     }
 
     _initializeParticles() {
@@ -154,159 +166,118 @@ class Explosion extends EffectInstance {
         const alphaAttribute = this.geometry.attributes.alpha;
 
         for (let i = 0; i < this.options.particleCount; i++) {
-            // Initial position (relative to the Points object's origin)
             positionAttribute.setXYZ(i, 0, 0, 0);
 
-            // Random velocity
             const direction = new THREE.Vector3(
                 Math.random() - 0.5,
                 Math.random(), // Slightly biased upwards
                 Math.random() - 0.5
             ).normalize();
 
-            // Speed influenced by base speed, size, and randomness
             const speed = this.options.baseSpeed * this.size * (0.5 + Math.random() * 0.7);
             const velocity = direction.multiplyScalar(speed);
 
-            // Random color from the options
             const color = this.options.colors[Math.floor(Math.random() * this.options.colors.length)];
             colorAttribute.setXYZ(i, color.r, color.g, color.b);
+            alphaAttribute.setX(i, 1.0);
 
-            // Initial alpha
-            alphaAttribute.setX(i, 1.0); // Start fully opaque
-
-            // Store data for updates
-            const initialLife = this.options.maxLife * (0.7 + Math.random() * 0.3); // Random lifespan
+            const initialLife = this.options.maxLife * (0.7 + Math.random() * 0.3);
             this.particlesData.push({
                 velocity: velocity,
                 initialLife: initialLife,
-                life: initialLife // Current life starts at full
+                life: initialLife
             });
         }
-
-        // Mark attributes as needing update
-        positionAttribute.needsUpdate = true;
-        colorAttribute.needsUpdate = true;
-        alphaAttribute.needsUpdate = true;
     }
-
-    // --- Animation Loop Function ---
+    
     _animate() {
-        // Stop the loop if the explosion is no longer alive
-        if (!this.alive) {
-            return;
-        }
-
-        // Request the next frame *before* doing the work for this frame
-        // This keeps the loop going even if update() takes time
+        if (!this.alive) return;
         this._animationFrameId = requestAnimationFrame(this._animate);
-
-        // Update the particle states
         this.update();
     }
 
-    // --- Update Logic (called each frame by _animate) ---
     update() {
         const deltaTime = this.clock.getDelta();
-        // Ensure deltaTime is not excessively large (e.g., after tab switching)
-        const dt = Math.min(deltaTime, 0.1); // Cap delta time to avoid large jumps
+        const dt = Math.min(deltaTime, 0.1);
+        const elapsedTime = this.clock.getElapsedTime();
 
+        // --- Update Light ---
+        if (this.light && this.light.visible) {
+            const lifeRatio = Math.min(elapsedTime / (this.options.maxLife * 0.25), 1.0);
+            const decay = Math.pow(1.0 - lifeRatio, 2.0);
+            this.light.intensity = this.options.lightIntensity * this.size * decay;
+            if (this.light.intensity <= 0) {
+                this.light.visible = false;
+            }
+        }
+        
+        // --- Update Particles ---
         const positionAttribute = this.geometry.attributes.position;
         const alphaAttribute = this.geometry.attributes.alpha;
-
         let liveParticles = 0;
 
         for (let i = 0; i < this.options.particleCount; i++) {
             const data = this.particlesData[i];
-
-            // Only process particles that are still "alive" (life > 0)
             if (data.life > 0) {
-                data.life -= dt; // Decrease life by time elapsed
-
+                data.life -= dt;
                 if (data.life <= 0) {
-                    // Particle died this frame
-                    alphaAttribute.setX(i, 0); // Make it fully transparent
-                    // Optional: Could also move its position far away (positionAttribute.setXYZ(i, Infinity, Infinity, Infinity))
-                    // but setting alpha to 0 is usually sufficient and cheaper.
+                    alphaAttribute.setX(i, 0);
                 } else {
-                    // Particle is still alive
                     liveParticles++;
-
-                    // Update position based on velocity
                     const currentPos = new THREE.Vector3().fromBufferAttribute(positionAttribute, i);
                     currentPos.addScaledVector(data.velocity, dt);
                     positionAttribute.setXYZ(i, currentPos.x, currentPos.y, currentPos.z);
-
-                    // Apply simple gravity
                     data.velocity.y += this.options.gravity * dt;
-
-                    // Update Alpha for fade-out effect
-                    // Using lifeRatio squared makes it fade faster towards the end
                     const lifeRatio = Math.max(0, data.life / data.initialLife);
                     alphaAttribute.setX(i, lifeRatio * lifeRatio);
                 }
             }
         }
-
-        // Mark attributes as needing GPU update
         positionAttribute.needsUpdate = true;
         alphaAttribute.needsUpdate = true;
 
-        // If no particles are left alive and we haven't disposed yet, trigger cleanup
         if (liveParticles === 0 && this.alive) {
             this.dispose();
         }
     }
 
-    // --- Cleanup ---
     dispose() {
-        // Prevent dispose from running multiple times
         if (!this.alive) return;
-        super.dispose(); // Call parent dispose method
+        super.dispose();
 
         console.log("Disposing explosion");
 
-        // Stop the animation loop
         if (this._animationFrameId) {
             cancelAnimationFrame(this._animationFrameId);
             this._animationFrameId = null;
         }
 
-        // Remove from scene
+        if (this.light && this.scene) {
+            this.scene.remove(this.light);
+        }
+        this.light = null;
+
         if (this.points && this.scene) {
             this.scene.remove(this.points);
         }
+        if (this.geometry) this.geometry.dispose();
+        if (this.material) this.material.dispose();
 
-        // Dispose Three.js resources
-        if (this.geometry) {
-            this.geometry.dispose();
-            this.geometry = null;
-        }
-        if (this.material) {
-            // Dispose texture ONLY if it was created by this instance
-            // or if you know it's safe to do so. The default one is shared.
-            // If using custom textures per explosion, uncomment the map.dispose() line.
-            // if (this.material.map && this.material.map !== EXPLOSION_DEFAULTS.texture) {
-            //     this.material.map.dispose();
-            // }
-            this.material.dispose();
-            this.material = null;
-        }
-
-        // Clear internal data
         this.particlesData = [];
+        this.geometry = null;
+        this.material = null;
         this.points = null;
-        this.scene = null; // Release scene reference if no longer needed
-        this.clock = null; // Release clock reference
-        
-        // Notify that explosion was disposed
+        this.scene = null;
+        this.clock = null;
+
         EventManager.instance.notify(EVENT.EFFECT_DISPOSED, {
             type: 'explosion'
         });
     }
 }
 
-// --- MuzzleFlash Effect Class ---
+
+// --- MuzzleFlash Effect Class (Unchanged) ---
 class MuzzleFlash extends EffectInstance {
     constructor(scene, position, direction, options = {}) {
         super(scene);
