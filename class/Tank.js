@@ -15,65 +15,72 @@ import { Tree } from "./Tree.js";
 import { ModelLoader } from '../loader.js';
 import { Barrel } from './Barrel.js';
 
-class Tank extends GameObject{
-  tankType;               // TANKTYPE.
-  hp;
-  maxHp;
-  moveSpeed;
-  rotateSpeed;
-  shootCooldown = 2500;   // ms
-  damage;
-  defense;
-  isMoving = false;
-  lastMoveTime = 0;
-  moveSoundDuration = 100; // 0.1s
+class Tank extends GameObject {
+    tankType;
+    hp;
+    maxHp;
+    moveSpeed;
+    rotateSpeed;
+    shootCooldown = 2500;
+    damage;
+    defense;
+    isMoving = false;
+    lastMoveTime = 0;
+    moveSoundDuration = 100;
 
-  lastShotTime = 0;       // ms
-  prevPosition;
-  prevRotation;
+    lastShotTime = 0;
+    prevPosition;
+    prevRotation;
 
-  HealthBar;
-  reloadBar;
-  enemyIndicator; 
-  indicatorLight;
+    HealthBar;
+    reloadBar;
+    enemyIndicator;
+    indicatorLight;
 
-  constructor(id, faction, position, isCollision, tankType = TANKTYPE.V001) {
-      super(id, faction, position, isCollision);
-      this.tankType = tankType;
-      this.setTankStats(this.tankType);
-      
-      this.healthBar = new HealthBar(this, this.hp); 
+    isHoverTank = false;
+    initialY = 0;
+    constructor(id, faction, position, isCollision, tankType = TANKTYPE.V001) {
+        super(id, faction, position, isCollision);
+        this.tankType = tankType;
+        this.setTankStats(this.tankType);
+        
+        this.isHoverTank = (this.tankType === TANKTYPE.V010);
+        if (this.isHoverTank) {
+            this.initialY = 1.0;
+            this.position.y = this.initialY;
+        }
+        
+        this.healthBar = new HealthBar(this, this.hp);
 
-      this.loadTankModelFromCache();
+        this.loadTankModelFromCache();
 
-      this.prevPosition = this.position.clone();
-      this.prevRotation = 0;
-      
+        this.prevPosition = this.position.clone();
+        this.prevRotation = 0;
 
-      if (this.faction === FACTION.PLAYER) {
-          this.reloadBar = new ReloadBar(this);
-      }
-      
-      EventManager.instance.subscribe(EVENT.COLLISION, this.handleCollision.bind(this));
-      EventManager.instance.subscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
-      EventManager.instance.subscribe(EVENT.OBJECT_HEALED, this.handleHeal.bind(this)); 
-  }
 
-  setModel(model) {
-    // --- DEBUG LOG ---
-    console.log(`%c[Tank] SET_MODEL called for: ${this.id} (Faction: ${this.faction})`, 'color: lightblue');
-    super.setModel(model); 
+        if (this.faction === FACTION.PLAYER) {
+            this.reloadBar = new ReloadBar(this);
+        }
 
-    if (this.healthBar) {
-        // --- DEBUG LOG ---
-        console.log(`%c[Tank] Calling healthBar.setReady() for ${this.id}`, 'color: lightblue; font-weight: bold;');
-        this.healthBar.setReady();
+        EventManager.instance.subscribe(EVENT.COLLISION, this.handleCollision.bind(this));
+        EventManager.instance.subscribe(EVENT.OBJECT_DAMAGED, this.handleDamage.bind(this));
+        EventManager.instance.subscribe(EVENT.OBJECT_HEALED, this.handleHeal.bind(this));
     }
 
-    if (this.faction === FACTION.ENEMY) {
-      this.createEnemyIndicator();
+    setModel(model) {
+        super.setModel(model);
+        if (this.isHoverTank && this.model) {
+            this.model.position.y = this.initialY;
+        }
+
+        if (this.healthBar) {
+            this.healthBar.setReady();
+        }
+
+        if (this.faction === FACTION.ENEMY) {
+            this.createEnemyIndicator();
+        }
     }
-  }
 
   createEnemyIndicator() {
     if (!this.model) return; // Can't add indicator if there's no model to attach to
@@ -270,25 +277,36 @@ setTankHP(hp) {
         bulletOffsetY = 1.2;
         bulletOffsetZ = 4;
       } else if (this.tankType === TANKTYPE.V002) {
-        bulletOffsetY = 1.4;
+        bulletOffsetY = 2.1;
         bulletOffsetZ = 4.2;
       } else if (this.tankType === TANKTYPE.V003) {
         bulletOffsetY = 1.3;
         bulletOffsetZ = 4.1;
       } else if (this.tankType === TANKTYPE.V004) {
-        bulletOffsetY = 1.0;
+        bulletOffsetY = 2.1;
         bulletOffsetZ = 3.5;
       } else if (this.tankType === TANKTYPE.V005) {
-        bulletOffsetY = 0.9;
+        bulletOffsetY = 2.4;
         bulletOffsetZ = 3.2;
       } else if (this.tankType === TANKTYPE.V006) {
-        bulletOffsetY = 1.5;
+        bulletOffsetY = 2.4;
         bulletOffsetZ = 4.5;
       } else if (this.tankType === TANKTYPE.V007) {
+        bulletOffsetY = 2.2;
+        bulletOffsetZ = 5.0;
+      } else if (this.tankType === TANKTYPE.V008) {
+        bulletOffsetY = 1.9;
+        bulletOffsetZ = 3.5;
+      } else if (this.tankType === TANKTYPE.V009) {
+        bulletOffsetY = 1.7;
+        bulletOffsetZ = 4.0;
+      } else if (this.tankType === TANKTYPE.V010) {
         bulletOffsetY = 1.0;
-        bulletOffsetZ = 3.0;
-      }
-      
+        bulletOffsetZ = 4.5;
+      } else if (this.tankType === TANKTYPE.V011) {
+        bulletOffsetY = 1.5;
+        bulletOffsetZ = 4.2;
+      } 
       // Áp dụng offset Y
       bulletPosition.y += bulletOffsetY;
       
@@ -494,33 +512,41 @@ handleCollision({ objA, objB }) {
     }
 }
 
-  update() {
-    if (this.model) {
-        this.position.copy(this.model.position);
-    }
+    update() {
+      const time = performance.now() * 0.001; 
+      console.log(this.model.userData)
+      if (this.isHoverTank && this.model) {
+        
+          this.model.position.y = this.initialY + Math.sin(time * 2) * 0.1;
 
-    if (this.healthBar) {
-        this.healthBar.update();
-    }
-    if (this.reloadBar) {
-        this.reloadBar.update();
-    }
+          this.model.rotation.x = Math.sin(time * 1.5) * 0.02;
+          this.model.rotation.z = Math.cos(time * 1.2) * 0.02;
+      } 
+      if (this.model) {
+          this.position.copy(this.model.position);
+      }
+
+      if (this.healthBar) {
+          this.healthBar.update();
+      }
+      if (this.reloadBar) {
+          this.reloadBar.update();
+      }
 
 
-    if (this.enemyIndicator) {
-        // Create a simple bobbing motion using a sine wave based on time
-        const time = performance.now() * 0.002; // Speed of the bobbing
-        this.enemyIndicator.position.y = 3.5 + Math.sin(time) * 0.25; // Base height + bob amount
-    }
+      if (this.enemyIndicator) {
+          const time = performance.now() * 0.002;
+          this.enemyIndicator.position.y = 3.5 + Math.sin(time) * 0.25;
+      }
 
-    const currentTime = Date.now();
-    if (this.isMoving && currentTime - this.lastMoveTime > this.moveSoundDuration) {
-      this.isMoving = false;
-      if (this.faction === FACTION.PLAYER) {
-        EventManager.instance.notify(EVENT.PLAYER_MOVE, { isMoving: false });
+      const currentTime = Date.now();
+      if (this.isMoving && currentTime - this.lastMoveTime > this.moveSoundDuration) {
+          this.isMoving = false;
+          if (this.faction === FACTION.PLAYER) {
+              EventManager.instance.notify(EVENT.PLAYER_MOVE, { isMoving: false });
+          }
       }
     }
-  }
 }
 
 export { Tank };

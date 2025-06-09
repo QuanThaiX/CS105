@@ -263,7 +263,6 @@ class ModelLoader {
      */
     getTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
         const cacheKey = `tank_${tankType.name}`;
-        
         if (!this.modelCache.has(cacheKey)) {
             // Xử lý custom JS tank model
             if (tankType.useCustomRenderer && tankType.assetPathJS) {
@@ -304,7 +303,6 @@ class ModelLoader {
             
             // Apply tank-specific transforms
             this._applyTankTransforms(clonedModel, tankType, position);
-            
             return clonedModel;
         } catch (error) {
             console.error(`❌ Error cloning tank model ${tankType.name}:`, error);
@@ -465,10 +463,21 @@ class ModelLoader {
             model.position.set(position.x, position.y - 1, position.z);
             model.scale.set(1.2, 1.2, 1.2);
         } else if (tankType == TANKTYPE.V007) {
-            // Giảm scale của V007 và tăng vị trí Y lên 0.3 đơn vị
             model.position.set(position.x, position.y - 1 + 0.3, position.z);
-            model.scale.set(1.2, 1.2, 1.2); // Giảm từ 1.5 xuống 1.2
-        } else {
+            model.scale.set(1.2, 1.2, 1.2); 
+        } else if (tankType == TANKTYPE.V008) {
+            model.position.set(position.x, position.y - 1 + 0.3, position.z);
+            model.scale.set(1.2, 1.2, 1.2); 
+        } else if (tankType == TANKTYPE.V009) {
+            model.position.copy(position);
+            model.position.y = position.y - 1; 
+        } else if (tankType == TANKTYPE.V010) {
+            model.position.copy(position);
+            model.position.y = position.y + 0.3; 
+        } else if (tankType == TANKTYPE.V011) {
+            model.position.copy(position);
+            model.position.y = position.y - 0.2; 
+        }  else {
             model.position.copy(position);
             model.scale.set(3.5, 3.5, 3.5);
         }

@@ -10,6 +10,10 @@
     --accent-blue-dark: #225bc5;
     --accent-red: #de4a4a;
     --accent-red-dark: #c52222;
+    --accent-orange: #f97316; /* For Fire Rate */
+    --accent-orange-dark: #ea580c;
+    --accent-lime: #84cc16; /* For HP */
+    --accent-lime-dark: #65a30d;
     --accent-glow: rgba(74, 222, 128, 0.5);
     --text-light: #e2e8f0;
     --text-medium: #9ca3af;
@@ -163,7 +167,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    width: 280px;
+    width: 400px;
 }
 
 .stat-container {
@@ -212,6 +216,24 @@ body {
     box-shadow: 0 0 8px var(--accent-glow);
     transition: width 0.5s ease-out;
 }
+
+/* ADDED: Styles for new stat bars */
+.stat-fill-hp {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, var(--accent-lime-dark), var(--accent-lime));
+    box-shadow: 0 0 8px rgba(132, 204, 22, 0.5);
+    transition: width 0.5s ease-out;
+}
+
+.stat-fill-firerate {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, var(--accent-orange-dark), var(--accent-orange));
+    box-shadow: 0 0 8px rgba(249, 115, 22, 0.5);
+    transition: width 0.5s ease-out;
+}
+
 .nav-button {
     background: transparent;
     color: var(--accent-green);

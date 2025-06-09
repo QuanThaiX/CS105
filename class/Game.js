@@ -777,7 +777,8 @@ class Game {
     this.bot.update();
     this.collisionManager.update();
     this.projectilesManager.update();
-    this.playerTank.update();    for (let i = this.updatableObjects.length - 1; i >= 0; i--) {
+    this.playerTank.update();
+    for (let i = this.updatableObjects.length - 1; i >= 0; i--) {
         const obj = this.updatableObjects[i];
         
         if (obj.isDestroyed) {

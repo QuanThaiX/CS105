@@ -190,8 +190,8 @@ const TANK_STATS = Object.freeze({
         defense: 60,
     },
     V005: {
-        hp: 500,
-        maxHp: 500,
+        hp: 650,
+        maxHp: 650,
         moveSpeed: 0.14,
         rotateSpeed: 0.04,
         shootCooldown: 1500,
@@ -201,10 +201,10 @@ const TANK_STATS = Object.freeze({
     V006: {
         hp: 1200,
         maxHp: 1200,
-        moveSpeed: 0.06,
+        moveSpeed: 0.04,
         rotateSpeed: 0.015,
         shootCooldown: 3000,
-        damage: 200,
+        damage: 120,
         defense: 100,
     },
     V007: {
@@ -215,7 +215,43 @@ const TANK_STATS = Object.freeze({
         shootCooldown: 1800,
         damage: 130,
         defense: 75,
-    }
+    },
+    V008: {
+        hp: 1200,
+        maxHp: 1200,
+        moveSpeed: 0.04,
+        rotateSpeed: 0.04,
+        shootCooldown: 5000,
+        damage: 170,
+        defense: 120,
+    },
+    V009: {
+        hp: 900,
+        maxHp: 900,
+        moveSpeed: 0.12,
+        rotateSpeed: 0.035,
+        shootCooldown: 1600,
+        damage: 110,
+        defense: 80,
+    },
+    V010: {
+        hp: 850,
+        maxHp: 850,
+        moveSpeed: 0.1,
+        rotateSpeed: 0.035,
+        shootCooldown: 2100,
+        damage: 90,
+        defense: 74,
+    },
+    V011: {
+        hp: 500,
+        maxHp: 500,
+        moveSpeed: 0.15,
+        rotateSpeed: 0.055,
+        shootCooldown: 900,
+        damage: 80,
+        defense: 50,
+    },
 });
 
 const TANKTYPE = Object.freeze({
@@ -246,9 +282,29 @@ const TANKTYPE = Object.freeze({
     },
     V007: {
         name: "V007",
-        assetPathJS: "./tankv007.js",
+        assetPathJS: "./custom_tanks/tankv007.js",
         useCustomRenderer: true
-    }
+    },
+    V008: {
+        name: "V008",
+        assetPathJS: "./custom_tanks/tankv008.js",
+        useCustomRenderer: true
+    },
+    V009: {
+        name: "V009",
+        assetPathJS: "./custom_tanks/tankv009.js",
+        useCustomRenderer: true
+    },
+    V010: {
+        name: "V010",
+        assetPathJS: "./custom_tanks/tankv010.js",
+        useCustomRenderer: true
+    },
+    V011: {
+        name: "V011",
+        assetPathJS: "./custom_tanks/tankv011.js",
+        useCustomRenderer: true
+    },    
 });
 
 const EVENT = Object.freeze({

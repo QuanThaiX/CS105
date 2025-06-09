@@ -31,7 +31,9 @@ class GameObject {
     }
 
     setModel(model){
+        if (!model) return;
         this.model = model;
+        this.model.userData = model.userData;
         Game.instance.scene.add(this.model);
         EventManager.instance.notify(EVENT.OBJECT_LOADED, {
             object: this,

@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { Game } from './class/Game.js';
 import { UIManager } from './class/UIManager.js'; // Import the new UIManager
-import { EVENT, COLOR, TANKTYPE, loadTankModel } from './utils.js';
+import { EVENT, COLOR, TANKTYPE, loadTankModel, TANK_STATS } from './utils.js';
 import { ModelLoader } from './loader.js';
 import { EventManager } from './class/EventManager.js'; // Adjust path if needed
 import { SoundManager } from './class/SoundManager.js'; // Adjust path if needed
@@ -17,21 +17,28 @@ let game = null;
 let selectedTankModel = TANKTYPE.V001; // Default selected tank
 let menuScene, menuCamera, menuRenderer, menuControls;
 let tankModel = null; // Holds the 3D model in the menu
-let availableTanks = [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006, TANKTYPE.V007];
+let availableTanks = [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006, TANKTYPE.V007,
+     TANKTYPE.V008, TANKTYPE.V009, TANKTYPE.V010, TANKTYPE.V011];
 let currentTankIndex = 0;
 let modelLoader = null; // ModelLoader instance
 let isPreloadingModels = false; // Flag to track preload status
 
 const GAME_START_DELAY = 250; // ms, for loading simulation or DOM readiness
 
+// UPDATED: Added hp and firerate stats, and filled out for all tanks
+// HP is normalized from maxHp. Fire Rate is normalized from shootCooldown (inverted).
 const tankStatsData = {
-    [TANKTYPE.V001.name]: { power: 80, speed: 60, defense: 70 },
-    [TANKTYPE.V002.name]: { power: 90, speed: 40, defense: 90 },
-    [TANKTYPE.V003.name]: { power: 90, speed: 50, defense: 85 },
-    [TANKTYPE.V004.name]: { power: 70, speed: 80, defense: 60 },
-    [TANKTYPE.V005.name]: { power: 60, speed: 90, defense: 50 },
-    [TANKTYPE.V006.name]: { power: 100, speed: 30, defense: 100 },
-    [TANKTYPE.V007.name]: { power: 85, speed: 65, defense: 75 }
+    [TANKTYPE.V001.name]: { power: 80, speed: 100, defense: 70, hp: 50, firerate: 85 },
+    [TANKTYPE.V002.name]: { power: 150, speed: 70, defense: 90, hp: 80, firerate: 78 },
+    [TANKTYPE.V003.name]: { power: 120, speed: 80, defense: 85, hp: 60, firerate: 75 },
+    [TANKTYPE.V004.name]: { power: 90, speed: 120, defense: 60, hp: 70, firerate: 65 },
+    [TANKTYPE.V005.name]: { power: 80, speed: 140, defense: 50, hp: 65, firerate: 95 },
+    [TANKTYPE.V006.name]: { power: 120, speed: 40, defense: 100, hp: 120, firerate: 70 },
+    [TANKTYPE.V007.name]: { power: 130, speed: 90, defense: 75, hp: 85, firerate: 82 },
+    [TANKTYPE.V008.name]: { power: 170, speed: 40, defense: 120, hp: 120, firerate: 50 },
+    [TANKTYPE.V009.name]: { power: 110, speed: 120, defense: 80, hp: 90, firerate: 84 },
+    [TANKTYPE.V010.name]: { power: 90, speed: 70, defense: 74, hp: 85, firerate: 79 },
+    [TANKTYPE.V011.name]: { power: 80, speed: 150, defense: 50, hp: 50, firerate: 100 },
 };
 
 async function preloadAllModels() {
@@ -234,12 +241,15 @@ function loadTankForMenu(tankType) {
         });
 }
 
+// UPDATED: Function now sets the new stat bars
 function updateTankStatsUI(tankName) {
     const stats = tankStatsData[tankName];
     if (stats) {
-        document.getElementById('power-stat').style.width = `${stats.power}%`;
-        document.getElementById('speed-stat').style.width = `${stats.speed}%`;
+        document.getElementById('power-stat').style.width = `${stats.power * 0.6}%`;
+        document.getElementById('speed-stat').style.width = `${stats.speed * 0.8}%`;
         document.getElementById('defense-stat').style.width = `${stats.defense}%`;
+        document.getElementById('hp-stat').style.width = `${stats.hp}%`;
+        document.getElementById('firerate-stat').style.width = `${stats.firerate}%`;
     }
 }
 
