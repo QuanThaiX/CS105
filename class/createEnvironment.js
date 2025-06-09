@@ -86,7 +86,7 @@ function createLights(scene) {
     scene.add(new THREE.AmbientLight(0x404040, 0.8));
 
     // Main directional light, which casts shadows.
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
     directionalLight.position.set(200, 400, 200);
     directionalLight.target.position.set(0, 0, 0);
     directionalLight.castShadow = true;

@@ -166,7 +166,7 @@ class Bot {
         // State entry actions
         switch (newState) {
             case BotState.ATTACK:
-                tank.startAutoShoot(Math.max(800, bot.shootCooldown * 0.6));
+                tank.startAutoShoot(Math.max(5000, bot.shootCooldown * 1.5));
                 bot.debugInfo.isShooting = true;
                 break;
                 
@@ -299,15 +299,14 @@ class Bot {
     moveWithObstacleAvoidance(tank, targetPosition, speedMultiplier = 1) {
         const bot = tank.bot;
         
-        // Check for nearby obstacles and get the closest one's distance
         const { avoidanceVector, nearestObstacleDistance } = this.calculateObstacleAvoidance(tank);
-
+        
         const panicDistance = 4.0;
         if (nearestObstacleDistance < panicDistance) {
             bot.debugInfo.isAvoidingObstacle = true;
             bot.debugInfo.currentAction = "Evasive Maneuver!";
 
-            tank.moveBackward(bot.moveSpeed * 0.75);
+            tank.moveBackward(bot.moveSpeed * 2);
 
             const directionToAvoidance = new THREE.Vector3().subVectors(avoidanceVector, tank.position).normalize();
             const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(tank.model.quaternion);
@@ -319,7 +318,7 @@ class Bot {
             } else {
                 tank.rotateRight(bot.rotateSpeed * 1.5);
             }
-            return; // Don't do anything else this frame. Just evade.
+            return;
         }
 
         if (avoidanceVector.length() > 0.1) {
@@ -334,7 +333,6 @@ class Bot {
             const avoidanceTarget = tank.position.clone().add(steeredDirection.multiplyScalar(20));
             this.moveTowardTarget(tank, avoidanceTarget, speedMultiplier * 0.8);
         } else {
-            // No obstacles detected, proceed as normal.
             bot.debugInfo.isAvoidingObstacle = false;
             bot.debugInfo.currentAction = "Moving to target";
             this.moveTowardTarget(tank, targetPosition, speedMultiplier);

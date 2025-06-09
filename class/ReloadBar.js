@@ -55,9 +55,7 @@ class ReloadBar {
      * - Hiding the bar when finished.
      */
     update() {
-        // Guard clause: If the bar shouldn't be visible or the tank is gone, do nothing.
         if (!this.isVisible || !this.tank || this.tank.disposed) {
-            // Ensure it's hidden if it was somehow left visible
             if (this.barGroup.visible) {
                 this.barGroup.visible = false;
             }
@@ -71,13 +69,10 @@ class ReloadBar {
         this.foreground.scale.x = reloadProgress;
         this.foreground.position.x = - (1 - reloadProgress) * (this.barWidth / 2);
 
-        // --- POSITION & ROTATION UPDATE (The Follow Effect) ---
         const healthBar = this.tank.healthBar;
 
-        // Position the reload bar relative to the health bar for consistent placement.
         if (healthBar && healthBar.sprite && healthBar.isReady) {
             const healthBarPosition = healthBar.sprite.position;
-            // Calculate Y offset: half health bar's height + half reload bar's height + a small gap
             const verticalOffset = (healthBar.barHeight / 2) + (this.barHeight / 2) + 0.05;
 
             this.barGroup.position.set(
@@ -86,7 +81,6 @@ class ReloadBar {
                 healthBarPosition.z
             );
         } else {
-            // Fallback: If health bar isn't ready, position relative to the tank directly.
             const barPosition = this.tank.position.clone();
             barPosition.y += 2.2; 
             this.barGroup.position.copy(barPosition);

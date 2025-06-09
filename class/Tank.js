@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { loadTankModel, FACTION, EVENT, TANKTYPE, TANK_STATS } from "../utils.js";
+import { loadTankModel, FACTION, EVENT, TANKTYPE, COLOR, TANK_STATS } from "../utils.js";
 import { GAMECONFIG } from '../config.js';
 import { Bullet } from "./Bullet.js";
 import { CollisionManager } from "./CollisionManager.js";
@@ -14,7 +14,6 @@ import { Rock } from "./Rock.js";
 import { Tree } from "./Tree.js";
 import { ModelLoader } from '../loader.js';
 import { Barrel } from './Barrel.js';
-
 class Tank extends GameObject {
     tankType;
     hp;
@@ -51,7 +50,19 @@ class Tank extends GameObject {
         }
         
         this.healthBar = new HealthBar(this, this.hp);
-
+        if (this.tankType === TANKTYPE.V002) {
+          this.healthBar.yOffset = 3.5;   
+        } else if (this.tankType === TANKTYPE.V003) {
+          this.healthBar.yOffset = -1.;   
+        } else if (this.tankType === TANKTYPE.V004) {
+          this.healthBar.yOffset = 3.5;   
+        } else if (this.tankType === TANKTYPE.V005) {
+          this.healthBar.yOffset = 3.5;   
+        } else if (this.tankType === TANKTYPE.V006) {
+          this.healthBar.yOffset = 3.5;   
+        } else if (this.tankType === TANKTYPE.V007) {
+          this.healthBar.yOffset = 3.5;   
+        }
         this.loadTankModelFromCache();
 
         this.prevPosition = this.position.clone();
@@ -80,33 +91,38 @@ class Tank extends GameObject {
         if (this.faction === FACTION.ENEMY) {
             this.createEnemyIndicator();
         }
+        if (this.faction === FACTION.PLAYER && this.tankType !== TANKTYPE.V010 &&
+           this.tankType !== TANKTYPE.V011 && this.tankType !== TANKTYPE.V009) {
+            this.createPlayerIndicator();
+        }
     }
+  createPlayerIndicator() {
+    if (!this.model) return; 
 
+    this.indicatorLight = new THREE.PointLight(0xffffff, 25, 8); 
+    this.indicatorLight.position.set(0, 1.5, 0); 
+
+    this.model.add(this.indicatorLight);
+  }
   createEnemyIndicator() {
-    if (!this.model) return; // Can't add indicator if there's no model to attach to
+    if (!this.model) return; 
 
-    // --- 1. Create the Arrow (Indicator) ---
-    const arrowGeometry = new THREE.ConeGeometry(0.3, 0.6, 8); // Small cone
+    const arrowGeometry = new THREE.ConeGeometry(0.3, 0.6, 8); 
     const arrowMaterial = new THREE.MeshBasicMaterial({ color: 0xff4444 }); // Bright red
     this.enemyIndicator = new THREE.Mesh(arrowGeometry, arrowMaterial);
 
-    // Position the arrow above the tank model
-    this.enemyIndicator.position.set(0, 3.5, 0); // Adjust Y value as needed
-    this.enemyIndicator.rotation.x = Math.PI; // Point it downwards
+    this.enemyIndicator.position.set(0, 3.5, 0); 
+    this.enemyIndicator.rotation.x = Math.PI; 
 
-    // --- 2. Create the Red Light ---
-    this.indicatorLight = new THREE.PointLight(0xff0000, 100, 8); // Red light, intensity 2, range 8
-    this.indicatorLight.position.set(0, 1.5, 0); // Position it in the middle of the tank
+    this.indicatorLight = new THREE.PointLight(0xff0000, 25, 8); 
+    this.indicatorLight.position.set(0, 1.5, 0); 
 
-    // --- 3. Attach them to the tank model ---
-    // This makes them move and rotate along with the parent tank model automatically!
     this.model.add(this.enemyIndicator);
     this.model.add(this.indicatorLight);
   }
 
   // We need to override dispose to clean up the new objects
   dispose() {
-    // --- Clean up indicator and light ---
     if (this.model) {
         if (this.enemyIndicator) {
             this.model.remove(this.enemyIndicator);
@@ -127,7 +143,7 @@ class Tank extends GameObject {
       this.playDestructionSound();
     }
     
-    super.dispose(); // Call parent dispose AFTER removing our custom objects
+    super.dispose();
     if (this.faction === FACTION.ENEMY) {
       Bot.instance.removeTank(this);
     }
@@ -280,7 +296,7 @@ setTankHP(hp) {
         bulletOffsetY = 2.1;
         bulletOffsetZ = 4.2;
       } else if (this.tankType === TANKTYPE.V003) {
-        bulletOffsetY = 1.3;
+        bulletOffsetY = 2.3;
         bulletOffsetZ = 4.1;
       } else if (this.tankType === TANKTYPE.V004) {
         bulletOffsetY = 2.1;
@@ -307,7 +323,6 @@ setTankHP(hp) {
         bulletOffsetY = 1.5;
         bulletOffsetZ = 4.2;
       } 
-      // Áp dụng offset Y
       bulletPosition.y += bulletOffsetY;
       
       // Tính toán hướng và áp dụng offset Z
@@ -320,12 +335,41 @@ setTankHP(hp) {
       if (this.reloadBar) {
         this.reloadBar.startReload();
       }
-      EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
+      if (this.tankType === TANKTYPE.V009) {
+        EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
         tank: this,
         position: bulletPosition,
         direction: forward.clone(),
-        speed: 0.5
+        speed: 0.5,
+        color: COLOR.cyan
       });
+
+    } else if (this.tankType === TANKTYPE.V010) {
+        EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
+        tank: this,
+        position: bulletPosition,
+        direction: forward.clone(),
+        speed: 0.5,
+        color: COLOR.cyan
+      });
+      } else if (this.tankType === TANKTYPE.V011) {
+        EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
+        tank: this,
+        position: bulletPosition,
+        direction: forward.clone(),
+        speed: 0.5,
+        color: COLOR.purple
+      });
+      }
+      else {
+        EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
+          tank: this,
+          position: bulletPosition,
+          direction: forward.clone(),
+          speed: 0.5,
+          color: COLOR.orange
+        });
+      }
       
       return true;
     }
@@ -447,7 +491,7 @@ setTankHP(hp) {
   }
   takeDamage(atk, objSource){
     if (this.hp !== undefined || this.hp !== null){
-      let damage = atk - this.defense > 0 ? atk - this.defense : 1;
+      let damage = atk -  (this.defense * 1.5) / 10 > 0 ? atk -  (this.defense * 1.5) / 10 : 25;
       this.hp -= damage;
       
       // Store damage source for destruction sound
@@ -514,7 +558,6 @@ handleCollision({ objA, objB }) {
 
     update() {
       const time = performance.now() * 0.001; 
-      console.log(this.model.userData)
       if (this.isHoverTank && this.model) {
         
           this.model.position.y = this.initialY + Math.sin(time * 2) * 0.1;

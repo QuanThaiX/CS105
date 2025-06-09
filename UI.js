@@ -29,16 +29,16 @@ const GAME_START_DELAY = 250; // ms, for loading simulation or DOM readiness
 // HP is normalized from maxHp. Fire Rate is normalized from shootCooldown (inverted).
 const tankStatsData = {
     [TANKTYPE.V001.name]: { power: 80, speed: 100, defense: 70, hp: 50, firerate: 85 },
-    [TANKTYPE.V002.name]: { power: 150, speed: 70, defense: 90, hp: 80, firerate: 78 },
+    [TANKTYPE.V002.name]: { power: 110, speed: 70, defense: 90, hp: 80, firerate: 78 },
     [TANKTYPE.V003.name]: { power: 120, speed: 80, defense: 85, hp: 60, firerate: 75 },
-    [TANKTYPE.V004.name]: { power: 90, speed: 120, defense: 60, hp: 70, firerate: 65 },
+    [TANKTYPE.V004.name]: { power: 90, speed: 70, defense: 60, hp: 70, firerate: 65 },
     [TANKTYPE.V005.name]: { power: 80, speed: 140, defense: 50, hp: 65, firerate: 95 },
     [TANKTYPE.V006.name]: { power: 120, speed: 40, defense: 100, hp: 120, firerate: 70 },
     [TANKTYPE.V007.name]: { power: 130, speed: 90, defense: 75, hp: 85, firerate: 82 },
-    [TANKTYPE.V008.name]: { power: 170, speed: 40, defense: 120, hp: 120, firerate: 50 },
-    [TANKTYPE.V009.name]: { power: 110, speed: 120, defense: 80, hp: 90, firerate: 84 },
-    [TANKTYPE.V010.name]: { power: 90, speed: 70, defense: 74, hp: 85, firerate: 79 },
-    [TANKTYPE.V011.name]: { power: 80, speed: 150, defense: 50, hp: 50, firerate: 100 },
+    [TANKTYPE.V008.name]: { power: 140, speed: 40, defense: 90, hp: 120, firerate: 55 },
+    [TANKTYPE.V009.name]: { power: 110, speed: 70, defense: 80, hp: 90, firerate: 84 },
+    [TANKTYPE.V010.name]: { power: 90, speed: 120, defense: 74, hp: 85, firerate: 79 },
+    [TANKTYPE.V011.name]: { power: 80, speed: 150, defense: 50, hp: 50, firerate: 110 },
 };
 
 async function preloadAllModels() {
@@ -247,9 +247,9 @@ function updateTankStatsUI(tankName) {
     if (stats) {
         document.getElementById('power-stat').style.width = `${stats.power * 0.6}%`;
         document.getElementById('speed-stat').style.width = `${stats.speed * 0.8}%`;
-        document.getElementById('defense-stat').style.width = `${stats.defense}%`;
-        document.getElementById('hp-stat').style.width = `${stats.hp}%`;
-        document.getElementById('firerate-stat').style.width = `${stats.firerate}%`;
+        document.getElementById('defense-stat').style.width = `${stats.defense * 0.8}%`;
+        document.getElementById('hp-stat').style.width = `${stats.hp * 0.8}%`;
+        document.getElementById('firerate-stat').style.width = `${stats.firerate * 0.8}%`;
     }
 }
 

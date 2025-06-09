@@ -266,7 +266,6 @@ class Game {
       updateSceneFog(this.scene, settings);
   }
   
-  // ADDED: New handler for when the fog setting is changed in the UI
   handleFogSettingChanged() {
     console.log('Fog setting updated. Applying changes to the scene.');
     this.updateFog();
@@ -274,7 +273,6 @@ class Game {
   registerEventListeners() {
     window.addEventListener('resize', this.boundOnWindowResize, false);
     
-    // Subscribe with async support and proper priority
     EventManager.instance.subscribe(EVENT.PLAYER_DIE, this.boundHandlePlayerDie, {
       priority: 10,
       async: true
@@ -313,7 +311,6 @@ class Game {
         winScreen.style.display = 'flex';
       }
       
-      // Notify UI update with proper data structure
       EventManager.instance.notify(EVENT.UI_UPDATE_HUD, {
         playerHP: 0,
         score: this.score,
@@ -334,7 +331,6 @@ class Game {
         gameOverScreen.style.display = 'flex';
       }
       
-      // Notify UI update
       EventManager.instance.notify(EVENT.UI_UPDATE_HUD, {
         playerHP: 0,
         score: this.score,
@@ -355,7 +351,7 @@ class Game {
 
     if (tank && tank.faction === FACTION.ENEMY && pointValue !== undefined) {
         this.addScore(pointValue);
-        this.enemiesKilled++; // Track total kills
+        this.enemiesKilled++;
         tank.isDestroyed = true;
         const index = this.enemies.indexOf(tank);
         if (index !== -1) {
@@ -363,14 +359,14 @@ class Game {
         }
 
         if (this.playerTank && !this.playerTank.isDestroyed && tank.maxHp > 0) {
-            const healAmount = tank.maxHp * 1.0;
+            const healAmount = tank.maxHp * 0.3;
             
             const actualHealAmount = this.playerTank.heal(healAmount);
 
             if (actualHealAmount > 0) {
                 const healPosition = this.playerTank.position.clone();
 
-                const healLight = new THREE.PointLight(0x50ff50, 250, 30, 2);
+                const healLight = new THREE.PointLight(0x50ff50, 70, 30, 2);
                 healLight.position.copy(healPosition).add(new THREE.Vector3(0, 1.5, 0)); 
                 this.scene.add(healLight);
 
@@ -407,16 +403,14 @@ class Game {
         totalSpawned: this.totalEnemiesSpawned
       });
 
-      // Respawn system logic
       const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
-      // The enemy has already been removed, so we check current length
       if (respawnConfig.ENABLED && this.enemies.length < respawnConfig.MAX_ENEMIES_ALIVE) {
           const respawnDelay = this.generator.getRandomInRange(respawnConfig.MIN_DELAY, respawnConfig.MAX_DELAY);
           
           if (respawnDelay > 2000) {
               setTimeout(() => {
                   this.showSpawnWarning();
-              }, respawnDelay - 2000); // Show warning 2s before spawn
+              }, respawnDelay - 2000);
           }
           
           setTimeout(() => {
@@ -426,7 +420,6 @@ class Game {
         console.log(`⏰ New enemy tank will spawn in ${(respawnDelay/1000).toFixed(1)}s (Killed: ${this.enemiesKilled}, Active: ${this.enemies.length})`);
       }
 
-      // Check win condition - disable for infinite gameplay
       if (this.isWin()) {
         setTimeout(() => {
           EventManager.instance.notify(EVENT.GAME_WIN, {
@@ -466,10 +459,8 @@ class Game {
       const newEnemyId = `enemy-respawn-${this.nextSpawnId++}`;
       const newEnemyTank = new Tank(newEnemyId, FACTION.ENEMY, safePosition, true, randomTankType);
       
-      // Progressive difficulty scaling
       const difficultyMultiplier = this.calculateDifficultyMultiplier();
       
-      // Set stats cho tank mới với scaling
       const basePointValue = this.gameConfig.ENEMY_CONFIG.ENEMY_POINT_VALUE;
       const baseHp = this.gameConfig.ENEMY_CONFIG.ENEMY_HP;
       
@@ -478,9 +469,7 @@ class Game {
       
       newEnemyTank.setTankHP(scaledHp);
       newEnemyTank.pointValue = scaledPointValue;
-      
-      // Track spawned enemies
-      this.totalEnemiesSpawned++;
+            this.totalEnemiesSpawned++;
       
       // Add vào game systems
       this.enemies.push(newEnemyTank);
@@ -512,14 +501,12 @@ class Game {
    */
   createSpawnEffect(position) {
     try {
-      // Tạo spawn explosion effect
       EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
         position: new THREE.Vector3(position.x, position.y + 2, position.z),
         direction: new THREE.Vector3(0, 1, 0),
         effectType: 'spawn'
       });
 
-      // Play spawn sound
       EventManager.instance.notify(EVENT.AUDIO_PLAY, {
         soundId: 'tank_spawn',
         volume: 0.5,

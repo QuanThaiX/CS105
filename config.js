@@ -11,14 +11,14 @@ const QUALITY_SETTINGS_PROFILES = {
     [QUALITY.LOW]: {
         antialias: false,
         pixelRatio: 1,
-        shadowMapSize: 512,
+        shadowMapSize: 1024,
         shadowType: THREE.PCFShadowMap,
         shadowRadius: 1,
         toneMapping: THREE.NoToneMapping,
         exposure: 1.0,
         extraLights: false,
         useSky: false,
-        useFog: false, // ADDED: Fog setting for LOW
+        useFog: false, 
     },
     [QUALITY.MEDIUM]: {
         antialias: true,
@@ -30,7 +30,7 @@ const QUALITY_SETTINGS_PROFILES = {
         exposure: 1.2,
         extraLights: true,
         useSky: true,
-        useFog: true, // ADDED: Fog setting for MEDIUM
+        useFog: true,
     },
     [QUALITY.HIGH]: {
         antialias: true,
@@ -42,7 +42,7 @@ const QUALITY_SETTINGS_PROFILES = {
         exposure: 1.2,
         extraLights: true,
         useSky: true,
-        useFog: true, // ADDED: Fog setting for HIGH
+        useFog: true, 
     }
 };
 
@@ -55,43 +55,29 @@ export const gameSettings = {
 };
 
 export function loadSettings() {
-    try {
-        const savedSettings = localStorage.getItem('tankGameSettings');
-        if (savedSettings) {
-            const parsed = JSON.parse(savedSettings);
+    const savedSettings = localStorage.getItem('tankGameSettings');
+    if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
 
-            // Load quality with a fallback
-            if (parsed.quality && Object.values(QUALITY).includes(parsed.quality)) {
-                gameSettings.quality = parsed.quality;
-            }
-
-            gameSettings.fog = parsed.fog ?? QUALITY_SETTINGS_PROFILES[gameSettings.quality].useFog;
-            gameSettings.volumeMaster = parsed.volumeMaster ?? 1.0;
-            gameSettings.volumeMusic = parsed.volumeMusic ?? 0.8;
-            gameSettings.volumeSfx = parsed.volumeSfx ?? 1.0;
-            
-            console.log('⚙️ Settings loaded:', gameSettings);
-        } else {
-            // No saved settings, so apply defaults from the current quality profile
-            const qualityProfile = QUALITY_SETTINGS_PROFILES[gameSettings.quality];
-            gameSettings.fog = qualityProfile.useFog;
-            console.log('⚙️ No saved settings found, using defaults for MEDIUM quality.');
+        if (parsed.quality && Object.values(QUALITY).includes(parsed.quality)) {
+            gameSettings.quality = parsed.quality;
         }
-    } catch (e) {
-        console.error('Failed to load settings from localStorage', e);
-        // If loading fails, the defaults in gameSettings will be used
+
+        gameSettings.fog = parsed.fog ?? QUALITY_SETTINGS_PROFILES[gameSettings.quality].useFog;
+        gameSettings.volumeMaster = parsed.volumeMaster ?? 1.0;
+        gameSettings.volumeMusic = parsed.volumeMusic ?? 0.8;
+        gameSettings.volumeSfx = parsed.volumeSfx ?? 1.0;
+        
+        console.log('⚙️ Settings loaded:', gameSettings);
+    } else {
+        const qualityProfile = QUALITY_SETTINGS_PROFILES[gameSettings.quality];
+        gameSettings.fog = qualityProfile.useFog;
+        console.log('⚙️ No saved settings found, using defaults for MEDIUM quality.');
     }
 }
 
-// Function to save settings to localStorage. Call this when the setting is changed.
 export function saveSettings() {
-    try {   
-        // We now save the entire gameSettings object as a single JSON string
-        localStorage.setItem('tankGameSettings', JSON.stringify(gameSettings));
-        console.log('⚙️ Settings saved.');
-    } catch (e) {
-        console.error('Failed to save settings to localStorage', e);
-    }
+    localStorage.setItem('tankGameSettings', JSON.stringify(gameSettings));
 }
 
 export const GAMECONFIG = Object.freeze({
@@ -99,11 +85,11 @@ export const GAMECONFIG = Object.freeze({
     WORLD_BOUNDARY: 500,
     QUALITY_PROFILES: QUALITY_SETTINGS_PROFILES,
     SCENERY: {
-        NUM_ROCKS: 60,
+        NUM_ROCKS: 100,
         ROCK_TYPES: ['rock09', 'rock13'],
         ROCK_SCALE_MIN: 3.0,
-        ROCK_SCALE_MAX: 14,
-        NUM_TREES: 80,
+        ROCK_SCALE_MAX: 12,
+        NUM_TREES: 100,
         TREE_TYPES: ['tree01'],
         TREE_SCALE_MIN: 0.9,
         TREE_SCALE_MAX: 2.9,
@@ -120,12 +106,12 @@ export const GAMECONFIG = Object.freeze({
             PARTICLE_COUNT: 50,      
             CHAIN_REACTION: true      
         },
-        MIN_SPAWN_RADIUS: 100, // Scenery can spawn closer to the center
-        MAX_SPAWN_RADIUS_FACTOR: 0.95, // Scenery will spawn up to this factor of (WORLD_BOUNDARY / 2)
+        MIN_SPAWN_RADIUS: 90, // Scenery can spawn closer to the center
+        MAX_SPAWN_RADIUS_FACTOR: 1.25, // Scenery will spawn up to this factor of (WORLD_BOUNDARY / 2)
     },
     ENEMY_CONFIG: {
-        NUM_ENEMIES: 3,
-        ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V003],
+        NUM_ENEMIES:5,
+        ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006],
         ENEMY_POINT_VALUE: (type) => {
             switch(type) {
                 case TANKTYPE.V001: return 100;
@@ -153,7 +139,7 @@ export const GAMECONFIG = Object.freeze({
         
         // =================== RESPAWN CONFIGURATION ===================
         RESPAWN: {
-            ENABLED: false,                    // Bật/tắt respawn system
+            ENABLED: true,                    // Bật/tắt respawn system
             MIN_DELAY: 2000,                  // Thời gian tối thiểu trước khi spawn (ms)
             MAX_DELAY: 5000,                  // Thời gian tối đa trước khi spawn (ms)
             MIN_DISTANCE_FROM_PLAYER: 50,    // Khoảng cách tối thiểu từ player

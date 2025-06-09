@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { EVENT } from '../utils.js';
 import { Bullet } from './Bullet.js';
 import { CollisionManager } from './CollisionManager.js';
 import { EventManager } from './EventManager.js';
 import { Game } from './Game.js';
+import { loadTankModel, FACTION, EVENT, TANKTYPE, COLOR, TANK_STATS } from "../utils.js";
 
 class ProjectilesManager {
   static instance;
@@ -21,9 +21,15 @@ class ProjectilesManager {
     EventManager.instance.subscribe(EVENT.COLLISION, this.handleCollision.bind(this));
   }
 
-  handleObjectShoot({ tank, position, direction, speed }) {
-    this.createBullet(tank.faction, position, direction, speed);
+  handleObjectShoot({ tank, position, direction, speed, color}) {
+    if (!tank) {
+      return;
+    }
+    this.createBullet(tank.faction, position, direction, speed, color);
+    if(tank.tankType === TANKTYPE.V009) {
+        this.createBullet(tank.faction, position, direction, speed, color);
   }
+}
   
   handleBulletExpired({ bullet }) {
     this.removeBullet(bullet);
@@ -50,8 +56,8 @@ class ProjectilesManager {
     return bullet;
   }
   
-  createBullet(faction, position, direction, speed = 0.5) {
-    const bullet = new Bullet(faction, position);
+  createBullet(faction, position, direction, speed = 0.5, color) {
+    const bullet = new Bullet(faction, position, color);
     bullet.setVelocity(direction.multiplyScalar(speed));
     return this.addProjectile(bullet);
   }

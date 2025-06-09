@@ -176,7 +176,6 @@ export function createTank() {
         light.position.y = -0.3;
         padGroup.add(light);
         
-        // --- NEW: Active Thruster Cone Effect ---
         const coneGeo = new THREE.ConeGeometry(0.5, 1.2, 8);
         const coneMat = new THREE.MeshBasicMaterial({
             color: 0x00ffff,

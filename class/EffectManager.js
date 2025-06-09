@@ -44,21 +44,27 @@ class Effect {
 const EXPLOSION_DEFAULTS = {
     // General
     particleCount: 500,   
-    maxLife: 1.5,         // Maximum particle lifetime (seconds)
-    baseSpeed: 15,        // Base particle speed
-    gravity: -9.8,        // Gravity (negative pulls down)
-    particleBaseSize: 0.5,// Base particle size
-    colors: [             // Array of possible particle colors
-        new THREE.Color(0xffa000), // Orange
-        new THREE.Color(0xff4000), // Red-Orange
-        new THREE.Color(0xffc040), // Yellow-Orange
+    maxLife: 1.5,        
+    baseSpeed: 15,       
+    gravity: -9.8,        
+    particleBaseSize: 0.5,
+    colors: [             
+        new THREE.Color(0xffa000), 
+        new THREE.Color(0xff4000), 
+        new THREE.Color(0xffc040), 
     ],
     // Light
-    addLight: true,       // Whether to add a light flash
-    lightColor: 0xffa000, // Bright orange-yellow
-    lightIntensity: 2000,  // Very bright initially
-    lightDistance: 50,    // How far the light reaches
-    texture: createParticleTexture()
+    addLight: true,      
+    lightColor: 0xffa000,
+    lightIntensity: 2000,  
+    lightDistance: 50,    
+    texture: createParticleTexture(),
+    addShockwave: true,
+    shockwaveColor: 0xffffff,
+    shockwaveDuration: 0.8, 
+    shockwaveInitialRadius: 0.2, 
+    shockwaveMaxRadius: 15, 
+    shockwaveThickness: 1.5, 
 };
 
 function createParticleTexture(size = 64) {
@@ -111,19 +117,22 @@ class Explosion extends EffectInstance {
         this.geometry = null;
         this.material = null;
         this.points = null;
+        this.shockwave = null; 
         
         this.clock = new THREE.Clock();
         this._animationFrameId = null;
 
-        // --- Setup ---
         if (this.options.addLight) {
             this._createLight();
+        }
+        if (this.options.addShockwave) {
+            this._createShockwave();
         }
         this._createParticles();
         this._initializeParticles();
 
-        // Add created objects to the scene
         if (this.light) this.scene.add(this.light);
+        if (this.shockwave) this.scene.add(this.shockwave);
         if (this.points) this.scene.add(this.points);
 
         this._animate = this._animate.bind(this);
@@ -137,6 +146,25 @@ class Explosion extends EffectInstance {
             this.options.lightDistance * this.size
         );
         this.light.position.copy(this.origin);
+    }
+    
+    _createShockwave() {
+        const geometry = new THREE.RingGeometry(
+            this.options.shockwaveInitialRadius, // innerRadius
+            this.options.shockwaveInitialRadius + (this.options.shockwaveThickness * this.size),
+            64 // thetaSegments
+        );
+
+        const material = new THREE.MeshBasicMaterial({
+            color: this.options.shockwaveColor,
+            transparent: true,
+            opacity: 1.0,
+            blending: THREE.AdditiveBlending
+        });
+
+        this.shockwave = new THREE.Mesh(geometry, material);
+        this.shockwave.position.copy(this.origin).add(new THREE.Vector3(0, 0.1, 0)); 
+        this.shockwave.rotation.x = -Math.PI / 2;
     }
 
     _createParticles() {
@@ -170,7 +198,7 @@ class Explosion extends EffectInstance {
 
             const direction = new THREE.Vector3(
                 Math.random() - 0.5,
-                Math.random(), // Slightly biased upwards
+                Math.random(), 
                 Math.random() - 0.5
             ).normalize();
 
@@ -205,13 +233,30 @@ class Explosion extends EffectInstance {
         if (this.light && this.light.visible) {
             const lifeRatio = Math.min(elapsedTime / (this.options.maxLife * 0.25), 1.0);
             const decay = Math.pow(1.0 - lifeRatio, 2.0);
-            this.light.intensity = this.options.lightIntensity * this.size * decay;
+            this.light.intensity = this.options.lightIntensity * this.size * decay + 1000;
             if (this.light.intensity <= 0) {
                 this.light.visible = false;
             }
         }
         
-        // --- Update Particles ---
+        if (this.shockwave && this.shockwave.visible) {
+            const shockwaveLife = Math.min(elapsedTime / this.options.shockwaveDuration, 1.0);
+            
+            const currentRadius = THREE.MathUtils.lerp(
+                this.options.shockwaveInitialRadius,
+                this.options.shockwaveMaxRadius * this.size,
+                shockwaveLife
+            );
+            this.shockwave.scale.set(currentRadius, currentRadius, currentRadius);
+
+            // Fade the shockwave out over its life
+            this.shockwave.material.opacity = Math.pow(1.0 - shockwaveLife, 2.0);
+
+            if (shockwaveLife >= 1.0) {
+                this.shockwave.visible = false; // Mark for cleanup
+            }
+        }
+
         const positionAttribute = this.geometry.attributes.position;
         const alphaAttribute = this.geometry.attributes.alpha;
         let liveParticles = 0;
@@ -229,6 +274,7 @@ class Explosion extends EffectInstance {
                     positionAttribute.setXYZ(i, currentPos.x, currentPos.y, currentPos.z);
                     data.velocity.y += this.options.gravity * dt;
                     const lifeRatio = Math.max(0, data.life / data.initialLife);
+                    // Fade out particles quadratically for a nice fade effect
                     alphaAttribute.setX(i, lifeRatio * lifeRatio);
                 }
             }
@@ -236,7 +282,7 @@ class Explosion extends EffectInstance {
         positionAttribute.needsUpdate = true;
         alphaAttribute.needsUpdate = true;
 
-        if (liveParticles === 0 && this.alive) {
+        if (liveParticles === 0 && this.alive && (!this.shockwave || !this.shockwave.visible)) {
             this.dispose();
         }
     }
@@ -252,14 +298,17 @@ class Explosion extends EffectInstance {
             this._animationFrameId = null;
         }
 
-        if (this.light && this.scene) {
-            this.scene.remove(this.light);
-        }
+        if (this.light && this.scene) this.scene.remove(this.light);
         this.light = null;
-
-        if (this.points && this.scene) {
-            this.scene.remove(this.points);
+        
+        if (this.shockwave) {
+            if (this.scene) this.scene.remove(this.shockwave);
+            this.shockwave.geometry.dispose();
+            this.shockwave.material.dispose();
+            this.shockwave = null;
         }
+
+        if (this.points && this.scene) this.scene.remove(this.points);
         if (this.geometry) this.geometry.dispose();
         if (this.material) this.material.dispose();
 
@@ -277,7 +326,6 @@ class Explosion extends EffectInstance {
 }
 
 
-// --- MuzzleFlash Effect Class (Unchanged) ---
 class MuzzleFlash extends EffectInstance {
     constructor(scene, position, direction, options = {}) {
         super(scene);

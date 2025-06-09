@@ -257,7 +257,8 @@ class Generator {
                 const enemyTank = new Tank(def.id, FACTION.ENEMY, def.position, true, def.type);
                 enemyTank.setTankHP(def.hp);
                 enemyTank.pointValue = def.pointValue;
-                enemyTank.damage = enemyTank.damage * 0.8;
+                enemyTank.defense = enemyTank.defense * 0.7;
+                
                 if (bot) bot.addTank(enemyTank);
                 if (collisionManager) collisionManager.add(enemyTank);
                 

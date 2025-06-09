@@ -83,10 +83,12 @@ export function createTank() {
         cannonGroup.add(ring);
     }
 
+    let indicatorLight = new THREE.PointLight(0x800080, 50, 8); 
+    indicatorLight.position.set(0, 1.5, 0); 
 
-    // --- Legs ---
+    tank.add(indicatorLight);
+
     const legs = [];
-    // CHANGE: Increased leg segment length from 1.5 to 2.2 for a longer, spidery look.
     const legSegmentLength = 2.2;
     const legSegmentGeo = new THREE.BoxGeometry(0.25, 0.25, legSegmentLength);
 
@@ -96,10 +98,8 @@ export function createTank() {
         const lowerLegPivot = new THREE.Group();
 
         upperLegPivot.position.y = 0;
-        // CHANGE: Position the "knee" joint at the end of the new, longer segment.
         lowerLegPivot.position.z = legSegmentLength - 0.1; 
 
-        // CHANGE: Center the mesh along the new length.
         const meshOffset = legSegmentLength / 2;
         const upperLeg = new THREE.Mesh(legSegmentGeo, darkMaterial);
         upperLeg.position.z = meshOffset;

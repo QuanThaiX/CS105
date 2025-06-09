@@ -4,7 +4,6 @@ export function createTank() {
     const tank = new THREE.Group();
     tank.name = "Tank_V008_Juggernaut";
 
-    // --- Vật liệu ---
     const bodyMaterial = new THREE.MeshStandardMaterial({
         color: 0x4a535b, metalness: 0.8, roughness: 0.5
     });

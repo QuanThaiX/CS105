@@ -18,27 +18,30 @@ class Bullet extends GameObject{
   hasCollided = false;
   damage = 100;
   boundHandleCollision;
+  color; 
 
   trail;
   trailPoints = [];
   trailLength = 20; 
 
 
-  constructor(faction, position) {
+  /**
+   * @param {FACTION} faction The faction this bullet belongs to.
+   * @param {THREE.Vector3} position The initial position of the bullet.
+   * @param {THREE.Color | number | string} [color=COLOR.orange] The color of the bullet's tracer and trail.
+   */
+  constructor(faction, position, color) {
     super("Bullet" + Bullet.count, faction, position, true);
     
+    this.color = color || COLOR.orange;
     this.prevPosition = this.position.clone();
     this.velocity = new THREE.Vector3(0, 0, 0);
     this.creationTime = Date.now();
-
-
     this.setModel(this.createTracerHead());
     this.createTrail();
 
     Bullet.count++;
     CollisionManager.instance.add(this);
-    // this.boundHandleCollision = this.handleCollision.bind(this);
-    // EventManager.instance.subscribe(EVENT.COLLISION, this.boundHandleCollision);
   }
 
   setVelocity(velocityVector) {
@@ -54,8 +57,8 @@ class Bullet extends GameObject{
   createTracerHead() {
     const geometry = new THREE.SphereGeometry(0.2, 8, 8);
     const material = new THREE.MeshStandardMaterial({ 
-      color: COLOR.yellow,
-      emissive: COLOR.orange,
+      color: this.color,
+      emissive: this.color, 
       emissiveIntensity: 2, 
       metalness: 0.5,
       roughness: 0.5
@@ -65,7 +68,7 @@ class Bullet extends GameObject{
     mesh.castShadow = true;
 
 
-    const light = new THREE.PointLight(COLOR.orange, 5, 5);
+    const light = new THREE.PointLight(this.color, 20, 20); // Light matches the bullet color
     light.position.set(0, 0, 0);
     mesh.add(light);
 
@@ -75,7 +78,6 @@ class Bullet extends GameObject{
 
   createTrail() {
     const trailGeometry = new THREE.BufferGeometry();
-    // Use vertex colors to make the trail fade out
     const trailMaterial = new THREE.LineBasicMaterial({
       vertexColors: true,
       blending: THREE.AdditiveBlending,
@@ -89,7 +91,6 @@ class Bullet extends GameObject{
   
 
   updateTrail() {
-    // Add the bullet's current position to the trail history
     this.trailPoints.push(this.position.clone());
     
     // Limit the number of points in the trail
@@ -99,7 +100,7 @@ class Bullet extends GameObject{
 
     const positions = [];
     const colors = [];
-    const trailColor = new THREE.Color(COLOR.orange);
+    const trailColor = new THREE.Color(this.color); // Use the bullet's color for the trail
 
     for (let i = 0; i < this.trailPoints.length; i++) {
       const p = this.trailPoints[i];
@@ -152,29 +153,25 @@ class Bullet extends GameObject{
     }
   }
 
-  // --- VISUAL ENHANCEMENT: Replaced the simple sphere with a particle explosion ---
   createImpactEffect() {
     const scene = Game.instance.scene;
     const impactPosition = this.position;
     
-    // 1. Create a bright flash of light
+    // A bright white flash for the initial impact
     const flashLight = new THREE.PointLight(0xffffff, 20, 15, 2);
     flashLight.position.copy(impactPosition);
     scene.add(flashLight);
     
-    // 2. Create sparks using a particle system
     const particleCount = 60;
     const particlesGeometry = new THREE.BufferGeometry();
     const posArray = new Float32Array(particleCount * 3);
     const velocities = [];
 
     for (let i = 0; i < particleCount; i++) {
-      // Start all particles at the impact point
       posArray[i * 3 + 0] = 0;
       posArray[i * 3 + 1] = 0;
       posArray[i * 3 + 2] = 0;
       
-      // Give each particle a random outward velocity
       const velocity = new THREE.Vector3(
         (Math.random() - 0.5) * 2,
         (Math.random() - 0.5) * 2,
@@ -186,7 +183,7 @@ class Bullet extends GameObject{
     particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
     
     const particleMaterial = new THREE.PointsMaterial({
-      color: 0xffaa00,
+      color: this.color, // Sparks match the bullet's color
       size: 0.15,
       blending: THREE.AdditiveBlending,
       transparent: true,
@@ -197,8 +194,7 @@ class Bullet extends GameObject{
     sparks.position.copy(impactPosition);
     scene.add(sparks);
     
-    // 3. Animate the effect over a short duration
-    let duration = 0.7; // seconds
+    let duration = 0.7; 
     let elapsed = 0;
     const clock = new THREE.Clock();
     
@@ -207,7 +203,6 @@ class Bullet extends GameObject{
       elapsed += dt;
 
       if (elapsed > duration) {
-        // Cleanup
         scene.remove(sparks);
         scene.remove(flashLight);
         sparks.geometry.dispose();
@@ -215,12 +210,10 @@ class Bullet extends GameObject{
         return;
       }
 
-      // Animate fade out and movement
       const progress = elapsed / duration;
       flashLight.intensity = 20 * (1 - progress);
       particleMaterial.opacity = 1 - progress;
 
-      // Update particle positions
       const positions = sparks.geometry.attributes.position.array;
       for (let i = 0; i < particleCount; i++) {
           positions[i * 3 + 0] += velocities[i].x * dt * 10;
