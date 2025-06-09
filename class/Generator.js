@@ -1,3 +1,4 @@
+// ./class/Generator.js
 import * as THREE from 'three';
 import { FACTION, TANKTYPE } from '../utils.js';
 import { Tank } from './Tank.js';
@@ -5,239 +6,95 @@ import { Rock } from './Rock.js';
 import { Tree } from './Tree.js';
 import { Barrel } from './Barrel.js';
 import { CollisionManager } from './CollisionManager.js';
+import { GAMECONFIG } from '../config.js'; // Import GAMECONFIG for stats functions
 
 /**
- * Advanced Generator class handles all procedural generation
- * - Object creation with async support
- * - Optimized algorithms for placement
- * - Batch processing for performance
- * - Memory-efficient generation patterns
+ * Advanced Generator class now acts as a manager for a Web Worker.
+ * It offloads the heavy computation of object placement to a separate thread,
+ * then uses the resulting data to instantiate the actual 3D objects on the main thread.
  */
 class Generator {
     static instance;
+    worker;
+    _levelGenerationResolve = null;
+    _levelGenerationReject = null;
 
     constructor() {
         if (Generator.instance) {
             return Generator.instance;
         }
         Generator.instance = this;
-        
+
+        if (typeof(Worker) === "undefined") {
+            console.error("❌ This browser does not support Web Workers. Level generation will be synchronous and may freeze the UI.");
+            return;
+        }
+
+        this.worker = new Worker('./class/GeneratorWorker.js', { type: 'module' });
+        this.worker.onmessage = this.handleWorkerMessage.bind(this);
+        this.worker.onerror = (error) => {
+            console.error("🛠️ Generator Worker Error:", error);
+            if (this._levelGenerationReject) {
+                this._levelGenerationReject(error);
+                this._levelGenerationReject = null;
+                this._levelGenerationResolve = null;
+            }
+        };
+
         // Performance optimization
         this.batchSize = 50;
         this.processingDelay = 0; // ms delay between batches
     }
-
-    /**
-     * Get random number in range
-     * @param {number} min - Minimum value
-     * @param {number} max - Maximum value
-     * @returns {number} Random number between min and max
-     */
-    getRandomInRange(min, max) {
-        return Math.random() * (max - min) + min;
+    
+    handleWorkerMessage(e) {
+        const { type, payload } = e.data;
+        if (type === 'generationComplete') {
+            if (this._levelGenerationResolve) {
+                this._levelGenerationResolve(payload);
+                this._levelGenerationResolve = null;
+                this._levelGenerationReject = null;
+            }
+        }
     }
 
     /**
-     * Get random element from array
-     * @param {Array} arr - Array to pick from
-     * @returns {*} Random element from array
+     * Generate complete level definitions by offloading the task to a Web Worker.
+     * @param {Object} config - Level configuration.
+     * @returns {Promise<Object>} A promise that resolves with the object definitions.
      */
-    getRandomElement(arr) {
-        if (!arr || arr.length === 0) return undefined;
-        return arr[Math.floor(Math.random() * arr.length)];
-    }
-
-    /**
-     * Generate scattered objects (rocks, trees, barrels) in circular pattern
-     * @param {number} count - Number of objects to generate
-     * @param {Array} types - Array of object types
-     * @param {number} scaleMin - Minimum scale
-     * @param {number} scaleMax - Maximum scale
-     * @param {number} maxSpawnRadius - Maximum spawn radius
-     * @param {number} minSpawnRadius - Minimum spawn radius
-     * @param {number} playerSafeRadius - Safe radius around player spawn (0,0,0)
-     * @returns {Array} Array of object definitions
-     */
-    generateScatteredObjects(count, types, scaleMin, scaleMax, maxSpawnRadius, minSpawnRadius = 0, playerSafeRadius = 35) {
-        const objects = [];
-        if (!types || types.length === 0) {
-            console.warn("generateScatteredObjects: No types provided, cannot generate objects.");
-            return objects;
-        }
-
-        const maxAttempts = count * 20; // Increase attempts to find valid positions
-        let attempts = 0;
-
-        while (objects.length < count && attempts < maxAttempts) {
-            attempts++;
-            
-            const angle = Math.random() * Math.PI * 2;
-            const effectiveMinRadius = Math.max(minSpawnRadius, playerSafeRadius);
-            const radius = this.getRandomInRange(effectiveMinRadius, maxSpawnRadius);
-
-            const x = radius * Math.cos(angle);
-            const z = radius * Math.sin(angle);
-
-            const distanceFromPlayer = Math.sqrt(x * x + z * z);
-            if (distanceFromPlayer >= (playerSafeRadius + 5)) {
-                objects.push({
-                    position: { x, y: 0, z },
-                    scale: this.getRandomInRange(scaleMin, scaleMax),
-                    rotation: Math.random() * Math.PI * 2,
-                    type: this.getRandomElement(types),
-                });
-            }
-        }
-
-        if (objects.length < count) {
-            console.warn(`Generated ${objects.length}/${count} objects. Some positions were too close to player spawn.`);
-        }
-
-        return objects;
-    }
-
-    /**
-     * Generate collision-aware placement for better object distribution
-     * @param {number} count - Number of objects to generate
-     * @param {Array} types - Array of object types
-     * @param {number} scaleMin - Minimum scale
-     * @param {number} scaleMax - Maximum scale
-     * @param {Object} bounds - { minX, maxX, minZ, maxZ }
-     * @param {number} minDistance - Minimum distance between objects
-     * @returns {Array} Array of object definitions with validated positions
-     */
-    generateCollisionAwareObjects(count, types, scaleMin, scaleMax, bounds, minDistance = 5) {
-        const objects = [];
-        const maxAttempts = count * 10; // Limit attempts to prevent infinite loops
-        let attempts = 0;
-        
-        while (objects.length < count && attempts < maxAttempts) {
-            attempts++;
-            
-            const x = this.getRandomInRange(bounds.minX, bounds.maxX);
-            const z = this.getRandomInRange(bounds.minZ, bounds.maxZ);
-            const position = new THREE.Vector3(x, 0, z);
-            const scale = this.getRandomInRange(scaleMin, scaleMax);
-            
-            // Check if position is valid (no overlaps)
-            let validPosition = true;
-            
-            // Check against existing objects in this generation
-            for (const existingObj of objects) {
-                const distance = position.distanceTo(new THREE.Vector3(
-                    existingObj.position.x, 
-                    existingObj.position.y, 
-                    existingObj.position.z
-                ));
-                
-                if (distance < minDistance * Math.max(scale, existingObj.scale)) {
-                    validPosition = false;
-                    break;
-                }
-            }
-            
-            // Check against existing objects in CollisionManager if available
-            if (validPosition && typeof CollisionManager !== 'undefined' && CollisionManager.instance) {
-                const objectSize = {
-                    width: scale * 2,
-                    height: scale * 2,
-                    depth: scale * 2
-                };
-                
-                validPosition = CollisionManager.instance.isPositionValid(position, objectSize);
-            }
-            
-            if (validPosition) {
-                objects.push({
-                    position: { x, y: 0, z },
-                    scale: scale,
-                    rotation: Math.random() * Math.PI * 2,
-                    type: this.getRandomElement(types),
-                });
-            }
+    async generateLevel(config) {
+        if (!this.worker) {
+            return Promise.reject(new Error("Web Worker is not supported or initialized."));
         }
         
-        if (objects.length < count) {
-            console.warn(`Could only generate ${objects.length}/${count} objects without overlaps`);
-        }
-        
-        return objects;
+        // ============================ THE FIX ============================
+        // Create a "sanitized" configuration object that is safe to clone for the worker.
+        // This removes the functions (ENEMY_HP, ENEMY_POINT_VALUE) that cause the cloning error.
+        const workerConfig = {
+            worldBoundary: config.worldBoundary,
+            enemyConfig: {
+                NUM_ENEMIES: config.enemyConfig.NUM_ENEMIES,
+                ENEMY_TYPES: config.enemyConfig.ENEMY_TYPES, // This array of simple objects is safe to clone
+                MAX_SPAWN_RADIUS_FACTOR: config.enemyConfig.MAX_SPAWN_RADIUS_FACTOR,
+                MIN_SPAWN_RADIUS: config.enemyConfig.MIN_SPAWN_RADIUS,
+            },
+            sceneryConfig: config.sceneryConfig, // This object is already safe (no functions)
+        };
+        // ===============================================================
+
+        return new Promise((resolve, reject) => {
+            this._levelGenerationResolve = resolve;
+            this._levelGenerationReject = reject;
+            // Send the sanitized, cloneable config to the worker
+            this.worker.postMessage({ type: 'generateLevel', payload: workerConfig });
+        });
     }
+    
+    // --- Helper functions remain on the main thread if needed elsewhere, or can be removed if only used for generation ---
+    getRandomInRange(min, max) { return Math.random() * (max - min) + min; }
+    getRandomElement(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-    /**
-     * Enhanced random objects generation with collision avoidance
-     * @param {number} count - Number of objects to generate
-     * @param {Array} types - Array of object types
-     * @param {number} scaleMin - Minimum scale
-     * @param {number} scaleMax - Maximum scale
-     * @param {Object} bounds - { minX, maxX, minZ, maxZ }
-     * @param {Object} options - { avoidCollisions: boolean, minDistance: number }
-     * @returns {Array} Array of object definitions
-     */
-    generateRandomObjects(count, types, scaleMin, scaleMax, bounds, options = {}) {
-        const { avoidCollisions = false, minDistance = 5 } = options;
-        
-        if (avoidCollisions) {
-            return this.generateCollisionAwareObjects(count, types, scaleMin, scaleMax, bounds, minDistance);
-        } else {
-            // Use original method for backward compatibility
-            const objects = [];
-            const { minX, maxX, minZ, maxZ } = bounds;
-
-            for (let i = 0; i < count; i++) {
-                const x = this.getRandomInRange(minX, maxX);
-                const z = this.getRandomInRange(minZ, maxZ);
-                
-                objects.push({
-                    position: { x, y: 0, z },
-                    scale: this.getRandomInRange(scaleMin, scaleMax),
-                    rotation: Math.random() * Math.PI * 2,
-                    type: this.getRandomElement(types),
-                });
-            }
-            
-            return objects;
-        }
-    }
-
-    /**
-     * Generate enemy tank definitions with random placement
-     * @param {number} count - Number of enemies to generate
-     * @param {Array} types - Array of tank types
-     * @param {number|Function} pointValue - Point value or function to calculate points
-     * @param {number|Function} hp - HP value or function to calculate HP
-     * @param {number} maxSpawnRadius - Maximum spawn radius
-     * @param {number} minSpawnRadius - Minimum spawn radius
-     * @returns {Array} Array of enemy definitions
-     */
-    generateEnemyDefinitions(count, types, pointValue, hp, maxSpawnRadius, minSpawnRadius = 0) {
-        const definitions = [];
-        if (!types || types.length === 0) {
-            console.warn("generateEnemyDefinitions: No enemy types provided, cannot generate enemies.");
-            return definitions;
-        }
-
-        for (let i = 0; i < count; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const effectiveMinRadius = Math.min(minSpawnRadius, maxSpawnRadius);
-            const radius = this.getRandomInRange(effectiveMinRadius, maxSpawnRadius);
-
-            const x = radius * Math.cos(angle);
-            const z = radius * Math.sin(angle);
-            const selectedType = this.getRandomElement(types);
-
-            definitions.push({
-                id: `enemy-${i + 1}`, // Unique ID for each enemy
-                position: { x, y: 1, z }, // y=1 for ground level
-                pointValue: typeof pointValue === 'function' ? pointValue(selectedType) : pointValue,
-                type: selectedType,
-                hp: typeof hp === 'function' ? hp(selectedType) : hp,
-            });
-        }
-        return definitions;
-    }
-
-    // =================== OBJECT CREATION METHODS (moved from static classes) ===================
+    // =================== OBJECT CREATION METHODS (MUST REMAIN ON MAIN THREAD) ===================
 
     /**
      * Create Tank objects from enemy definitions (async batch processing)
@@ -249,15 +106,31 @@ class Generator {
     async createEnemyTanks(enemyDefinitions, bot, collisionManager) {
         const tanks = [];
         
-        // Process in batches for performance
         for (let i = 0; i < enemyDefinitions.length; i += this.batchSize) {
             const batch = enemyDefinitions.slice(i, i + this.batchSize);
             
             const batchTanks = batch.map(def => {
                 const enemyTank = new Tank(def.id, FACTION.ENEMY, def.position, true, def.type);
-                enemyTank.setTankHP(def.hp);
-                enemyTank.pointValue = def.pointValue;
-                enemyTank.defense = enemyTank.defense * 0.7;
+                
+                // Get HP and point values specifically defined for enemies in GAMECONFIG
+                const pointValue = typeof GAMECONFIG.ENEMY_CONFIG.ENEMY_POINT_VALUE === 'function' 
+                    ? GAMECONFIG.ENEMY_CONFIG.ENEMY_POINT_VALUE(def.type) 
+                    : GAMECONFIG.ENEMY_CONFIG.ENEMY_POINT_VALUE;
+
+                const hp = typeof GAMECONFIG.ENEMY_CONFIG.ENEMY_HP === 'function'
+                    ? GAMECONFIG.ENEMY_CONFIG.ENEMY_HP(def.type)
+                    : GAMECONFIG.ENEMY_CONFIG.ENEMY_HP;
+
+                // Apply the enemy-specific HP and points
+                enemyTank.setTankHP(hp);
+                enemyTank.pointValue = pointValue;
+                
+                // Adjust other stats to make enemies slightly weaker than their player counterparts
+                enemyTank.defense *= 0.8;       // 30% less damage reduction
+                enemyTank.damage *= 0.8;        // 20% less damage output
+                enemyTank.shootCooldown *= 1.2; // 20% slower fire rate (longer cooldown)
+                enemyTank.moveSpeed *= 0.9;     // 10% slower movement
+                enemyTank.rotateSpeed *= 0.9;   // 10% slower rotation
                 
                 if (bot) bot.addTank(enemyTank);
                 if (collisionManager) collisionManager.add(enemyTank);
@@ -267,7 +140,6 @@ class Generator {
             
             tanks.push(...batchTanks);
             
-            // Yield control to prevent blocking
             if (this.processingDelay > 0) {
                 await new Promise(resolve => setTimeout(resolve, this.processingDelay));
             }
@@ -277,7 +149,7 @@ class Generator {
     }
 
     /**
-     * Create Rock objects from definitions (consolidated from Rock.createRocksFromList)
+     * Create Rock objects from definitions
      * @param {Array} rockDefinitions - Array of rock definitions
      * @param {CollisionManager} collisionManager - Collision manager to register rocks
      * @returns {Promise<Array>} Array of created Rock objects
@@ -310,29 +182,9 @@ class Generator {
         
         return rocks;
     }
-
+    
     /**
-     * Create random rocks with optimized generation
-     * @param {number} count - Number of rocks to create
-     * @param {Object} bounds - { minX, maxX, minZ, maxZ }
-     * @param {Object} scaleRange - { min, max }
-     * @param {Array} types - Rock types to choose from
-     * @returns {Promise<Array>} Array of created Rock objects
-     */
-    async createRandomRocks(count, bounds, scaleRange = { min: 0.5, max: 2.0 }, types = ['rock09', 'rock13']) {
-        const rockDefinitions = this.generateRandomObjects(
-            count, 
-            types, 
-            scaleRange.min, 
-            scaleRange.max, 
-            bounds
-        );
-        
-        return this.createRocks(rockDefinitions);
-    }
-
-    /**
-     * Create Tree objects from definitions (consolidated from Tree.createTreesFromList)
+     * Create Tree objects from definitions
      * @param {Array} treeDefinitions - Array of tree definitions
      * @param {CollisionManager} collisionManager - Collision manager to register trees
      * @returns {Promise<Array>} Array of created Tree objects
@@ -367,7 +219,7 @@ class Generator {
     }
 
     /**
-     * Create Barrel objects from definitions (consolidated from Barrel.createBarrelsFromList)
+     * Create Barrel objects from definitions
      * @param {Array} barrelDefinitions - Array of barrel definitions
      * @param {CollisionManager} collisionManager - Collision manager to register barrels
      * @returns {Promise<Array>} Array of created Barrel objects
@@ -402,175 +254,14 @@ class Generator {
     }
 
     /**
-     * Create random barrels with collision awareness and explosion considerations
-     * @param {number} count - Number of barrels to create
-     * @param {Object} bounds - { minX, maxX, minZ, maxZ }
-     * @param {Object} scaleRange - { min, max }
-     * @param {Object} options - { avoidCollisions: boolean, minDistance: number, safeFromPlayer: number }
-     * @returns {Promise<Array>} Array of created Barrel objects
-     */
-    async createRandomBarrels(count, bounds, scaleRange = { min: 0.8, max: 1.5 }, options = {}) {
-        const { 
-            avoidCollisions = true, 
-            minDistance = 8, // Larger distance for barrels due to explosion radius
-            safeFromPlayer = 15 // Keep barrels away from player spawn
-        } = options;
-        
-        // Modify bounds to keep barrels away from player spawn (0,0,0)
-        const safeBounds = {
-            minX: bounds.minX < -safeFromPlayer ? bounds.minX : -bounds.maxX,
-            maxX: bounds.maxX > safeFromPlayer ? bounds.maxX : -bounds.minX,
-            minZ: bounds.minZ < -safeFromPlayer ? bounds.minZ : -bounds.maxZ,
-            maxZ: bounds.maxZ > safeFromPlayer ? bounds.maxZ : -bounds.minZ
-        };
-        
-        const barrelDefinitions = this.generateRandomObjects(
-            count, 
-            ['barrel'], 
-            scaleRange.min, 
-            scaleRange.max, 
-            safeBounds,
-            { avoidCollisions, minDistance }
-        );
-        
-        return this.createBarrels(barrelDefinitions);
-    }
-
-    /**
-     * Generate complete level with all objects (async version)
-     * @param {Object} config - Level configuration
-     * @returns {Promise<Object>} Object containing all generated entities
-     */
-    async generateLevel(config) {
-        const {
-            worldBoundary,
-            sceneryConfig,
-            enemyConfig
-        } = config;
-
-        const worldBoundaryHalf = worldBoundary / 2;
-        const playerSafeRadius = 35; // Safe zone around player spawn
-
-        // Generate enemy definitions
-        const maxEnemySpawnRadius = worldBoundaryHalf * enemyConfig.MAX_SPAWN_RADIUS_FACTOR;
-        const minEnemySpawnRadius = Math.max(enemyConfig.MIN_SPAWN_RADIUS, playerSafeRadius); // Keep enemies away from player
-
-        const enemyDefinitions = this.generateEnemyDefinitions(
-            enemyConfig.NUM_ENEMIES,
-            enemyConfig.ENEMY_TYPES,
-            enemyConfig.ENEMY_POINT_VALUE,
-            enemyConfig.ENEMY_HP,
-            maxEnemySpawnRadius,
-            minEnemySpawnRadius
-        );
-
-        // Generate scenery definitions with player safe zone
-        const maxScenerySpawnRadius = worldBoundaryHalf * sceneryConfig.MAX_SPAWN_RADIUS_FACTOR;
-        const minScenerySpawnRadius = Math.max(sceneryConfig.MIN_SPAWN_RADIUS, playerSafeRadius);
-
-        const rockDefinitions = this.generateScatteredObjects(
-            sceneryConfig.NUM_ROCKS,
-            sceneryConfig.ROCK_TYPES,
-            sceneryConfig.ROCK_SCALE_MIN,
-            sceneryConfig.ROCK_SCALE_MAX,
-            maxScenerySpawnRadius,
-            minScenerySpawnRadius,
-            playerSafeRadius
-        );
-
-        const treeDefinitions = this.generateScatteredObjects(
-            sceneryConfig.NUM_TREES,
-            sceneryConfig.TREE_TYPES,
-            sceneryConfig.TREE_SCALE_MIN,
-            sceneryConfig.TREE_SCALE_MAX,
-            maxScenerySpawnRadius,
-            minScenerySpawnRadius,
-            playerSafeRadius
-        );
-
-        const barrelDefinitions = this.generateScatteredObjects(
-            sceneryConfig.NUM_BARRELS || 0,
-            sceneryConfig.BARREL_TYPES || ['barrel'],
-            sceneryConfig.BARREL_SCALE_MIN || 0.8,
-            sceneryConfig.BARREL_SCALE_MAX || 1.5,
-            maxScenerySpawnRadius,
-            minScenerySpawnRadius,
-            playerSafeRadius + 10 // Extra safe distance for explosive barrels
-        );
-
-        console.log(`🎯 Generated level with player safe zone of ${playerSafeRadius} units`);
-        console.log(`📊 Objects: ${enemyDefinitions.length} enemies, ${rockDefinitions.length} rocks, ${treeDefinitions.length} trees, ${barrelDefinitions.length} barrels`);
-
-        return {
-            enemyDefinitions,
-            rockDefinitions,
-            treeDefinitions,
-            barrelDefinitions
-        };
-    }
-
-    /**
-     * Async level creation with progress callback
-     * @param {Object} config - Level configuration
-     * @param {Function} progressCallback - Progress callback (optional)
-     * @returns {Promise<Object>} Created level objects
-     */
-    async createLevelAsync(config, progressCallback = null) {
-        const levelData = await this.generateLevel(config);
-        const totalSteps = 4;
-        let currentStep = 0;
-
-        const updateProgress = (step, description) => {
-            if (progressCallback) {
-                progressCallback({
-                    step: step,
-                    total: totalSteps,
-                    progress: (step / totalSteps) * 100,
-                    description: description
-                });
-            }
-        };
-
-        updateProgress(++currentStep, 'Creating enemy tanks...');
-        const enemies = await this.createEnemyTanks(levelData.enemyDefinitions);
-
-        updateProgress(++currentStep, 'Creating rocks...');
-        const rocks = await this.createRocks(levelData.rockDefinitions);
-
-        updateProgress(++currentStep, 'Creating trees...');
-        const trees = await this.createTrees(levelData.treeDefinitions);
-
-        updateProgress(++currentStep, 'Creating barrels...');
-        const barrels = await this.createBarrels(levelData.barrelDefinitions);
-
-        return {
-            enemies,
-            rocks,
-            trees,
-            barrels,
-            definitions: levelData
-        };
-    }
-
-    /**
-     * Set processing options for batch operations
-     * @param {Object} options - { batchSize: number, processingDelay: number }
-     */
-    setProcessingOptions(options) {
-        if (options.batchSize !== undefined) {
-            this.batchSize = Math.max(1, options.batchSize);
-        }
-        if (options.processingDelay !== undefined) {
-            this.processingDelay = Math.max(0, options.processingDelay);
-        }
-    }
-
-    /**
      * Cleanup generator resources
      */
     dispose() {
+        if (this.worker) {
+            this.worker.terminate();
+        }
         Generator.instance = null;
     }
 }
 
-export { Generator }; 
+export { Generator };

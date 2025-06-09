@@ -1,4 +1,4 @@
-// A simple grid-based manager for finding spawn locations
+// ./class/SpawnManager
 export class SpawnManager {
   constructor(worldBoundary, cellSize) {
     this.worldBoundary = worldBoundary;

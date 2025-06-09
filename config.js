@@ -1,3 +1,4 @@
+// ./config.js
 import { TANKTYPE } from './utils.js';
 import * as THREE from 'three';
 
@@ -18,7 +19,7 @@ const QUALITY_SETTINGS_PROFILES = {
         exposure: 1.0,
         extraLights: false,
         useSky: false,
-        useFog: false, 
+        useFog: false,
     },
     [QUALITY.MEDIUM]: {
         antialias: true,
@@ -42,16 +43,17 @@ const QUALITY_SETTINGS_PROFILES = {
         exposure: 1.2,
         extraLights: true,
         useSky: true,
-        useFog: true, 
+        useFog: true,
     }
 };
 
 export const gameSettings = {
     quality: QUALITY.MEDIUM,
-    fog: true, 
-    volumeMaster: 1.0,
+    fog: true,
+    dayNightCycle: 'day', // NEW: Added setting, default to 'day'
+    volumeMaster: 0.8,
     volumeMusic: 0.8,
-    volumeSfx: 1.0,
+    volumeSfx: 0.5,
 };
 
 export function loadSettings() {
@@ -63,11 +65,16 @@ export function loadSettings() {
             gameSettings.quality = parsed.quality;
         }
 
+        // NEW: Load the day/night cycle setting
+        if (['day', 'night', 'dynamic'].includes(parsed.dayNightCycle)) {
+            gameSettings.dayNightCycle = parsed.dayNightCycle;
+        }
+
         gameSettings.fog = parsed.fog ?? QUALITY_SETTINGS_PROFILES[gameSettings.quality].useFog;
-        gameSettings.volumeMaster = parsed.volumeMaster ?? 1.0;
+        gameSettings.volumeMaster = parsed.volumeMaster ?? 0.8;
         gameSettings.volumeMusic = parsed.volumeMusic ?? 0.8;
-        gameSettings.volumeSfx = parsed.volumeSfx ?? 1.0;
-        
+        gameSettings.volumeSfx = parsed.volumeSfx ?? 0.5;
+
         console.log('⚙️ Settings loaded:', gameSettings);
     } else {
         const qualityProfile = QUALITY_SETTINGS_PROFILES[gameSettings.quality];
@@ -85,87 +92,96 @@ export const GAMECONFIG = Object.freeze({
     WORLD_BOUNDARY: 500,
     QUALITY_PROFILES: QUALITY_SETTINGS_PROFILES,
     SCENERY: {
-        NUM_ROCKS: 100,
+        NUM_ROCKS: 80,
         ROCK_TYPES: ['rock09', 'rock13'],
         ROCK_SCALE_MIN: 3.0,
         ROCK_SCALE_MAX: 12,
-        NUM_TREES: 100,
+        NUM_TREES: 80,
         TREE_TYPES: ['tree01'],
         TREE_SCALE_MIN: 0.9,
         TREE_SCALE_MAX: 2.9,
-        // =================== BARREL CONFIGURATION ===================
         NUM_BARRELS: 20,
         BARREL_TYPES: ['barrel'],
         BARREL_SCALE_MIN: 3.5,
         BARREL_SCALE_MAX: 4.5,
         BARREL_EXPLOSION: {
-            DAMAGE: 50,             
-            RADIUS: 0.5,               
-            PUSH_FORCE: 500,          
-            SOUND_VOLUME: 0.8,       
-            PARTICLE_COUNT: 50,      
-            CHAIN_REACTION: true      
+            DAMAGE: 50,
+            RADIUS: 0.5,
+            PUSH_FORCE: 500,
+            SOUND_VOLUME: 0.8,
+            PARTICLE_COUNT: 50,
+            CHAIN_REACTION: true
         },
-        MIN_SPAWN_RADIUS: 90, // Scenery can spawn closer to the center
-        MAX_SPAWN_RADIUS_FACTOR: 1.25, // Scenery will spawn up to this factor of (WORLD_BOUNDARY / 2)
+        MIN_SPAWN_RADIUS: 90,
+        MAX_SPAWN_RADIUS_FACTOR: 1.,
     },
     ENEMY_CONFIG: {
         NUM_ENEMIES:5,
-        ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006],
+        ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003,
+             TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006, TANKTYPE.V007, TANKTYPE.V008],
+        // --- FIX: Switched to using type.name for robust comparison ---
         ENEMY_POINT_VALUE: (type) => {
-            switch(type) {
-                case TANKTYPE.V001: return 100;
-                case TANKTYPE.V002: return 150;
-                case TANKTYPE.V003: return 120;
-                case TANKTYPE.V004: return 180;
-                case TANKTYPE.V005: return 200;
-                case TANKTYPE.V006: return 250;
+            switch(type.name) {
+                case TANKTYPE.V001.name: return 100;
+                case TANKTYPE.V002.name: return 150;
+                case TANKTYPE.V003.name: return 120;
+                case TANKTYPE.V004.name: return 180;
+                case TANKTYPE.V005.name: return 200;
+                case TANKTYPE.V006.name: return 250;
+                case TANKTYPE.V007.name: return 200;
+                case TANKTYPE.V008.name: return 260;
                 default: return 50;
             }
         },
+        // --- FIX: Switched to using type.name for robust comparison ---
         ENEMY_HP: (type) => {
-            switch(type) {
-                case TANKTYPE.V001: return 100;
-                case TANKTYPE.V002: return 120;
-                case TANKTYPE.V003: return 110;
-                case TANKTYPE.V004: return 140;
-                case TANKTYPE.V005: return 160;
-                case TANKTYPE.V006: return 180;
-                default: return 80;
+            switch(type.name) {
+                case TANKTYPE.V001.name: return 100;
+                case TANKTYPE.V002.name: return 200;
+                case TANKTYPE.V003.name: return 170;
+                case TANKTYPE.V004.name: return 190;
+                case TANKTYPE.V005.name: return 180;
+                case TANKTYPE.V006.name: return 350;
+                case TANKTYPE.V007.name: return 230;
+                case TANKTYPE.V008.name: return 230;
+                case TANKTYPE.V009.name: return 360;
+                default: return 150;
             }
         },
-        MIN_SPAWN_RADIUS: 40, 
+        MIN_SPAWN_RADIUS: 40,
         MAX_SPAWN_RADIUS_FACTOR: 0.85,
-        
-        // =================== RESPAWN CONFIGURATION ===================
         RESPAWN: {
-            ENABLED: true,                    // Bật/tắt respawn system
-            MIN_DELAY: 2000,                  // Thời gian tối thiểu trước khi spawn (ms)
-            MAX_DELAY: 5000,                  // Thời gian tối đa trước khi spawn (ms)
-            MIN_DISTANCE_FROM_PLAYER: 50,    // Khoảng cách tối thiểu từ player
-            MIN_DISTANCE_FROM_OBSTACLES: 15, // Khoảng cách tối thiểu từ obstacles
-            MAX_SPAWN_ATTEMPTS: 50,           // Số lần thử tìm vị trí spawn tối đa
-            TANK_SIZE: 8,                     // Kích thước tank để tính collision
-            MAX_ENEMIES_ALIVE: 6,             // Số lượng tank địch tối đa cùng lúc
-            PROGRESSIVE_DIFFICULTY: true,     // Tăng độ khó theo thời gian
+            ENABLED: true,
+            MIN_DELAY: 2000,
+            MAX_DELAY: 5000,
+            MIN_DISTANCE_FROM_PLAYER: 50,
+            MIN_DISTANCE_FROM_OBSTACLES: 15,
+            MAX_SPAWN_ATTEMPTS: 50,
+            TANK_SIZE: 8,
+            MAX_ENEMIES_ALIVE: 6,
+            PROGRESSIVE_DIFFICULTY: true,
             DIFFICULTY_SCALING: {
-                SCORE_THRESHOLD: 500,         // Điểm để tăng độ khó
-                HP_MULTIPLIER: 1.2,           // Nhân HP khi tăng độ khó
-                POINT_MULTIPLIER: 1.5         // Nhân điểm khi tăng độ khó
+                SCORE_THRESHOLD: 500,
+                HP_MULTIPLIER: 1.2,
+                POINT_MULTIPLIER: 1.5
             }
         }
     },
-    // =================== AUDIO CONFIGURATION ===================
+    POWERUP_CONFIG: {
+        MAX_ACTIVE: 3,
+        SPAWN_INTERVAL: 15000,
+        TOTAL_SPAWN_LIMIT: 10,
+    },
     AUDIO: {
         BARREL_EXPLOSION: {
             PATH: './assets/audio/barrel-explosion.wav',
-            VOLUME: 0.8,
+            VOLUME: 0.6,
             DISTANCE_FALLOFF: true,
             MAX_DISTANCE: 100
         },
         TANK_DESTRUCTION: {
             PATH: './assets/audio/tank-far-explosion.wav',
-            VOLUME: 0.7,
+            VOLUME: 0.3,
             DISTANCE_FALLOFF: true,
             MAX_DISTANCE: 150
         }

@@ -1,3 +1,4 @@
+// ./class/UIManager.js
 import { EventManager } from './EventManager.js';
 import { EVENT } from '../utils.js';
 

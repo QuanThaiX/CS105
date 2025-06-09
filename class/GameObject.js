@@ -74,10 +74,6 @@ class GameObject {
      */
     destroy() {
         if (!this.disposed) {
-            EventManager.instance.notify(EVENT.OBJECT_DESTROYED, {
-                object: this
-            });
-            
             this.dispose();
         }
     }
@@ -86,6 +82,7 @@ class GameObject {
      * Xóa khỏi scene
      */
     dispose(){
+        if (this.disposed) return;
         if (this.model && Game.instance.scene) {
             Game.instance.scene.remove(this.model);
         }

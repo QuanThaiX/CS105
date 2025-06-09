@@ -1,3 +1,4 @@
+// ./class/Bullet.js
 import * as THREE from "three";
 import { COLOR, EVENT, FACTION}  from "../utils.js";
 import { GLTFLoader } from "../three/examples/jsm/loaders/GLTFLoader.js";

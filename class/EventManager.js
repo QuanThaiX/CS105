@@ -192,9 +192,6 @@ class EventManager {
      * @private
      */
     async executeOnWorker(handler, data) {
-        // For now, fallback to async execution
-        // In real implementation, this would serialize the handler and data
-        // and send to a worker thread
         return new Promise(resolve => {
             setTimeout(async () => {
                 try {

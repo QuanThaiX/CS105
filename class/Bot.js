@@ -1,70 +1,66 @@
+// ./class/Bot.js
 import * as THREE from 'three';
-import { FACTION, EVENT } from "../utils.js";
 import { Game } from './Game.js';
 import { GAMECONFIG } from '../config.js';
-import { Tank } from './Tank.js'; 
-
-/**
- * Simplified Bot AI với FSM và intelligent distance management
- * Features:
- * - Simple Finite State Machine (3 states)
- * - Distance-based movement và combat
- * - Continuous player attacking
- * - Smart obstacle avoidance
- */
-
-const BotState = Object.freeze({
-    PATROL: 'patrol',               // Tuần tra random
-    HUNT: 'hunt',                   // Tìm kiếm và di chuyển về phía player
-    ATTACK: 'attack'                // Tấn công player liên tục
-});
+import { Tank } from './Tank.js';
 
 class Bot {
     static instance;
     tanks = [];
-
+    worker;
+    
     constructor() {
         if (Bot.instance) {
             return Bot.instance;
         }
         Bot.instance = this;
+
+        if (typeof(Worker) === "undefined") {
+            console.error("❌ This browser does not support Web Workers. Bot AI will not function.");
+            return;
+        }
+
+        console.log("🚀 Initializing Bot AI with Web Worker support.");
+        
+        this.worker = new Worker('./class/BotWorker.js', { type: 'module' });
+        this.worker.onmessage = this.handleWorkerMessage.bind(this);
+        this.worker.onerror = (error) => {
+            console.error("🤖 Bot Worker Error:", error.message, error);
+        };
+        
+        this.worker.postMessage({
+            type: 'init',
+            payload: {
+                config: { WORLD_BOUNDARY: GAMECONFIG.WORLD_BOUNDARY }
+            }
+        });
     }
 
     addTank(tank) {
+        if (!this.worker) return;
+
+        // The initial bot configuration is still defined here
         tank.bot = {
-            // =================== FSM STATES ===================
-            currentState: BotState.PATROL,
+            currentState: 'patrol',
             stateStartTime: Date.now(),
             stateTimer: 0,
-            minStateTime: 1000,           // Minimum time in state (ms)
-            
-            // =================== TARGETS & DETECTION ===================
-            playerTank: Game.instance.playerTank,
-            detectionRange: 2000,          // Detection range
-            attackRange: 150,             // Attack range 
-            optimalAttackRange: 20,       // Optimal attack distance
-            minDistanceToObstacles: 5,   // Minimum distance to obstacles
-            minDistanceToTanks: 5,       // Minimum distance to other tanks
-            
-            // =================== MOVEMENT ===================
+            minStateTime: 1000,
+            playerTank: null, // This will be provided by gameState now
+            detectionRange: 2000,
+            attackRange: 150,
+            optimalAttackRange: 20,
+            minDistanceToObstacles: 5,
+            minDistanceToTanks: 5,
             moveSpeed: tank.moveSpeed || 0.1,
             rotateSpeed: tank.rotateSpeed || 0.03,
-            
-            // =================== PATROL SYSTEM ===================
-            patrolTarget: null,           // Current patrol target
-            patrolRadius: 100,            // Patrol radius
+            patrolTarget: null,
+            patrolRadius: 100,
             lastPatrolGeneration: 0,
-            patrolInterval: 3000,         // Generate new patrol point every 3s
-            
-            // =================== COMBAT ===================
+            patrolInterval: 3000,
             lastShotTime: 0,
             shootCooldown: tank.shootCooldown || 2000,
-            
-            // =================== BEHAVIOR UPDATE ===================
             lastBehaviorUpdate: Date.now(),
-            behaviorUpdateInterval: 300,   // Update behavior every 300ms
-            
-            // =================== DEBUG INFO ===================
+            behaviorUpdateInterval: 300,
             debugInfo: {
                 currentAction: 'Initializing',
                 distanceToPlayer: 0,
@@ -75,391 +71,119 @@ class Bot {
         };
 
         this.tanks.push(tank);
+        
+        this.worker.postMessage({
+            type: 'add',
+            payload: { id: tank.id, botConfig: tank.bot }
+        });
     }
 
     removeTank(tank) {
-        const index = this.tanks.findIndex(t => t === tank);
+        if (!this.worker) return;
+
+        const index = this.tanks.findIndex(t => t.id === tank.id);
         if (index !== -1) {
             this.tanks.splice(index, 1);
+            this.worker.postMessage({ type: 'remove', payload: { id: tank.id } });
         }
     }
 
     update() {
-        for (const tank of this.tanks) {
+        if (!this.worker || this.tanks.length === 0) return;
+        const gameState = this.serializeGameState();
+        if (gameState) {
+            this.worker.postMessage({ type: 'update', payload: gameState });
+        }
+    }
+
+    handleWorkerMessage(e) {
+        const { type, payload } = e.data;
+        if (type === 'commands') {
+            this.applyCommands(payload);
+        }
+    }
+
+    applyCommands(commands) {
+        for (const command of commands) {
+            const tank = this.tanks.find(t => t.id === command.tankId);
             if (tank && !tank.disposed) {
-                this.updateTankBehavior(tank);
+                switch (command.action) {
+                    case 'moveForward':
+                        tank.moveForward(command.value);
+                        break;
+                    case 'moveBackward':
+                        tank.moveBackward(command.value);
+                        break;
+                    case 'rotateLeft':
+                        tank.rotateLeft(command.value);
+                        break;
+                    case 'rotateRight':
+                        tank.rotateRight(command.value);
+                        break;
+                    case 'startAutoShoot':
+                        tank.startAutoShoot(command.value);
+                        break;
+                    case 'stopAutoShoot':
+                        tank.stopAutoShoot();
+                        break;
+                    case 'updateDebugInfo':
+                        tank.bot.debugInfo = command.value;
+                        break;
+                }
             }
         }
     }
-
-    updateTankBehavior(tank) {
-        const bot = tank.bot;
-        const currentTime = Date.now();
-        
-        // Update timers
-        bot.stateTimer = currentTime - bot.stateStartTime;
-        
-        // Update behavior periodically
-        if (currentTime - bot.lastBehaviorUpdate >= bot.behaviorUpdateInterval) {
-            bot.lastBehaviorUpdate = currentTime;
-            this.evaluateStateTransition(tank);
-        }
-        
-        // Always execute current state
-        this.executeCurrentState(tank);
-    }
-
-    /**
-     * Evaluate state transitions
-     * @param {Tank} tank - Tank to evaluate
-     */
-    evaluateStateTransition(tank) {
-        const bot = tank.bot;
-        
-        // Don't change state too quickly
-        if (bot.stateTimer < bot.minStateTime) {
-            return;
-        }
-        
-        // Player check
-        if (!bot.playerTank || bot.playerTank.hp <= 0) {
-            this.transitionTo(tank, BotState.PATROL);
-            return;
-        }
-
-        const distanceToPlayer = tank.position.distanceTo(bot.playerTank.position);
-        bot.debugInfo.distanceToPlayer = distanceToPlayer;
-        
-        // State transitions based on distance
-        if (distanceToPlayer <= bot.attackRange) {
-            // In attack range - always attack
-            if (bot.currentState !== BotState.ATTACK) {
-                this.transitionTo(tank, BotState.ATTACK);
-            }
-        } else if (distanceToPlayer <= bot.detectionRange) {
-            // In detection range - hunt player
-            if (bot.currentState !== BotState.HUNT) {
-                this.transitionTo(tank, BotState.HUNT);
-            }
-        } else {
-            // Out of range - patrol
-            if (bot.currentState !== BotState.PATROL) {
-                this.transitionTo(tank, BotState.PATROL);
-            }
-        }
-    }
-
-    /**
-     * Transition to new state
-     * @param {Tank} tank - Tank to transition
-     * @param {string} newState - New state to transition to
-     */
-    transitionTo(tank, newState) {
-        const bot = tank.bot;
-        
-        if (newState === bot.currentState) return;
-        
-        bot.currentState = newState;
-        bot.stateStartTime = Date.now();
-        bot.stateTimer = 0;
-
-        // State entry actions
-        switch (newState) {
-            case BotState.ATTACK:
-                tank.startAutoShoot(Math.max(5000, bot.shootCooldown * 1.5));
-                bot.debugInfo.isShooting = true;
-                break;
-                
-            case BotState.HUNT:
-            case BotState.PATROL:
-                tank.stopAutoShoot();
-                bot.debugInfo.isShooting = false;
-                break;
-        }
-    }
-
-    /**
-     * Execute current state behavior
-     * @param {Tank} tank - Tank to execute behavior for
-     */
-    executeCurrentState(tank) {
-        const bot = tank.bot;
-        
-        switch (bot.currentState) {
-            case BotState.PATROL:
-                this.executePatrolState(tank);
-                break;
-            case BotState.HUNT:
-                this.executeHuntState(tank);
-                break;
-            case BotState.ATTACK:
-                this.executeAttackState(tank);
-                break;
-        }
-    }
-
-    /**
-     * Execute PATROL state - random movement
-     * @param {Tank} tank - Tank to control
-     */
-    executePatrolState(tank) {
-        const bot = tank.bot;
-        const currentTime = Date.now();
-        
-        // Generate new patrol target if needed
-        if (!bot.patrolTarget || currentTime - bot.lastPatrolGeneration > bot.patrolInterval) {
-            this.generatePatrolTarget(tank);
-            bot.lastPatrolGeneration = currentTime;
-        }
-        
-        // Move toward patrol target with obstacle avoidance
-        if (bot.patrolTarget) {
-            const distance = tank.position.distanceTo(bot.patrolTarget);
-            
-            // Reached patrol target - generate new one
-            if (distance < 10) {
-                this.generatePatrolTarget(tank);
-                return;
-            }
-            
-            // Move with obstacle avoidance
-            this.moveWithObstacleAvoidance(tank, bot.patrolTarget, 0.5);
-        }
-        
-        bot.debugInfo.currentAction = 'Patrolling';
-    }
-
-    /**
-     * Execute HUNT state - move toward player
-     * @param {Tank} tank - Tank to control
-     */
-    executeHuntState(tank) {
-        const bot = tank.bot;
-        
-        if (!bot.playerTank) return;
-        
-        // Move toward player with obstacle avoidance
-        this.moveWithObstacleAvoidance(tank, bot.playerTank.position, 0.8);
-        
-        bot.debugInfo.currentAction = 'Hunting player';
-    }
-
-    /**
-     * Execute ATTACK state - attack player while maintaining optimal distance
-     * @param {Tank} tank - Tank to control
-     */
-    executeAttackState(tank) {
-        const bot = tank.bot;
-        
-        if (!bot.playerTank) return;
-        
-        const distanceToPlayer = tank.position.distanceTo(bot.playerTank.position);
-        
-        // Always face player for accurate shooting
-        this.faceTarget(tank, bot.playerTank.position, true);
-        
-        // Distance management
-        if (distanceToPlayer > bot.optimalAttackRange * 1.3) {
-            this.moveWithObstacleAvoidance(tank, bot.playerTank.position, 0.6);
-            bot.debugInfo.currentAction = 'Attacking - moving closer';
-        } else if (distanceToPlayer < bot.optimalAttackRange * 0.7) {
-            this.moveWithObstacleAvoidance(tank, bot.playerTank.position, 0.4);
-            bot.debugInfo.currentAction = 'Attacking - backing away';
-        } else {
-            bot.debugInfo.currentAction = 'Attacking - in optimal range';
-        }
-    }
-
-    /**
-     * Generate random patrol target
-     * @param {Tank} tank - Tank to generate patrol target for
-     */
-    generatePatrolTarget(tank) {
-        const bot = tank.bot;
-        const angle = Math.random() * Math.PI * 2;
-        const distance = bot.patrolRadius * (0.5 + Math.random() * 0.5);
-        
-        const x = tank.position.x + Math.cos(angle) * distance;
-        const z = tank.position.z + Math.sin(angle) * distance;
-        
-        // Check world boundaries
-        const halfBoundary = (GAMECONFIG?.WORLD_BOUNDARY || 1500) / 2;
-        const clampedX = Math.max(-halfBoundary + 50, Math.min(halfBoundary - 50, x));
-        const clampedZ = Math.max(-halfBoundary + 50, Math.min(halfBoundary - 50, z));
-        
-        bot.patrolTarget = new THREE.Vector3(clampedX, 1, clampedZ);
-    }
-    /**
-     * Move toward target with intelligent obstacle avoidance.
-     * This version adds a "panic" mode for when obstacles are too close.
-     * @param {Tank} tank - Tank to move
-     * @param {THREE.Vector3} targetPosition - Target to move toward
-     * @param {number} speedMultiplier - Speed multiplier
-     */
-    moveWithObstacleAvoidance(tank, targetPosition, speedMultiplier = 1) {
-        const bot = tank.bot;
-        
-        const { avoidanceVector, nearestObstacleDistance } = this.calculateObstacleAvoidance(tank);
-        
-        const panicDistance = 4.0;
-        if (nearestObstacleDistance < panicDistance) {
-            bot.debugInfo.isAvoidingObstacle = true;
-            bot.debugInfo.currentAction = "Evasive Maneuver!";
-
-            tank.moveBackward(bot.moveSpeed * 2);
-
-            const directionToAvoidance = new THREE.Vector3().subVectors(avoidanceVector, tank.position).normalize();
-            const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(tank.model.quaternion);
-            
-            const cross = new THREE.Vector3().crossVectors(forward, directionToAvoidance);
-            
-            if (cross.y > 0) {
-                tank.rotateLeft(bot.rotateSpeed * 1.5);
-            } else {
-                tank.rotateRight(bot.rotateSpeed * 1.5);
-            }
-            return;
-        }
-
-        if (avoidanceVector.length() > 0.1) {
-            bot.debugInfo.isAvoidingObstacle = true;
-            bot.debugInfo.currentAction = "Steering...";
-            
-            const directionToTarget = new THREE.Vector3().subVectors(targetPosition, tank.position).normalize();
-            const steeredDirection = new THREE.Vector3()
-                .addVectors(directionToTarget, avoidanceVector.normalize())
-                .normalize();
-
-            const avoidanceTarget = tank.position.clone().add(steeredDirection.multiplyScalar(20));
-            this.moveTowardTarget(tank, avoidanceTarget, speedMultiplier * 0.8);
-        } else {
-            bot.debugInfo.isAvoidingObstacle = false;
-            bot.debugInfo.currentAction = "Moving to target";
-            this.moveTowardTarget(tank, targetPosition, speedMultiplier);
-        }
-    }
-
-    /**
-     * Calculate obstacle avoidance vector.
-     * @param {Tank} tank - Tank to calculate avoidance for
-     * @returns {object} { avoidanceVector, nearestObstacleDistance }
-     */
-    calculateObstacleAvoidance(tank) {
-        const bot = tank.bot;
+    
+     serializeGameState() {
         const game = Game.instance;
-        const avoidanceVector = new THREE.Vector3();
+        if (!game || !game.playerTank || !game.playerTank.model) return null;
         
-        if (!game) return { avoidanceVector, nearestObstacleDistance: Infinity };
+        const gsm = game.getGameStateManager();
+        if (!gsm) return null;
         
-        let nearestObstacleDistance = Infinity;
+        const playerTank = gsm.getPlayerTank();
+        const serializedPlayer = playerTank ? {
+            id: playerTank.id,
+            position: { x: playerTank.position.x, y: playerTank.position.y, z: playerTank.position.z },
+            hp: playerTank.hp
+        } : null;
         
-        const obstacles = [
-            ...(game.rocks || []),
-            ...(game.trees || []),
-            ...(game.barrels?.filter(b => !b.hasExploded) || []),
-            game.playerTank, 
-            ...(game.enemies?.filter(t => t !== tank) || [])
-        ].filter(obj => obj && !obj.disposed && obj.position);
+        const allTanks = gsm.getAllTanks();
+        const serializedTanks = allTanks
+            .filter(tank => tank.model)
+            .map(tank => ({
+                id: tank.id,
+                position: { x: tank.position.x, y: tank.position.y, z: tank.position.z },
+                quaternion: { x: tank.model.quaternion.x, y: tank.model.quaternion.y, z: tank.model.quaternion.z, w: tank.model.quaternion.w },
+                rotationY: tank.model.rotation.y
+            }));
         
-        for (const obstacle of obstacles) {
-            const distance = tank.position.distanceTo(obstacle.position);
-            
-            if (distance < nearestObstacleDistance) {
-                nearestObstacleDistance = distance;
-            }
-            
-            // Adjust min distance for different object types
-            let minDistance = bot.minDistanceToObstacles;
-            if (obstacle instanceof Tank) {
-                minDistance = bot.minDistanceToTanks;
-            }
-            
-            if (distance < minDistance) {
-                const avoidDirection = new THREE.Vector3()
-                    .subVectors(tank.position, obstacle.position)
-                    .normalize();
-                
-                const avoidanceStrength = (minDistance - distance) / minDistance;
-                avoidDirection.multiplyScalar(avoidanceStrength);
-                
-                avoidanceVector.add(avoidDirection);
-            }
-        }
+        const allObstacles = gsm.getAllObstacles();
+        const serializedObstacles = allObstacles.map(obs => ({
+            id: obs.id,
+            position: { x: obs.position.x, y: obs.position.y, z: obs.position.z },
+            // Add a type property so the worker knows what it is
+            type: obs.constructor.name 
+        }));
         
-        bot.debugInfo.nearestObstacleDistance = nearestObstacleDistance;
-        
-        return { avoidanceVector, nearestObstacleDistance };
+        // --- NEW: Serialize barrels for tactical AI ---
+        const allBarrels = game.barrels || [];
+        const serializedBarrels = allBarrels
+            .filter(barrel => barrel && !barrel.hasExploded)
+            .map(barrel => ({
+                id: barrel.id,
+                position: { x: barrel.position.x, y: barrel.position.y, z: barrel.position.z },
+                hp: barrel.hp
+            }));
+
+        return {
+            playerTank: serializedPlayer,
+            tanks: serializedTanks,
+            obstacles: serializedObstacles,
+            barrels: serializedBarrels, // <-- ADDED
+        };
     }
 
-    /**
-     * Move tank toward target using Tank's built-in movement functions
-     * @param {Tank} tank - Tank to move
-     * @param {THREE.Vector3} targetPosition - Target to move toward
-     * @param {number} speedMultiplier - Speed multiplier
-     */
-    moveTowardTarget(tank, targetPosition, speedMultiplier = 1) {
-        // Face target first
-        this.faceTarget(tank, targetPosition);
-        
-        // Check if tank is facing the target
-        const direction = new THREE.Vector3()
-            .subVectors(targetPosition, tank.position)
-            .normalize();
-        
-        const forward = new THREE.Vector3(0, 0, 1)
-            .applyQuaternion(tank.model.quaternion)
-            .normalize();
-        
-        const dot = forward.dot(direction);
-        
-        // Move based on facing direction
-        if (dot > 0.3) {
-            // Facing towards target - move forward
-            tank.moveForward(tank.bot.moveSpeed * speedMultiplier);
-        } else if (dot < -0.3) {
-            // Facing away from target - move backward  
-            tank.moveBackward(tank.bot.moveSpeed * speedMultiplier);
-        }
-        // If not aligned enough, just rotate until aligned
-    }
-
-    /**
-     * Face tank toward target position
-     * @param {Tank} tank - Tank to rotate
-     * @param {THREE.Vector3} targetPosition - Position to face
-     * @param {boolean} preciseMode - Whether to use precise mode
-     */
-    faceTarget(tank, targetPosition, preciseMode = false) {
-        const direction = new THREE.Vector3()
-            .subVectors(targetPosition, tank.position)
-            .normalize();
-        
-        const targetAngle = Math.atan2(direction.x, direction.z);
-        const currentAngle = tank.model.rotation.y;
-        
-        // Calculate shortest rotation direction
-        let angleDifference = targetAngle - currentAngle;
-        
-        // Normalize angle difference to [-π, π]
-        while (angleDifference > Math.PI) angleDifference -= 2 * Math.PI;
-        while (angleDifference < -Math.PI) angleDifference += 2 * Math.PI;
-        
-        // Use different tolerances based on mode
-        const rotationTolerance = preciseMode ? 0.05 : 0.15;
-        const rotationSpeed = preciseMode ? tank.bot.rotateSpeed : tank.bot.rotateSpeed * 1.5;
-        
-        if (Math.abs(angleDifference) > rotationTolerance) {
-            if (angleDifference > 0) {
-                tank.rotateLeft(Math.min(Math.abs(angleDifference), rotationSpeed));
-            } else {
-                tank.rotateRight(Math.min(Math.abs(angleDifference), rotationSpeed));
-            }
-        }
-    }
-
-    /**
-     * Clear all tanks and cleanup
-     */
     clear() {
         this.tanks.forEach(tank => {
             if (tank) {
@@ -467,15 +191,19 @@ class Bot {
             }
         });
         this.tanks = [];
+        if (this.worker) {
+            this.worker.postMessage({ type: 'clear' });
+        }
     }
 
-    /**
-     * Dispose bot and cleanup resources
-     */
     dispose() {
         this.clear();
+        if (this.worker) {
+            this.worker.terminate();
+            this.worker = null;
+        }
         Bot.instance = null;
     }
 }
 
-export { Bot }; 
+export { Bot };

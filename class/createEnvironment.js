@@ -1,11 +1,11 @@
+// ./class/createEnvrionment.js
 import * as THREE from 'three';
 import { Sky } from '../three/examples/jsm/objects/Sky.js';
 import { OrbitControls } from '../three/examples/jsm/controls/OrbitControls.js';
 import { GAMECONFIG } from '../config.js';
 import { toRad } from '../utils.js';
 
-// --- Constants for Configuration ---
-const SHADOW_MAP_SIZE = 2048;
+const SHADOW_MAP_SIZE = 1024;
 const RENDERER_CONFIG = {
     toneMappingExposure: 1.2,
 };
@@ -21,6 +21,34 @@ const CONTROLS_CONFIG = {
     maxDistance: 100,
     maxPolarAngle: Math.PI / 2,
 };
+
+// NEW: Define presets for day and night for easier interpolation
+const DAY_CONFIG = {
+    turbidity: 10,
+    rayleigh: 2,
+    mieCoefficient: 0.005,
+    mieDirectionalG: 0.8,
+    sunPosition: new THREE.Vector3().setFromSphericalCoords(1, toRad(90 - 45), toRad(180)), // Afternoon sun
+    ambientLightColor: new THREE.Color(0x66728c),
+    ambientLightIntensity: 0.8,
+    directionalLightIntensity: 1.5,
+    rimLightIntensity: 1.0,
+    fogColor: new THREE.Color(0x9fb8d1)
+};
+
+const NIGHT_CONFIG = {
+    turbidity: 1,
+    rayleigh: 0.05,
+    mieCoefficient: 0.002,
+    mieDirectionalG: 0.7,
+    sunPosition: new THREE.Vector3().setFromSphericalCoords(1, toRad(90 - (-5)), toRad(180)), // Sun below horizon
+    ambientLightColor: new THREE.Color(0x0a142c),
+    ambientLightIntensity: 0.2,
+    directionalLightIntensity: 0.1, // Moonlight
+    rimLightIntensity: 0.2,
+    fogColor: new THREE.Color(0x050a14)
+};
+
 
 /**
  * Creates the WebGL renderer and appends it to the DOM.
@@ -55,7 +83,7 @@ function createRenderer() {
 function createCamera(scene, targetPosition, renderer) {
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.set(5, 5, 5);
-    
+
     const controls = new OrbitControls(camera, renderer.domElement);
     if (targetPosition) {
         controls.target.copy(targetPosition).add(new THREE.Vector3(0, 1, 0));
@@ -71,7 +99,7 @@ function createCamera(scene, targetPosition, renderer) {
         LEFT: THREE.MOUSE.PAN,
         RIGHT: THREE.MOUSE.ROTATE,
     };
-    
+
     return { camera, controls };
 }
 
@@ -79,14 +107,15 @@ function createCamera(scene, targetPosition, renderer) {
 /**
  * Creates and adds all lights to the scene.
  * @param {THREE.Scene} scene - The scene to add lights to.
- * @returns {{directionalLight: THREE.DirectionalLight, shadowHelper?: THREE.CameraHelper}} An object containing lights that may need to be updated.
+ * @returns {{directionalLight: THREE.DirectionalLight, ambientLight: THREE.AmbientLight, rimLight: THREE.DirectionalLight, shadowHelper?: THREE.CameraHelper}} An object containing lights that may need to be updated.
  */
 function createLights(scene) {
-    // Ambient light provides soft, global illumination.
-    scene.add(new THREE.AmbientLight(0x404040, 0.8));
+    // MODIFIED: Capture ambient light to return it.
+    const ambientLight = new THREE.AmbientLight(DAY_CONFIG.ambientLightColor, DAY_CONFIG.ambientLightIntensity);
+    scene.add(ambientLight);
 
-    // Main directional light, which casts shadows.
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    // Main directional light (sun/moon), which casts shadows.
+    const directionalLight = new THREE.DirectionalLight(0xffffff, DAY_CONFIG.directionalLightIntensity);
     directionalLight.position.set(200, 400, 200);
     directionalLight.target.position.set(0, 0, 0);
     directionalLight.castShadow = true;
@@ -106,7 +135,7 @@ function createLights(scene) {
     scene.add(directionalLight);
 
     // Rim light to create highlights on object edges.
-    const rimLight = new THREE.DirectionalLight(0x7799ff, 1.0);
+    const rimLight = new THREE.DirectionalLight(0x7799ff, DAY_CONFIG.rimLightIntensity);
     rimLight.position.set(-100, 200, -100);
     rimLight.target.position.set(0, 0, 0);
     scene.add(rimLight);
@@ -137,8 +166,8 @@ function createLights(scene) {
         scene.add(shadowHelper);
     }
 
-    // Only return objects that need to be manipulated later.
-    return { directionalLight, shadowHelper };
+    // MODIFIED: Return more lights for manipulation.
+    return { directionalLight, ambientLight, rimLight, shadowHelper };
 }
 
 /**
@@ -161,18 +190,7 @@ function createSky(scene) {
     sky.scale.setScalar(10000);
     scene.add(sky);
 
-    const skyUniforms = sky.material.uniforms;
-    skyUniforms['turbidity'].value = 100;
-    skyUniforms['rayleigh'].value = 2;
-    skyUniforms['mieCoefficient'].value = 0.005;
-    skyUniforms['mieDirectionalG'].value = 0.8;
-
-    const sun = new THREE.Vector3();
-    const phi = toRad(45);
-    const theta = toRad(60);
-    sun.setFromSphericalCoords(1, phi, theta);
-    skyUniforms['sunPosition'].value.copy(sun);
-
+    // Initial setup will be handled by updateEnvironment
     return sky;
 }
 
@@ -188,7 +206,7 @@ function createSky(scene) {
  */
 function createGround(scene, { width = 500, height = 500, repeatX = 20, repeatY = 20 } = {}) {
     const textureLoader = new THREE.TextureLoader();
-    
+
     const texturePaths = {
         map: './assets/ground/rocky_terrain_02_diff_1k.jpg',
         normalMap: './assets/ground/rocky_terrain_02_nor_gl_1k.jpg',
@@ -213,13 +231,13 @@ function createGround(scene, { width = 500, height = 500, repeatX = 20, repeatY 
     const geometry = new THREE.PlaneGeometry(width, height, 1, 1);
     // Add UV2 attributes for Ambient Occlusion map
     geometry.setAttribute('uv2', new THREE.BufferAttribute(geometry.attributes.uv.array, 2));
-    
+
     const plane = new THREE.Mesh(geometry, material);
     plane.rotation.x = toRad(-90);
     plane.receiveShadow = true;
     plane.castShadow = true;
     scene.add(plane);
-    
+
     return plane;
 }
 
@@ -259,23 +277,27 @@ function handleWindowResize(camera, renderer) {
 }
 
 /**
- * ADDED: Applies or removes fog from a scene based on settings.
+ * Applies or removes fog from a scene based on settings.
  * @param {THREE.Scene} scene The scene to apply fog to.
  * @param {object} settings An object containing fog and sky settings.
  * @param {boolean} settings.enabled Whether to enable or disable fog.
  * @param {boolean} settings.useSky Whether a skybox is being used.
+ * @param {THREE.Color} settings.fogColor The color to use for the fog.
  */
-function updateSceneFog(scene, { enabled, useSky }) {
+function updateSceneFog(scene, { enabled, useSky, fogColor }) {
     if (enabled) {
+        const nearDistance = 10;
+        const farDistance = 150;
         if (!scene.fog) {
-            const fogColor = 0x9fb8d1;
-            const nearDistance = 10;
-            const farDistance = 150;
             scene.fog = new THREE.Fog(fogColor, nearDistance, farDistance);
+        } else {
+            scene.fog.color.copy(fogColor);
+            scene.fog.near = nearDistance;
+            scene.fog.far = farDistance;
+        }
 
-            if (!useSky) {
-                scene.background = new THREE.Color(fogColor);
-            }
+        if (!useSky) {
+            scene.background = new THREE.Color(fogColor);
         }
     } else {
         if (scene.fog) {
@@ -285,6 +307,43 @@ function updateSceneFog(scene, { enabled, useSky }) {
             }
         }
     }
+}
+
+/**
+ * NEW: Updates all environment visuals based on a progress value (0=day, 1=night).
+ * @param {number} progress - A value from 0 (full day) to 1 (full night).
+ * @param {THREE.Scene} scene - The main scene.
+ * @param {Sky} sky - The sky object.
+ * @param {object} lights - The lights object from createLights.
+ */
+function updateEnvironment(progress, scene, sky, lights) {
+    if (!sky || !lights || !lights.ambientLight) return;
+
+    const uniforms = sky.material.uniforms;
+    const easedProgress = 1 - Math.cos(progress * Math.PI / 2); // Ease-out for smoother transition
+
+    uniforms['turbidity'].value = THREE.MathUtils.lerp(DAY_CONFIG.turbidity, NIGHT_CONFIG.turbidity, easedProgress);
+    uniforms['rayleigh'].value = THREE.MathUtils.lerp(DAY_CONFIG.rayleigh, NIGHT_CONFIG.rayleigh, easedProgress);
+    uniforms['mieCoefficient'].value = THREE.MathUtils.lerp(DAY_CONFIG.mieCoefficient, NIGHT_CONFIG.mieCoefficient, easedProgress);
+    uniforms['mieDirectionalG'].value = THREE.MathUtils.lerp(DAY_CONFIG.mieDirectionalG, NIGHT_CONFIG.mieDirectionalG, easedProgress);
+
+    // Animate sun position
+    const sunAngle = Math.PI * progress; // 0 to PI
+    const sunY = Math.cos(sunAngle); // 1 to -1
+    const sunX = Math.sin(sunAngle); // 0 to 0
+    uniforms['sunPosition'].value.set(sunX, sunY, 0.2);
+
+    // Animate lights
+    lights.ambientLight.intensity = THREE.MathUtils.lerp(DAY_CONFIG.ambientLightIntensity, NIGHT_CONFIG.ambientLightIntensity, easedProgress);
+    lights.directionalLight.intensity = THREE.MathUtils.lerp(DAY_CONFIG.directionalLightIntensity, NIGHT_CONFIG.directionalLightIntensity, easedProgress);
+    lights.rimLight.intensity = THREE.MathUtils.lerp(DAY_CONFIG.rimLightIntensity, NIGHT_CONFIG.rimLightIntensity, easedProgress);
+
+    // Animate colors
+    lights.ambientLight.color.lerpColors(DAY_CONFIG.ambientLightColor, NIGHT_CONFIG.ambientLightColor, easedProgress);
+    
+    // Animate fog
+    const currentFogColor = new THREE.Color().lerpColors(DAY_CONFIG.fogColor, NIGHT_CONFIG.fogColor, easedProgress);
+    updateSceneFog(scene, { enabled: true, useSky: true, fogColor: currentFogColor });
 }
 
 
@@ -298,5 +357,6 @@ export {
     createScene,
     handleWindowResize,
     updateShadowArea,
-    updateSceneFog // EXPORTED the new function
+    updateSceneFog,
+    updateEnvironment // EXPORTED the new function
 };

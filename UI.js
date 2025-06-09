@@ -1,9 +1,10 @@
+// ./UI.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { Game } from './class/Game.js';
 import { UIManager } from './class/UIManager.js'; // Import the new UIManager
-import { EVENT, COLOR, TANKTYPE, loadTankModel, TANK_STATS } from './utils.js';
+import { EVENT, COLOR, TANKTYPE, TANK_STATS, loadTankModel } from './utils.js';
 import { ModelLoader } from './loader.js';
 import { EventManager } from './class/EventManager.js'; // Adjust path if needed
 import { SoundManager } from './class/SoundManager.js'; // Adjust path if needed
@@ -15,18 +16,24 @@ const uiManager = new UIManager();
 
 let game = null;
 let selectedTankModel = TANKTYPE.V001; // Default selected tank
+let selectedGameMode = 'endless'; // ADDED: Default game mode
 let menuScene, menuCamera, menuRenderer, menuControls;
 let tankModel = null; // Holds the 3D model in the menu
+let initialTankY = 0; // For hover animation
 let availableTanks = [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006, TANKTYPE.V007,
-     TANKTYPE.V008, TANKTYPE.V009, TANKTYPE.V010, TANKTYPE.V011];
+TANKTYPE.V008, TANKTYPE.V009, TANKTYPE.V010, TANKTYPE.V011];
 let currentTankIndex = 0;
 let modelLoader = null; // ModelLoader instance
 let isPreloadingModels = false; // Flag to track preload status
 
 const GAME_START_DELAY = 250; // ms, for loading simulation or DOM readiness
 
-// UPDATED: Added hp and firerate stats, and filled out for all tanks
-// HP is normalized from maxHp. Fire Rate is normalized from shootCooldown (inverted).
+// ADDED: Descriptions for game modes
+const modeDescriptions = {
+    classic: 'Defeat all enemies on the map to win. No respawns.',
+    endless: 'Survive as long as possible. Enemies will continuously respawn.'
+};
+
 const tankStatsData = {
     [TANKTYPE.V001.name]: { power: 80, speed: 100, defense: 70, hp: 50, firerate: 85 },
     [TANKTYPE.V002.name]: { power: 110, speed: 70, defense: 90, hp: 80, firerate: 78 },
@@ -46,24 +53,24 @@ async function preloadAllModels() {
         console.log("⏳ Models are already being preloaded...");
         return false;
     }
-    
+
     if (modelLoader && modelLoader.isPreloaded) {
         console.log("✅ Models have been preloaded previously.");
         return true;
     }
-    
+
     isPreloadingModels = true;
     try {
         console.log("🚀 Starting to preload all models...");
         modelLoader = new ModelLoader();
-        
+
         const preloadPromise = modelLoader.preloadAllModels();
         const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error('Preload timeout after 30 seconds')), 30000);
         });
-        
+
         const success = await Promise.race([preloadPromise, timeoutPromise]);
-        
+
         if (success) {
             console.log("✅ Preload models successful!");
         } else {
@@ -84,7 +91,7 @@ async function initMenuScene() {
     const qualityProfile = GAMECONFIG.QUALITY_PROFILES[gameSettings.quality];
 
     menuScene = new THREE.Scene();
-    menuScene.background = new THREE.Color(0x111827); 
+    menuScene.background = new THREE.Color(0x111827);
     if (gameSettings.fog) {
         menuScene.fog = new THREE.Fog(0x111827, 1, 300);
     }
@@ -92,29 +99,36 @@ async function initMenuScene() {
     hemiLight.position.set(0, 20, 0);
     menuScene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight(0xffeeb1, 2.0);
-    keyLight.position.set(5, 5, 8);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = qualityProfile.shadowMapSize;
-    keyLight.shadow.mapSize.height = qualityProfile.shadowMapSize;
-    const shadowSize = 5;
-    keyLight.shadow.camera.left = -shadowSize;
-    keyLight.shadow.camera.right = shadowSize;
-    keyLight.shadow.camera.top = shadowSize;
-    keyLight.shadow.camera.bottom = -shadowSize;
-    keyLight.shadow.bias = -0.0001;
-    menuScene.add(keyLight);
+    const keyLight_1 = new THREE.DirectionalLight(COLOR.white, 2.5);
+    keyLight_1.position.set(5, 5, 8);
+    keyLight_1.castShadow = true;
+    keyLight_1.shadow.mapSize.width = qualityProfile.shadowMapSize;
+    keyLight_1.shadow.mapSize.height = qualityProfile.shadowMapSize;
+    const shadowSize = 2.5;
+    keyLight_1.shadow.camera.left = -shadowSize;
+    keyLight_1.shadow.camera.right = shadowSize;
+    keyLight_1.shadow.camera.top = shadowSize;
+    keyLight_1.shadow.camera.bottom = -shadowSize;
+    keyLight_1.shadow.bias = -0.0001;
+
+    const secFillLight = new THREE.DirectionalLight(0xaaccff, 10);
+    secFillLight.position.set(0, 15, 0);
+    secFillLight.castShadow = true;
+    menuScene.add(secFillLight);
+    menuScene.add(keyLight_1);
+
 
     if (qualityProfile.extraLights) {
-        const fillLight = new THREE.DirectionalLight(0xaaccff, 0.6);
+        const fillLight = new THREE.DirectionalLight(0xaaccff, 5.5);
         fillLight.position.set(-5, 2, -4);
         menuScene.add(fillLight);
 
-        const rimLight = new THREE.DirectionalLight(0xffffff, 1.5);
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 5.5);
         rimLight.position.set(0, 4, -10);
         menuScene.add(rimLight);
     }
-    
+
     const tankDisplayDiv = document.getElementById('tank-display');
     const displayWidth = tankDisplayDiv.clientWidth;
     const displayHeight = tankDisplayDiv.clientHeight;
@@ -126,14 +140,15 @@ async function initMenuScene() {
     });
     menuRenderer.setSize(displayWidth, displayHeight);
     menuRenderer.setPixelRatio(qualityProfile.pixelRatio);
-    
+
     menuRenderer.shadowMap.enabled = true;
     menuRenderer.shadowMap.type = qualityProfile.shadowType;
     menuRenderer.outputColorSpace = THREE.SRGBColorSpace;
     menuRenderer.toneMapping = qualityProfile.toneMapping;
     menuRenderer.toneMappingExposure = 1.0;
     menuRenderer.physicallyCorrectLights = true;
-    
+
+    tankDisplayDiv.innerHTML = '';
     tankDisplayDiv.appendChild(menuRenderer.domElement);
 
     menuControls = new OrbitControls(menuCamera, menuRenderer.domElement);
@@ -144,6 +159,7 @@ async function initMenuScene() {
     menuControls.maxDistance = 15;
     menuControls.autoRotate = true;
     menuControls.autoRotateSpeed = 0.9;
+    menuControls.enablePan = false;
 
     const groundGeometry = new THREE.CircleGeometry(4, 64);
     const groundMaterial = new THREE.MeshStandardMaterial({
@@ -192,15 +208,18 @@ function disposeTankModel() {
 
 function loadTankForMenu(tankType) {
     document.getElementById('tank-name').textContent = `Loading ${tankType.name}...`;
+    updateTankStatsUI(null); // Clear stats while loading
     disposeTankModel();
 
     const placeModelInScene = (model) => {
         tankModel = model;
+        initialTankY = tankModel.position.y; // Capture Y position for hover animation
+
         tankModel.traverse(node => {
             if (node.isMesh) {
                 node.castShadow = true;
                 node.receiveShadow = true;
-                
+
                 if (node.material && node.material.isMeshStandardMaterial) {
                     node.material.metalness = 0.7;
                     node.material.roughness = 0.3;
@@ -232,7 +251,7 @@ function loadTankForMenu(tankType) {
             console.error('Error getting tank model from cache:', error);
         }
     }
-    
+
     loadTankModel(tankType)
         .then(placeModelInScene)
         .catch(error => {
@@ -241,21 +260,31 @@ function loadTankForMenu(tankType) {
         });
 }
 
-// UPDATED: Function now sets the new stat bars
+// UPDATED: Function now animates the stat bars
 function updateTankStatsUI(tankName) {
-    const stats = tankStatsData[tankName];
-    if (stats) {
-        document.getElementById('power-stat').style.width = `${stats.power * 0.6}%`;
-        document.getElementById('speed-stat').style.width = `${stats.speed * 0.8}%`;
-        document.getElementById('defense-stat').style.width = `${stats.defense * 0.8}%`;
-        document.getElementById('hp-stat').style.width = `${stats.hp * 0.8}%`;
-        document.getElementById('firerate-stat').style.width = `${stats.firerate * 0.8}%`;
-    }
+    const statIds = ['power', 'speed', 'defense', 'hp', 'firerate'];
+    const stats = tankName ? tankStatsData[tankName] : null;
+
+    statIds.forEach(id => {
+        const element = document.getElementById(`${id}-stat-fill`);
+        if (element) {
+            const value = stats ? (stats[id] / 1.5) : 0; // Use a base value for scaling
+            element.style.width = `${value}%`;
+        }
+    });
 }
+
 
 function animateMenu() {
     requestAnimationFrame(animateMenu);
     if (menuControls) menuControls.update();
+
+    // Subtle hover animation for the tank, respects initial position
+    if (tankModel) {
+        const time = performance.now() * 0.0005;
+        tankModel.position.y = initialTankY + Math.sin(time * 2) * 0.05;
+    }
+
     if (menuRenderer && menuScene && menuCamera) menuRenderer.render(menuScene, menuCamera);
 }
 
@@ -295,7 +324,7 @@ function setupGameRendererDOM(gameInstance) {
             gameCanvasContainer.removeChild(child);
         }
     });
-    
+
     if (!gameCanvasContainer.contains(gameInstance.renderer.domElement)) {
         gameCanvasContainer.insertBefore(gameInstance.renderer.domElement, hudElement);
     }
@@ -319,7 +348,7 @@ function disposeCurrentGame() {
 
 function startNewGame(tankTypeToUse) {
     hideLoadingScreen();
-    
+
     document.getElementById('menu-container').style.display = 'none';
     document.getElementById('game-container').style.display = 'none';
     document.getElementById('game-over-screen').style.display = 'none';
@@ -328,7 +357,11 @@ function startNewGame(tankTypeToUse) {
     disposeCurrentGame();
 
     try {
-        game = new Game({ tankType: tankTypeToUse });
+        // MODIFIED: Pass the selected game mode to the Game constructor
+        game = new Game({
+            tankType: tankTypeToUse,
+            gameMode: selectedGameMode
+        });
 
         setTimeout(() => {
             if (!game) { returnToMainMenu(false); return; }
@@ -409,6 +442,13 @@ openSettingsButton.addEventListener('click', () => {
     if (radioToCheck) {
         radioToCheck.checked = true;
     }
+    
+    // NEW: Day/Night Cycle settings
+    const currentCycle = gameSettings.dayNightCycle;
+    const cycleRadioToCheck = document.querySelector(`#day-night-options input[value="${currentCycle}"]`);
+    if (cycleRadioToCheck) {
+        cycleRadioToCheck.checked = true;
+    }
 
     // Set slider positions and text based on current gameSettings
     fogToggle.checked = gameSettings.fog;
@@ -439,25 +479,39 @@ createVolumeUpdater(masterVolumeSlider, masterVolumeValue, 'volumeMaster');
 createVolumeUpdater(musicVolumeSlider, musicVolumeValue, 'volumeMusic');
 createVolumeUpdater(sfxVolumeSlider, sfxVolumeValue, 'volumeSfx');
 
+fogToggle.addEventListener('change', () => {
+    gameSettings.fog = fogToggle.checked;
+    eventManager.notify(EVENT.FOG_SETTING_CHANGED, { enabled: gameSettings.fog });
+});
+
+// NEW: Add event listener for day/night cycle changes
+document.querySelectorAll('#day-night-options input[name="dayNightCycle"]').forEach(radio => {
+    radio.addEventListener('change', (event) => {
+        gameSettings.dayNightCycle = event.target.value;
+        // Notify systems immediately for instant change
+        eventManager.notify(EVENT.SETTINGS_UPDATED);
+    });
+});
+
 
 applySettingsButton.addEventListener('click', () => {
-    const selectedQuality = document.querySelector('#quality-options input:checked').value;
-    const newFogSetting = fogToggle.checked;
+    const selectedQuality = document.querySelector('#quality-options input[name="quality"]:checked').value;
     let reloadNeeded = false;
+
     if (selectedQuality && selectedQuality !== gameSettings.quality) {
         gameSettings.quality = selectedQuality;
         reloadNeeded = true;
     }
-    
-    if (newFogSetting !== gameSettings.fog) {
-        gameSettings.fog = newFogSetting;
-        eventManager.notify('FOG_SETTING_CHANGED', { enabled: newFogSetting });
-    }
 
-    saveSettings();
-    
+    // Day/Night and Fog are applied instantly, but we save them here.
+    gameSettings.dayNightCycle = document.querySelector('#day-night-options input[name="dayNightCycle"]:checked').value;
+    gameSettings.fog = fogToggle.checked;
+
+    saveSettings(); // Save all current settings
+    eventManager.notify(EVENT.SETTINGS_UPDATED); // Ensure sound volumes are updated
+
     settingsModal.style.display = 'none';
-    
+
     if (reloadNeeded) {
         alert("Graphics quality has been changed. The page will now reload to apply the new settings.");
         location.reload();
@@ -469,6 +523,7 @@ applySettingsButton.addEventListener('click', () => {
 closeSettingsButton.addEventListener('click', () => {
     settingsModal.style.display = 'none';
 });
+
 
 window.addEventListener('click', (event) => {
     if (event.target == settingsModal) {
@@ -517,7 +572,7 @@ document.getElementById('select-button').addEventListener('click', () => {
         transition: 'opacity 0.5s',
     });
     document.body.appendChild(successMessage);
-    
+
     setTimeout(() => {
         successMessage.style.opacity = '0';
         setTimeout(() => document.body.removeChild(successMessage), 500);
@@ -550,8 +605,8 @@ function stopHUDUpdates() {
 }
 
 window.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && game && game.isRunning) {
-        returnToMainMenu(true);
+    if (event.key === 'Escape' && game && game.playerTank && !game.playerTank.disposed) {
+        game.togglePause();
     }
 });
 
@@ -613,21 +668,42 @@ export function hideLoadingScreen() {
         setTimeout(() => loadingScreen.remove(), 500); // Fade out then remove
     }
 }
-
 document.addEventListener('DOMContentLoaded', () => {
+    // [FIXED] Load settings first, THEN notify all systems to update themselves.
     loadSettings();
+    eventManager.notify(EVENT.SETTINGS_UPDATED); // This tells SoundManager to apply loaded volumes.
+
     console.log("🎮 DOM loaded, waiting for user interaction...");
 
     const enterButton = document.getElementById('enter-game-button');
     const enterScreen = document.getElementById('enter-screen');
     const menuContainer = document.getElementById('menu-container');
 
-    // Make the whole screen clickable as a fallback
-    enterButton.addEventListener('click', handleGameEntry);     
-   async function handleGameEntry() {
-        // Prevent this from running more than once
+    // ADDED: Game Mode Selection Logic
+    const classicModeButton = document.getElementById('mode-classic-button');
+    const endlessModeButton = document.getElementById('mode-endless-button');
+    const modeDescriptionP = document.getElementById('game-mode-description');
+
+    function setGameMode(mode) {
+        selectedGameMode = mode;
+        if (mode === 'classic') {
+            classicModeButton.classList.add('active');
+            endlessModeButton.classList.remove('active');
+        } else {
+            endlessModeButton.classList.add('active');
+            classicModeButton.classList.remove('active');
+        }
+        modeDescriptionP.textContent = modeDescriptions[mode];
+    }
+
+    classicModeButton.addEventListener('click', () => setGameMode('classic'));
+    endlessModeButton.addEventListener('click', () => setGameMode('endless'));
+
+
+    enterButton.addEventListener('click', handleGameEntry);
+    async function handleGameEntry() {
         enterButton.removeEventListener('click', handleGameEntry);
-        enterButton.disabled = true; // Also good practice to disable it
+        enterButton.disabled = true;
         enterButton.textContent = 'Loading...';
 
         enterScreen.style.opacity = '0';
@@ -636,25 +712,45 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 500);
 
         menuContainer.style.display = 'flex';
+        document.getElementById('pause-resume-button').addEventListener('click', () => {
+            if (game) game.togglePause();
+        });
 
+        document.getElementById('pause-settings-button').addEventListener('click', () => {
+            const settingsModal = document.getElementById('settings-modal');
+            const radioToCheck = document.querySelector(`#quality-options input[value="${gameSettings.quality}"]`);
+            if (radioToCheck) radioToCheck.checked = true;
+            fogToggle.checked = gameSettings.fog;
+            masterVolumeSlider.value = gameSettings.volumeMaster * 100;
+            musicVolumeSlider.value = gameSettings.volumeMusic * 100;
+            sfxVolumeSlider.value = gameSettings.volumeSfx * 100;
+            masterVolumeValue.textContent = `${Math.round(masterVolumeSlider.value)}%`;
+            musicVolumeValue.textContent = `${Math.round(musicVolumeSlider.value)}%`;
+            sfxVolumeValue.textContent = `${Math.round(sfxVolumeSlider.value)}%`;
+            settingsModal.style.display = 'flex';
+        });
+
+        document.getElementById('pause-menu-button').addEventListener('click', () => {
+            document.getElementById('pause-screen').style.display = 'none';
+            returnToMainMenu(false);
+        });
         console.log("🚀 User interaction detected. Initializing game systems...");
         try {
             setupEndGameScreenEvents();
             await initMenuScene();
 
             console.log("🎵 Firing event to play lobby music.");
-            eventManager.notify(EVENT.ENTER_LOBBY); 
+            eventManager.notify(EVENT.ENTER_LOBBY);
 
         } catch (error) {
-        console.error("❌ Critical error during game initialization:", error);
-        const errorMessage = document.createElement('div');
-        errorMessage.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#ff4444;color:white;padding:20px;border-radius:10px;text-align:center;z-index:9999;`;
-        errorMessage.innerHTML = `<h3>Game Initialization Error</h3><p>Failed to load game resources. Please refresh the page and try again.</p><button onclick="location.reload()" style="margin-top:10px;padding:5px 10px;">Refresh Page</button>`;
-        document.body.appendChild(errorMessage);
+            console.error("❌ Critical error during game initialization:", error);
+            const errorMessage = document.createElement('div');
+            errorMessage.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#ff4444;color:white;padding:20px;border-radius:10px;text-align:center;z-index:9999;`;
+            errorMessage.innerHTML = `<h3>Game Initialization Error</h3><p>Failed to load game resources. Please refresh the page and try again.</p><button onclick="location.reload()" style="margin-top:10px;padding:5px 10px;">Refresh Page</button>`;
+            document.body.appendChild(errorMessage);
+        }
     }
-}
 });
-
 window.addEventListener('beforeunload', () => {
     disposeTankModel();
     disposeCurrentGame();

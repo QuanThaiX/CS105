@@ -5,7 +5,12 @@ import { ModelLoader } from './loader.js';
 function toRad(deg) {
     return THREE.MathUtils.degToRad(deg);
 }
-
+export const POWERUP_TYPE = Object.freeze({
+    SHIELD: { name: 'Shield', duration: 10000, color: 0x00BFFF },
+    RAPID_FIRE: { name: 'Rapid Fire', duration: 8000, color: 0xFFFF00 },
+    DAMAGE_BOOST: { name: 'Damage Boost', duration: 10000, color: 0xFF4500 },
+    HEALTH_PACK: { name: 'Health Pack', duration: 0, color: 0x00FF7F, value: 150 },
+});
 const HITBOX_SCALE = {
     TANK: { x: 0.7, y: 1.0, z: 0.7 },
     ROCK: { x: 0.6, y: 1.0, z: 0.6 },
@@ -226,18 +231,18 @@ const TANK_STATS = Object.freeze({
         defense: 90,
     },
     V009: {
-        hp: 900,
-        maxHp: 900,
+        hp: 500,
+        maxHp: 500,
         moveSpeed: 0.15,
         rotateSpeed: 0.035,
         shootCooldown: 1600,
-        damage: 110,
+        damage: 50,
         defense: 80,
     },
     V010: {
         hp: 850,
         maxHp: 850,
-        moveSpeed: 0.1,
+        moveSpeed: 0.12,
         rotateSpeed: 0.035,
         shootCooldown: 2100,
         damage: 90,
@@ -564,7 +569,9 @@ const EVENT = Object.freeze({
      * SETTINGS_UPDATED - Fired when game settings are changed
      */
     SETTINGS_UPDATED: 'settings:updated', 
-
+    POWERUP_COLLECTED: 'powerup_collected',
+    POWERUP_EXPIRED: 'powerup_expired',
+    POWERUP_SPAWNED: 'powerup_spawned',
 });
 
 const COLOR = Object.freeze({

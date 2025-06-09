@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tank3D</title>
+    <title>Tank Battleground Simulation</title>
     <link rel="icon" type="image/png" href="assets/tank3d_favicon.png">
     <link rel="stylesheet" href="index.css">
 </head>
@@ -14,7 +14,7 @@
     <div class="enter-content">
 
         <header class="game-intro">
-            <h1 class="game-title">Tank Battleground</h1>
+            <h2 class="game-title">Tank Battleground Simulation</h2>
             <p class="game-subtitle">Enter the arena of 3D tank combat.</p>
         </header>
 
@@ -36,67 +36,59 @@
     <div id="menu-container">
         <!-- Left Menu -->
         <div id="menu-left">
-            <h1 class="menu-title">TANK3D</h1>
-            <button id="start-button" class="menu-button">Start Game</button>
-            <button id="continue-button" class="menu-button" disabled>Continue Game</button>
-            <button id="settings-button" class="menu-button">Settings</button>
-            <button id="exit-button" class="menu-button">Exit Game</button>
-        </div>
-        
-        <!-- Right Menu - Tank Selection -->
-        <div id="menu-right">
-            <!-- Wrapper for 80% height canvas area -->
-            <div id="tank-display-wrapper">
-                <div id="tank-display"></div> <!-- Actual canvas host -->
+            <h1 class="menu-title">TANK BATTLE</h1>
+
+            <div class="menu-section">
+                <h2 class="menu-subtitle">Game Mode</h2>
+                <div id="game-mode-selector">
+                    <button id="mode-classic-button" class="menu-button-small" data-mode="classic">Classic</button>
+                    <button id="mode-endless-button" class="menu-button-small active" data-mode="endless">Endless</button>
+                </div>
+                <p id="game-mode-description">Survive as long as possible. Enemies will continuously respawn.</p>
             </div>
 
-            <!-- Panel at the bottom for controls (20% height) -->
-            <div id="bottom-panel">
-                <!-- Container for prev button, tank info, next button in a row -->
-                <div id="tank-selection-controls">
-                    <div id="prev-tank" class="nav-button"><</div>
-                    
-                    <div id="tank-info-center"> <!-- Groups tank name and stats -->
-                        <div id="tank-name">Tank v001</div>
-                        <div id="tank-stats">
-                            <div class="stat-container">
-                                <div class="stat-label">Power</div>
-                                <div class="stat-bar">
-                                    <div id="power-stat" class="stat-fill-power" style="width: 100%; background-color: #ff0000;"></div>
-                                </div>
-                            </div>
-                            <div class="stat-container">
-                                <div class="stat-label">Speed</div>
-                                <div class="stat-bar">
-                                    <div id="speed-stat" class="stat-fill-speed" style="width: 100%; background-color: #00ff00;"></div>
-                                </div>
-                            </div>
-                            <div class="stat-container">
-                                <div class="stat-label">Defense</div>
-                                <div class="stat-bar">
-                                    <div id="defense-stat" class="stat-fill-defense" style="width: 100%; background-color: #0000ff;"></div>
-                                </div>
-                            </div>
-                            <!-- ADDED: Max HP Stat Bar -->
-                            <div class="stat-container">
-                                <div class="stat-label">Max HP</div>
-                                <div class="stat-bar">
-                                    <div id="hp-stat" class="stat-fill-hp"></div>
-                                </div>
-                            </div>
-                            <!-- ADDED: Fire Rate Stat Bar -->
-                            <div class="stat-container">
-                                <div class="stat-label">Fire Rate</div>
-                                <div class="stat-bar">
-                                    <div id="firerate-stat" class="stat-fill-firerate"></div>
-                                </div>
-                            </div>
+            <div class="menu-actions">
+                <button id="start-button" class="menu-button">Start Game</button>
+                <button id="continue-button" class="menu-button" disabled>Continue Game</button>
+                <button id="settings-button" class="menu-button">Settings</button>
+                <button id="exit-button" class="menu-button">Exit Game</button>
+            </div>
+        </div>
+
+        <!-- Right Menu - Tank Selection -->
+        <div id="menu-right">
+            <div id="tank-display-wrapper">
+                <div id="tank-display"></div> <!-- Canvas host -->
+            </div>
+            <div id="tank-selection-panel">
+                <div id="prev-tank" class="nav-button">‹</div>
+                <div id="tank-info-container">
+                    <h2 id="tank-name">Tank Name</h2>
+                    <div id="tank-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Power</span>
+                            <div class="stat-bar-background"><div id="power-stat-fill" class="stat-bar-fill"></div></div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Speed</span>
+                            <div class="stat-bar-background"><div id="speed-stat-fill" class="stat-bar-fill"></div></div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Defense</span>
+                            <div class="stat-bar-background"><div id="defense-stat-fill" class="stat-bar-fill"></div></div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Max HP</span>
+                            <div class="stat-bar-background"><div id="hp-stat-fill" class="stat-bar-fill"></div></div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Fire Rate</span>
+                            <div class="stat-bar-background"><div id="firerate-stat-fill" class="stat-bar-fill"></div></div>
                         </div>
                     </div>
-                    
-                    <div id="next-tank" class="nav-button">></div>
+                    <button id="select-button" class="menu-button-small">Select This Tank</button>
                 </div>
-                <button id="select-button">Select Tank</button>
+                <div id="next-tank" class="nav-button">›</div>
             </div>
         </div>
     </div>
@@ -109,7 +101,16 @@
             <div id="high-score">High Score: 0</div>
         </div>
     </div>
-
+<div id="pause-screen" class="endgame-screen" style="display: none;">
+    <div class="endgame-content">
+        <h2 id="pause-title">PAUSED</h2>
+        <div class="endgame-buttons">
+            <button id="pause-resume-button" class="endgame-button">Resume Game</button>
+            <button id="pause-settings-button" class="endgame-button">Settings</button>
+            <button id="pause-menu-button" class="endgame-button">Back to Main Menu</button>
+        </div>
+    </div>
+</div>
     <!-- Game Over Screen -->
     <div id="game-over-screen" class="endgame-screen">
         <div class="endgame-content">
@@ -131,7 +132,7 @@
             <h2 id="win-title">VICTORY!</h2>
             <div id="win-score-info">
                 <p>Score: <span id="win-score">0</span></p>
-                <p>High Score: <span id="win-highscore">0</span></p>
+                <p>High Score: <span id="win-score">0</span></p>
             </div>
             <div class="endgame-buttons">
                 <button id="win-menu-button" class="endgame-button">Back to Menu</button>
@@ -143,7 +144,7 @@
     <div class="modal-content">
         <span id="close-settings-button" class="close-button">×</span>
         <h2>Settings</h2>
-        
+
         <div class="setting-item">
             <h3>Graphics Quality</h3>
             <p class="setting-description"></p>
@@ -162,8 +163,27 @@
                 </label>
             </div>
         </div>
+        
+        <!-- NEW: Day/Night Cycle Setting -->
+        <div class="setting-item">
+            <h3>Time of Day</h3>
+            <p class="setting-description">Set the time of day or enable a dynamic cycle. Changes are applied instantly.</p>
+            <div id="day-night-options" class="options-group">
+                <label>
+                    <input type="radio" name="dayNightCycle" value="day">
+                    <span>Day</span>
+                </label>
+                <label>
+                    <input type="radio" name="dayNightCycle" value="night">
+                    <span>Night</span>
+                </label>
+                <label>
+                    <input type="radio" name="dayNightCycle" value="dynamic">
+                    <span>Dynamic</span>
+                </label>
+            </div>
+        </div>
 
-        <!-- ADDED: Fog Toggle Setting -->
         <div class="setting-item">
             <h3>Enable Fog</h3>
             <p class="setting-description">Adds atmospheric fog for depth. Can be toggled on/off instantly during gameplay.</p>
@@ -217,8 +237,6 @@
             }
         }
     </script>
-    <script type="module">
-        import './UI.js';
-    </script>
+    <script type="module" src="./UI.js"></script>
 </body>
 </html>

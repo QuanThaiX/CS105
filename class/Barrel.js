@@ -1,3 +1,4 @@
+// ./class/Barrel.js
 import * as THREE from 'three';
 import { GLTFLoader } from '../three/examples/jsm/loaders/GLTFLoader.js';
 import { GameObject } from './GameObject.js';
@@ -6,13 +7,13 @@ import { EventManager } from './EventManager.js';
 import { EVENT, HITBOX_SCALE } from '../utils.js';
 import { ModelLoader } from '../loader.js';
 import { GAMECONFIG } from '../config.js';
-
+import { CollisionManager } from './CollisionManager.js';
 class Barrel extends GameObject {
     constructor(id, position, scale = 1, rotation = 0, barrelType = 'barrel') {
         super(id, 'neutral', position, true);
         this.scale = scale;
         this.barrelType = barrelType;
-        this.rotation = rotation; // Rotation around Y axis (radians)
+        this.rotation = rotation; 
         this.hitBoxScale = HITBOX_SCALE.BARREL;
         
         // Explosion properties
@@ -21,8 +22,6 @@ class Barrel extends GameObject {
         this.explosionRadius = GAMECONFIG.SCENERY.BARREL_EXPLOSION.RADIUS * this.scale;
         this.explosionDamage = GAMECONFIG.SCENERY.BARREL_EXPLOSION.DAMAGE;
         this.explosionForce = GAMECONFIG.SCENERY.BARREL_EXPLOSION.PUSH_FORCE;
-        
-        // Health system for barrels
         this.maxHP = 50;
         this.hp = this.maxHP;
         
@@ -268,7 +267,7 @@ class Barrel extends GameObject {
      */
     explode(explosionSource = null) {
         if (this.hasExploded || !this.canExplode) return;
-        
+        CollisionManager.instance.notifyObjectStateChange(this);
         this.hasExploded = true;
         console.log(`💥 Barrel ${this.id} exploded! Radius: ${this.explosionRadius}`);
         
@@ -348,14 +347,12 @@ class Barrel extends GameObject {
         
         affectedObjects.forEach(({ object, distance, damage, damageMultiplier }) => {
             if (damage > 0) {
-                // Apply damage based on object type
                 if (object.takeDamage && typeof object.takeDamage === 'function') {
                     object.takeDamage(damage, this);
                 } else if (object.hp !== undefined) {
                     object.hp = Math.max(0, object.hp - damage);
                 }
                 
-                // Notify explosion damage event
                 EventManager.instance.notify(EVENT.EXPLOSION_DAMAGE, {
                     source: this,
                     target: object,
@@ -371,11 +368,9 @@ class Barrel extends GameObject {
                     distance: distance
                 });
                 
-                // Chain reaction for other barrels
                 if (object instanceof Barrel && 
                     GAMECONFIG.SCENERY.BARREL_EXPLOSION.CHAIN_REACTION && 
                     !object.hasExploded) {
-                    // Delay chain explosion slightly for visual effect
                     setTimeout(() => {
                         if (!object.hasExploded) {
                             object.explode(this);
@@ -388,9 +383,6 @@ class Barrel extends GameObject {
         return damageDealt;
     }
 
-    /**
-     * Play barrel explosion sound effect
-     */
     playExplosionSound() {
         try {
             const audioConfig = GAMECONFIG.AUDIO.BARREL_EXPLOSION;
@@ -414,9 +406,6 @@ class Barrel extends GameObject {
      */
 // In Barrel.js
 
-    /**
-     * Create visually engaging explosion effects with particles, light, and a shockwave.
-     */
     createExplosionEffects() {
         const scene = Game.instance.scene;
         if (!scene) return;
@@ -424,7 +413,7 @@ class Barrel extends GameObject {
         const explosionPosition = this.position.clone();
         const clock = new THREE.Clock();
 
-        const flashLight = new THREE.PointLight(0xffa500, 500, 100, 2); 
+        const flashLight = new THREE.PointLight(0xffa500, 250, 100, 2); 
         flashLight.position.copy(explosionPosition);
         scene.add(flashLight);
 
@@ -479,7 +468,7 @@ class Barrel extends GameObject {
 
 
 
-        const shockwaveGeometry = new THREE.RingGeometry(1, 10, 64);
+        const shockwaveGeometry = new THREE.RingGeometry(1, 1.2, 64);
         const shockwaveMaterial = new THREE.MeshBasicMaterial({
             color: 0xffd700,
             transparent: true,
@@ -520,7 +509,6 @@ class Barrel extends GameObject {
             particleMaterial.opacity = 1.0 - progress;
             const positions = sparks.geometry.attributes.position.array;
             for (let i = 0; i < particleCount; i++) {
-                // Apply a bit of gravity
                 velocities[i].y -= 9.8 * dt * 0.5;
 
                 positions[i * 3 + 0] += velocities[i].x * dt;
@@ -565,4 +553,4 @@ class Barrel extends GameObject {
     }
 }
 
-export { Barrel }; 
+export { Barrel };

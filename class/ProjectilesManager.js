@@ -1,14 +1,15 @@
+// ./class/ProjectilesManager.js
 import * as THREE from 'three';
 import { Bullet } from './Bullet.js';
 import { CollisionManager } from './CollisionManager.js';
 import { EventManager } from './EventManager.js';
 import { Game } from './Game.js';
-import { loadTankModel, FACTION, EVENT, TANKTYPE, COLOR, TANK_STATS } from "../utils.js";
+import { FACTION, EVENT, TANKTYPE, COLOR, TANK_STATS } from "../utils.js";
 
 class ProjectilesManager {
   static instance;
   projectiles = [];
-  maxProjectiles = 100;
+  maxProjectiles = 5;
   
   constructor() {
     if (ProjectilesManager.instance) {
@@ -81,7 +82,6 @@ class ProjectilesManager {
       } else {
         return;
       }
-      //const tankPosition = Game.instance.playerTank.model.position;
       if (projectile.position.distanceTo(tankPosition) > 100 || projectile.hasCollided) {
         if (projectile.model && Game.instance.scene) {
           Game.instance.scene.remove(projectile.model);

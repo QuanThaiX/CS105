@@ -1,3 +1,4 @@
+// ./class/CollisionManager.js
 import * as THREE from 'three';
 import { GAMECONFIG } from '../config.js';
 import { Game } from './Game.js';
@@ -8,23 +9,19 @@ import { Rock } from './Rock.js';
 import { Tree } from './Tree.js';
 import { Barrel } from './Barrel.js';
 import { Bullet } from './Bullet.js';
-// Import the new Octree class
-import { Octree } from './Octree.js';
 
 class CollisionManager {
   static instance;
 
-  // Lists to manage different types of objects
   dynamicObjects;
   staticObjects;
-
-  // The Octree for high-performance spatial partitioning
-  octree;
-
-  // Caching and helpers
+  objectsMap; 
+  worker; 
   bboxCache;
   hitboxScaleMap;
   boxHelpers;
+
+  staticObjectsSent = false;
   
   constructor() {
     if (CollisionManager.instance) {
@@ -34,15 +31,35 @@ class CollisionManager {
     
     this.dynamicObjects = [];
     this.staticObjects = [];
+    this.objectsMap = new Map();
     this.bboxCache = new WeakMap();
     this.boxHelpers = new Map();
     
-    const worldSize = GAMECONFIG.WORLD_BOUNDARY || 500;
-    const worldBounds = new THREE.Box3(
-        new THREE.Vector3(-worldSize, -worldSize, -worldSize),
-        new THREE.Vector3(worldSize, worldSize, worldSize)
-    );
-    this.octree = new Octree(worldBounds, 8, 8);
+    // Create and initialize the worker
+    if (typeof Worker !== 'undefined') {
+        this.worker = new Worker('./class/CollisionWorker.js', { type: 'module' });
+        this.worker.onmessage = this.handleWorkerMessage.bind(this);
+        this.worker.onerror = (error) => console.error("Collision Worker Error:", error);
+        
+        const worldSize = GAMECONFIG.WORLD_BOUNDARY || 500;
+        const worldBounds = new THREE.Box3(
+            new THREE.Vector3(-worldSize, -worldSize, -worldSize),
+            new THREE.Vector3(worldSize, worldSize, worldSize)
+        );
+
+        // Send initialization data to the worker
+        this.worker.postMessage({
+            type: 'init',
+            payload: {
+                worldBounds: {
+                    min: { x: worldBounds.min.x, y: worldBounds.min.y, z: worldBounds.min.z },
+                    max: { x: worldBounds.max.x, y: worldBounds.max.y, z: worldBounds.max.z }
+                }
+            }
+        });
+    } else {
+        console.error("❌ Web Workers not supported. Collision detection will not run.");
+    }
 
     this.hitboxScaleMap = new Map([
         [Tank, HITBOX_SCALE.TANK],
@@ -52,36 +69,27 @@ class CollisionManager {
     ]);
   }
   
-  /**
-   * Adds a game object to the appropriate collision list.
-   */
   add(gameObject) {
-    if (!gameObject.isCollision) return;
+    if (!gameObject.isCollision || !gameObject.id || this.objectsMap.has(gameObject.id)) return;
 
     if (this.isStaticObject(gameObject)) {
-      if (!this.staticObjects.includes(gameObject)) {
-        this.staticObjects.push(gameObject);
-      }
+      if (!this.staticObjects.includes(gameObject)) this.staticObjects.push(gameObject);
     } else {
-      if (!this.dynamicObjects.includes(gameObject)) {
-        this.dynamicObjects.push(gameObject);
-      }
+      if (!this.dynamicObjects.includes(gameObject)) this.dynamicObjects.push(gameObject);
     }
+    this.objectsMap.set(gameObject.id, gameObject);
   }
   
-  /**
-   * Removes a game object from the collision lists and cleans up its debug helper.
-   */
   remove(gameObject) {
+    if (!gameObject || !gameObject.id) return;
+    
     let index = this.dynamicObjects.indexOf(gameObject);
-    if (index !== -1) {
-      this.dynamicObjects.splice(index, 1);
-    } else {
-      index = this.staticObjects.indexOf(gameObject);
-      if (index !== -1) {
-        this.staticObjects.splice(index, 1);
-      }
-    }
+    if (index !== -1) this.dynamicObjects.splice(index, 1);
+    
+    index = this.staticObjects.indexOf(gameObject);
+    if (index !== -1) this.staticObjects.splice(index, 1);
+
+    this.objectsMap.delete(gameObject.id);
 
     if (GAMECONFIG.DEBUG && this.boxHelpers.has(gameObject.id)) {
       const boxHelper = this.boxHelpers.get(gameObject.id);
@@ -90,25 +98,16 @@ class CollisionManager {
     }
   }
 
-  /**
-   * Checks if an object is static (non-movable).
-   */
   isStaticObject(obj) {
     return obj instanceof Rock || 
            obj instanceof Tree || 
            (obj instanceof Barrel && obj.hasExploded);
   }
 
-  /**
-   * Gets the appropriate hitbox scale for an object type using the map.
-   */
   getHitboxScale(obj) {
     return this.hitboxScaleMap.get(obj.constructor) || { x: 1.0, y: 1.0, z: 1.0 };
   }
 
-  /**
-   * Creates a scaled bounding box for an object.
-   */
   createScaledBoundingBox(obj) {
     if (!obj.model) return null;
     
@@ -128,20 +127,14 @@ class CollisionManager {
     return box;
   }
 
-  /**
-   * Handles the collision logic for a pair of objects.
-   */
    handleCollisionPair(objA, objB) {
     let bullet = null;
     let target = null;
 
-    // Identify which object is the bullet and which is the target
     if (objA instanceof Bullet) {
-      bullet = objA;
-      target = objB;
+      bullet = objA; target = objB;
     } else if (objB instanceof Bullet) {
-      bullet = objB;
-      target = objA;
+      bullet = objB; target = objA;
     }
     
     if (bullet) {
@@ -159,70 +152,82 @@ class CollisionManager {
           }
           bullet.onHit(target);
       }
-
       return;
     }
 
     EventManager.instance.notify(EVENT.COLLISION, { objA, objB });
   }
 
-  /**
-   * The main update loop, using the Octree for highly optimized collision detection.
-   */
-  update() {
-    // 1. Clear the Octree for the new frame.
-    this.octree.clear();
-    
-    // 2. Populate the Octree with all objects (static and dynamic).
-    // Also, cache their bounding boxes for this frame.
-    const allObjects = [...this.dynamicObjects, ...this.staticObjects];
-    for (const obj of allObjects) {
-      if (obj.model && !obj.disposed) {
-        const bbox = this.createScaledBoundingBox(obj);
-        if (bbox) {
-          this.bboxCache.set(obj, bbox);
-          this.octree.insert(obj, bbox);
+
+    update() {
+        if (!this.worker) return;
+
+        const dynamicPayload = [];
+        for (const obj of this.dynamicObjects) {
+            if (obj.model && !obj.disposed) {
+                const bbox = this.createScaledBoundingBox(obj);
+                if (bbox) {
+                    dynamicPayload.push({
+                        id: obj.id,
+                        bbox: {
+                            min: { x: bbox.min.x, y: bbox.min.y, z: bbox.min.z },
+                            max: { x: bbox.max.x, y: bbox.max.y, z: bbox.max.z }
+                        }
+                    });
+                }
+            }
         }
-      }
+
+        if (!this.staticObjectsSent) {
+            // First frame: send everything
+            const staticPayload = [];
+            for (const obj of this.staticObjects) {
+                if (obj.model && !obj.disposed) {
+                    const bbox = this.createScaledBoundingBox(obj);
+                    if (bbox) {
+                        staticPayload.push({
+                            id: obj.id,
+                            bbox: {
+                                min: { x: bbox.min.x, y: bbox.min.y, z: bbox.min.z },
+                                max: { x: bbox.max.x, y: bbox.max.y, z: bbox.max.z }
+                            }
+                        });
+                    }
+                }
+            }
+            this.worker.postMessage({
+                type: 'full_update',
+                payload: {
+                    dynamicObjects: dynamicPayload,
+                    staticObjects: staticPayload
+                }
+            });
+            this.staticObjectsSent = true;
+        } else {
+            // Subsequent frames: send only dynamic objects
+            this.worker.postMessage({
+                type: 'dynamic_update',
+                payload: {
+                    dynamicObjects: dynamicPayload
+                }
+            });
+        }
     }
 
-    // 3. Perform collision checks.
-    const processedPairs = new Set(); // Prevents checking A-B and then B-A.
-
-    // Iterate through DYNAMIC objects only. Static objects don't initiate collisions.
-    for (const objA of this.dynamicObjects) {
-      if (objA.disposed) continue;
-
-      const boxA = this.bboxCache.get(objA);
-      if (!boxA) continue;
-
-      // Retrieve only potential colliders from the Octree. This is the key optimization!
-      const potentialColliders = this.octree.retrieve(objA, boxA);
-
-      for (const objB of potentialColliders) {
-        // Skip self-collision and checks with disposed objects.
-        if (objA === objB || objB.disposed) continue;
-
-        // Prevent duplicate pair checks (e.g., Tank1-Tank2 and later Tank2-Tank1).
-        const pairKey = objA.id < objB.id ? `${objA.id}-${objB.id}` : `${objB.id}-${objA.id}`;
-        if (processedPairs.has(pairKey)) continue;
-        processedPairs.add(pairKey);
-
-        const boxB = this.bboxCache.get(objB);
-        if (!boxB) continue;
-
-        // Final, precise intersection test
-        if (boxA.intersectsBox(boxB)) {
-          this.handleCollisionPair(objA, objB);
-        }
+  handleWorkerMessage(e) {
+      const { type, payload } = e.data;
+      if (type === 'collisions') {
+          for (const pair of payload.pairs) {
+              const objA = this.objectsMap.get(pair.idA);
+              const objB = this.objectsMap.get(pair.idB);
+              
+              if (objA && objB && !objA.disposed && !objB.disposed) {
+                  this.handleCollisionPair(objA, objB);
+              }
+          }
       }
-    }
   }
 
-  /**
-   * Checks if a potential position is valid (not colliding with anything).
-   * Used primarily for procedural generation where performance is less critical.
-   */
   isPositionValid(position, objectSize, excludeObjects = []) {
     const testBox = new THREE.Box3().setFromCenterAndSize(
       position,
@@ -238,22 +243,15 @@ class CollisionManager {
         return false;
       }
     }
-    
     return true;
   }
 
-  /**
-   * Dispose collision manager and clean up resources.
-   */
   dispose() {
     this.dynamicObjects = [];
     this.staticObjects = [];
-    
-    // Clear the octree and all caches
-    this.octree.clear();
+    this.objectsMap.clear();
     this.bboxCache = new WeakMap();
 
-    // Clean up debug box helpers
     this.boxHelpers.forEach((boxHelper) => {
         if (boxHelper && Game.instance?.scene) {
           Game.instance.scene.remove(boxHelper);
@@ -261,8 +259,33 @@ class CollisionManager {
     });
     this.boxHelpers.clear();
     
+    if (this.worker) {
+        this.worker.terminate();
+        this.worker = null;
+    }
+    
     CollisionManager.instance = null;
   }
-}
+    notifyObjectStateChange(gameObject) {
+        if (!this.worker) return;
 
+        this.remove(gameObject); // Remove from its current list (likely dynamic)
+        this.add(gameObject);    // Re-add it, it will now be classified as static
+
+        // Send a specific command to the worker to update its internal lists
+        const bbox = this.createScaledBoundingBox(gameObject);
+        if (bbox) {
+            this.worker.postMessage({
+                type: 'object_became_static',
+                payload: {
+                    id: gameObject.id,
+                    bbox: {
+                         min: { x: bbox.min.x, y: bbox.min.y, z: bbox.min.z },
+                         max: { x: bbox.max.x, y: bbox.max.y, z: bbox.max.z }
+                    }
+                }
+            });
+        }
+    }
+}
 export { CollisionManager };

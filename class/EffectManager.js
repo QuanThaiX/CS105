@@ -1,3 +1,4 @@
+// ./class/EffectManager.js
 import * as THREE from 'three';
 import { EventManager } from './EventManager.js';
 import { EVENT } from '../utils.js';
@@ -12,12 +13,16 @@ class Effect {
         }
         Effect.instance = this;
         
+        // Bind event handlers once and store them for easy removal later
+        this.boundHandleTankDestroyed = this.handleTankDestroyed.bind(this);
+        this.boundHandleObjectShoot = this.handleObjectShoot.bind(this);
+        
         this.registerEventListeners();
     }
     
     registerEventListeners() {
-        EventManager.instance.subscribe(EVENT.TANK_DESTROYED, this.handleTankDestroyed.bind(this));
-        EventManager.instance.subscribe(EVENT.OBJECT_SHOOT, this.handleObjectShoot.bind(this));
+        EventManager.instance.subscribe(EVENT.TANK_DESTROYED, this.boundHandleTankDestroyed);
+        EventManager.instance.subscribe(EVENT.OBJECT_SHOOT, this.boundHandleObjectShoot);
     }
     
     handleTankDestroyed(data) {
@@ -38,6 +43,17 @@ class Effect {
     
     createMuzzleFlash(position, direction, options = {}) {
         return new MuzzleFlash(Game.instance.scene, position, direction, options);
+    }
+
+
+    dispose() {
+        if (EventManager.instance) {
+            EventManager.instance.unsubscribe(EVENT.TANK_DESTROYED, this.boundHandleTankDestroyed);
+            EventManager.instance.unsubscribe(EVENT.OBJECT_SHOOT, this.boundHandleObjectShoot);
+        }
+        
+        // Reset the singleton instance
+        Effect.instance = null;
     }
 }
 
@@ -151,7 +167,7 @@ class Explosion extends EffectInstance {
     _createShockwave() {
         const geometry = new THREE.RingGeometry(
             this.options.shockwaveInitialRadius, // innerRadius
-            this.options.shockwaveInitialRadius + (this.options.shockwaveThickness * this.size),
+            this.options.shockwaveInitialRadius - this.options.shockwaveThickness * this.size,
             64 // thetaSegments
         );
 

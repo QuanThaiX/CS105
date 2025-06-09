@@ -1,3 +1,4 @@
+// ./class/GameStateManager.js
 import * as THREE from 'three';
 import { FACTION } from '../utils.js';
 
@@ -15,6 +16,33 @@ class GameStateManager {
         }
         GameStateManager.instance = this;
         this.game = game;
+    }
+    
+    /**
+     * Creates a serializable, lightweight version of the game state for Web Workers.
+     * @returns {object} A plain object with game state data.
+     */
+    getSerializableState() {
+        const serializeObject = (obj) => {
+            if (!obj || obj.disposed || !obj.position) return null;
+            return {
+                id: obj.id,
+                faction: obj.faction,
+                hp: obj.hp,
+                position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
+                // Tank-specific data
+                rotation: obj.model ? { y: obj.model.rotation.y } : { y: 0 },
+            };
+        };
+
+        const playerTank = this.getPlayerTank();
+        
+        return {
+            playerTank: playerTank ? serializeObject(playerTank) : null,
+            tanks: this.getEnemyTanks().map(serializeObject).filter(Boolean),
+            obstacles: this.getAllObstacles().map(serializeObject).filter(Boolean),
+            // We can add projectiles or other data here if needed by the worker
+        };
     }
 
     /**
@@ -358,4 +386,4 @@ class GameStateManager {
     }
 }
 
-export { GameStateManager }; 
+export { GameStateManager };

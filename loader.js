@@ -1,3 +1,4 @@
+// ./loader.js
 import * as THREE from 'three';
 import { GLTFLoader } from "./three/examples/jsm/loaders/GLTFLoader.js";
 import { TANKTYPE } from './utils.js';
@@ -444,43 +445,61 @@ class ModelLoader {
      * @param {THREE.Vector3} position - Tank position
      */
     _applyTankTransforms(model, tankType, position) {
-        if (tankType == TANKTYPE.V001) {
-            model.position.set(position.x, position.y, position.z);
-            model.scale.set(3.5, 3.5, 3.5);
-        } else if (tankType == TANKTYPE.V003) {
-            model.position.set(position.x, position.y - 1, position.z);
-            model.scale.set(3.0, 3.0, 3.0);
-        } else if (tankType == TANKTYPE.V002) {
-            model.position.set(position.x, position.y - 1, position.z);
-            model.scale.set(2.0, 2.0, 2.0);
-        } else if (tankType == TANKTYPE.V004) {
-            model.position.set(position.x, position.y - 1, position.z);
-            model.scale.set(2.4, 2.4, 2.4);
-        } else if (tankType == TANKTYPE.V005) {
-            model.position.set(position.x, position.y - 1, position.z);
-            model.scale.set(1.4, 1.4, 1.4);
-        } else if (tankType == TANKTYPE.V006) {
-            model.position.set(position.x, position.y - 1, position.z);
-            model.scale.set(1.2, 1.2, 1.2);
-        } else if (tankType == TANKTYPE.V007) {
-            model.position.set(position.x, position.y - 1 + 0.3, position.z);
-            model.scale.set(1.2, 1.2, 1.2); 
-        } else if (tankType == TANKTYPE.V008) {
-            model.position.set(position.x, position.y - 1 + 0.3, position.z);
-            model.scale.set(1.2, 1.2, 1.2); 
-        } else if (tankType == TANKTYPE.V009) {
-            model.position.copy(position);
-            model.position.y = position.y - 1; 
-        } else if (tankType == TANKTYPE.V010) {
-            model.position.copy(position);
-            model.position.y = position.y + 0.3; 
-        } else if (tankType == TANKTYPE.V011) {
-            model.position.copy(position);
-            model.position.y = position.y - 0.2; 
-        }  else {
-            model.position.copy(position);
-            model.scale.set(3.5, 3.5, 3.5);
+        // ============================ THE FIX ============================
+        // Compare tankType.name (a string) instead of the tankType object.
+        // This is a robust way to identify the tank type.
+        switch (tankType.name) {
+            case TANKTYPE.V001.name:
+                model.position.set(position.x, position.y, position.z);
+                model.scale.set(3.5, 3.5, 3.5);
+                break;
+            case TANKTYPE.V003.name:
+                model.position.set(position.x, position.y - 1, position.z);
+                model.scale.set(3.0, 3.0, 3.0);
+                break;
+            case TANKTYPE.V002.name:
+                model.position.set(position.x, position.y - 1, position.z);
+                model.scale.set(2.0, 2.0, 2.0);
+                break;
+            case TANKTYPE.V004.name:
+                model.position.set(position.x, position.y - 1, position.z);
+                model.scale.set(2.4, 2.4, 2.4);
+                break;
+            case TANKTYPE.V005.name:
+                model.position.set(position.x, position.y - 1, position.z);
+                model.scale.set(1.4, 1.4, 1.4);
+                break;
+            case TANKTYPE.V006.name:
+                model.position.set(position.x, position.y - 1, position.z);
+                model.scale.set(1.2, 1.2, 1.2);
+                break;
+            case TANKTYPE.V007.name:
+                model.position.set(position.x, position.y - 1 + 0.3, position.z);
+                model.scale.set(1.2, 1.2, 1.2); 
+                break;
+            case TANKTYPE.V008.name:
+                model.position.set(position.x, position.y - 1 + 0.3, position.z);
+                model.scale.set(1.2, 1.2, 1.2); 
+                break;
+            case TANKTYPE.V009.name:
+                model.position.copy(position);
+                model.position.y = position.y - 1; 
+                break;
+            case TANKTYPE.V010.name:
+                model.position.copy(position);
+                model.position.y = position.y + 0.3; 
+                break;
+            case TANKTYPE.V011.name:
+                model.position.copy(position);
+                model.position.y = position.y - 0.2; 
+                break;
+            default:
+                // Default behavior for any tanks not listed above
+                model.position.copy(position);
+                model.scale.set(3.5, 3.5, 3.5);
+                break;
         }
+        // ===============================================================
     }
 
     /**
@@ -647,4 +666,4 @@ class ModelLoader {
     }
 }
 
-export { ModelLoader }; 
+export { ModelLoader };
