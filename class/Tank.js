@@ -495,7 +495,7 @@ this._bulletPosition.copy(this.model.position);
 
     let damage = atk - (this.defense * 1.5) / 10 > 0 ? atk - (this.defense * 1.5) / 10 : 25;
     this.hp -= damage;
-
+    this.hp = parseInt(this.hp);
     this.lastDamageSource = objSource;
 
     EventManager.instance.notify(EVENT.OBJECT_DAMAGED, {
