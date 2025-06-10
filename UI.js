@@ -1,13 +1,13 @@
 // ./UI.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'; // <-- MODIFIED: Added RGBELoader
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { Game } from './class/Game.js';
-import { UIManager } from './class/UIManager.js'; // Import the new UIManager
+import { UIManager } from './class/UIManager.js';
 import { EVENT, COLOR, TANKTYPE, TANK_STATS, loadTankModel } from './utils.js';
 import { ModelLoader } from './loader.js';
-import { EventManager } from './class/EventManager.js'; // Adjust path if needed
-import { SoundManager } from './class/SoundManager.js'; // Adjust path if needed
+import { EventManager } from './class/EventManager.js';
+import { SoundManager } from './class/SoundManager.js';
 import { QUALITY, GAMECONFIG, gameSettings, loadSettings, saveSettings } from './config.js';
 
 const eventManager = new EventManager();
@@ -15,27 +15,24 @@ const soundManager = new SoundManager();
 const uiManager = new UIManager();
 
 let game = null;
-let selectedTankModel = TANKTYPE.V001; // Default selected tank
-let selectedGameMode = 'endless'; // ADDED: Default game mode
+let selectedTankModel = TANKTYPE.V001;
+let selectedGameMode = 'endless'; // Default, will be overridden by modal selection
 let menuScene, menuCamera, menuRenderer, menuControls;
-let tankModel = null; // Holds the 3D model in the menu
-let initialTankY = 0; // For hover animation
+let tankModel = null;
+let initialTankY = 0;
 let availableTanks = [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006, TANKTYPE.V007,
 TANKTYPE.V008, TANKTYPE.V009, TANKTYPE.V010, TANKTYPE.V011];
 let currentTankIndex = 0;
-let modelLoader = null; // ModelLoader instance
-let isPreloadingModels = false; // Flag to track preload status
+let modelLoader = null;
+let isPreloadingModels = false;
 
-const GAME_START_DELAY = 250; // ms, for loading simulation or DOM readiness
+const GAME_START_DELAY = 250;
 
-// ADDED: Descriptions for game modes
-const modeDescriptions = {
-    classic: 'Defeat all enemies on the map to win. No respawns.',
-    endless: 'Survive as long as possible. Enemies will continuously respawn.'
-};
+// This const is no longer needed here as descriptions are in the HTML modal
+// const modeDescriptions = { ... };
 
 const tankStatsData = {
-    [TANKTYPE.V001.name]: { power: 80, speed: 80, defense: 70, hp: 50, firerate: 85 },
+    [TANKTYPE.V001.name]: { power: 80, speed: 100, defense: 70, hp: 50, firerate: 85 },
     [TANKTYPE.V002.name]: { power: 110, speed: 70, defense: 90, hp: 80, firerate: 78 },
     [TANKTYPE.V003.name]: { power: 120, speed: 80, defense: 85, hp: 60, firerate: 75 },
     [TANKTYPE.V004.name]: { power: 90, speed: 70, defense: 60, hp: 70, firerate: 65 },
@@ -43,11 +40,13 @@ const tankStatsData = {
     [TANKTYPE.V006.name]: { power: 120, speed: 40, defense: 100, hp: 120, firerate: 70 },
     [TANKTYPE.V007.name]: { power: 130, speed: 90, defense: 75, hp: 85, firerate: 82 },
     [TANKTYPE.V008.name]: { power: 140, speed: 40, defense: 90, hp: 120, firerate: 55 },
-    [TANKTYPE.V009.name]: { power: 55, speed: 90, defense: 80, hp: 90, firerate: 84 },
+    [TANKTYPE.V009.name]: { power: 110, speed: 70, defense: 80, hp: 90, firerate: 84 },
     [TANKTYPE.V010.name]: { power: 90, speed: 120, defense: 74, hp: 85, firerate: 79 },
     [TANKTYPE.V011.name]: { power: 80, speed: 150, defense: 50, hp: 50, firerate: 110 },
 };
 
+// --- (No changes to preloadAllModels, initMenuScene, disposeTankModel, loadTankForMenu, etc.) ---
+// ... (functions from preloadAllModels to onWindowResize remain the same) ...
 async function preloadAllModels() {
     if (isPreloadingModels) {
         console.log("⏳ Models are already being preloaded...");
@@ -440,8 +439,9 @@ function returnToMainMenu(preserveGameInstanceForPause = false) {
     onWindowResize();
 }
 
+// MODIFIED: Start button now opens the game mode modal
 document.getElementById('start-button').addEventListener('click', () => {
-    startNewGame(selectedTankModel);
+    document.getElementById('game-mode-modal').style.display = 'flex';
 });
 
 document.getElementById('continue-button').addEventListener('click', () => {
@@ -453,7 +453,8 @@ document.getElementById('continue-button').addEventListener('click', () => {
         startHUDUpdates();
         onWindowResize();
     } else {
-        startNewGame(selectedTankModel);
+        // If there's no game to continue, show the mode selection
+        document.getElementById('game-mode-modal').style.display = 'flex';
     }
 });
 
@@ -466,7 +467,6 @@ const masterVolumeSlider = document.getElementById('master-volume-slider');
 const musicVolumeSlider = document.getElementById('music-volume-slider');
 const sfxVolumeSlider = document.getElementById('sfx-volume-slider');
 const fogToggle = document.getElementById('fog-toggle');
-// NEW: Get the new toggle elements
 const cameraShakeToggle = document.getElementById('camera-shake-toggle');
 const minimapToggle = document.getElementById('minimap-toggle');
 
@@ -474,7 +474,6 @@ const masterVolumeValue = document.getElementById('master-volume-value');
 const musicVolumeValue = document.getElementById('music-volume-value');
 const sfxVolumeValue = document.getElementById('sfx-volume-value');
 openSettingsButton.addEventListener('click', () => {
-    // Quality settings
     const currentQuality = gameSettings.quality;
     const radioToCheck = document.querySelector(`#quality-options input[value="${currentQuality}"]`);
     if (radioToCheck) {
@@ -487,10 +486,9 @@ openSettingsButton.addEventListener('click', () => {
         cycleRadioToCheck.checked = true;
     }
 
-    // Set slider and toggle positions based on current gameSettings
     fogToggle.checked = gameSettings.fog;
-    cameraShakeToggle.checked = gameSettings.cameraShake; // NEW
-    minimapToggle.checked = gameSettings.showMinimap;     // NEW
+    cameraShakeToggle.checked = gameSettings.cameraShake;
+    minimapToggle.checked = gameSettings.showMinimap;
 
     masterVolumeSlider.value = gameSettings.volumeMaster * 100;
     musicVolumeSlider.value = gameSettings.volumeMusic * 100;
@@ -506,9 +504,7 @@ function createVolumeUpdater(slider, valueLabel, settingKey) {
     slider.addEventListener('input', () => {
         const volumePercentage = Math.round(slider.value);
         const volumeDecimal = volumePercentage / 100;
-
         valueLabel.textContent = `${volumePercentage}%`;
-
         gameSettings[settingKey] = volumeDecimal;
         eventManager.notify(EVENT.SETTINGS_UPDATED);
     });
@@ -518,18 +514,17 @@ createVolumeUpdater(masterVolumeSlider, masterVolumeValue, 'volumeMaster');
 createVolumeUpdater(musicVolumeSlider, musicVolumeValue, 'volumeMusic');
 createVolumeUpdater(sfxVolumeSlider, sfxVolumeValue, 'volumeSfx');
 
-// Listeners for instant-apply toggles
 fogToggle.addEventListener('change', () => {
     gameSettings.fog = fogToggle.checked;
     eventManager.notify(EVENT.FOG_SETTING_CHANGED, { enabled: gameSettings.fog });
 });
 
-cameraShakeToggle.addEventListener('change', () => { // NEW
+cameraShakeToggle.addEventListener('change', () => {
     gameSettings.cameraShake = cameraShakeToggle.checked;
     eventManager.notify(EVENT.SETTINGS_UPDATED);
 });
 
-minimapToggle.addEventListener('change', () => { // NEW
+minimapToggle.addEventListener('change', () => {
     gameSettings.showMinimap = minimapToggle.checked;
     eventManager.notify(EVENT.SETTINGS_UPDATED);
 });
@@ -541,7 +536,6 @@ document.querySelectorAll('#day-night-options input[name="dayNightCycle"]').forE
     });
 });
 
-// "Apply" button saves all settings and closes the modal
 applySettingsButton.addEventListener('click', () => {
     const selectedQuality = document.querySelector('#quality-options input[name="quality"]:checked').value;
     let reloadNeeded = false;
@@ -551,11 +545,10 @@ applySettingsButton.addEventListener('click', () => {
         reloadNeeded = true;
     }
 
-    // All other settings are updated in real-time, but we save them here.
     gameSettings.dayNightCycle = document.querySelector('#day-night-options input[name="dayNightCycle"]:checked').value;
     gameSettings.fog = fogToggle.checked;
-    gameSettings.cameraShake = cameraShakeToggle.checked; // NEW
-    gameSettings.showMinimap = minimapToggle.checked;     // NEW
+    gameSettings.cameraShake = cameraShakeToggle.checked;
+    gameSettings.showMinimap = minimapToggle.checked;
 
     saveSettings();
     eventManager.notify(EVENT.SETTINGS_UPDATED);
@@ -568,24 +561,16 @@ applySettingsButton.addEventListener('click', () => {
     }
 });
 
-
-// Listeners to close the modal
 closeSettingsButton.addEventListener('click', () => {
     settingsModal.style.display = 'none';
 });
 
-
-window.addEventListener('click', (event) => {
-    if (event.target == settingsModal) {
-        settingsModal.style.display = 'none';
-    }
-});
+// This listener is now handled inside DOMContentLoaded to include the new modal
+// window.addEventListener('click', (event) => { ... });
 
 document.getElementById('exit-button').addEventListener('click', () => {
     if (confirm('Are you sure you want to exit the game?')) {
-        if (game) {
-            game.stop();
-        }
+        if (game) game.stop();
         stopHUDUpdates();
         try {
             window.close();
@@ -671,17 +656,10 @@ function setupEndGameScreenEvents() {
 
 export function startLoadingScreen() {
     if (document.getElementById('loading-screen')) return;
-
     const loadingHTML = `
         <div id="loading-screen">
             <div class="loading-content">
-                <div class="loader">
-                    <div class="cube">
-                        <div class="face"></div><div class="face"></div>
-                        <div class="face"></div><div class="face"></div>
-                        <div class="face"></div><div class="face"></div>
-                    </div>
-                </div>
+                <div class="loader"><div class="cube"><div class="face"></div><div class="face"></div><div class="face"></div><div class="face"></div><div class="face"></div><div class="face"></div></div></div>
                 <div class="loaderBar"></div>
                 <div class="game-info">
                     <h2 class="objective-title">OBJECTIVE</h2>
@@ -689,18 +667,9 @@ export function startLoadingScreen() {
                     <div class="controls-section">
                         <h3 class="controls-title">CONTROLS</h3>
                         <div class="controls-grid">
-                            <div class="control-item">
-                                <span class="control-key">WASD</span>
-                                <span class="control-description">Move Tank</span>
-                            </div>
-                            <div class="control-item">
-                                <span class="control-key">SPACE</span>
-                                <span class="control-description">Shoot</span>
-                            </div>
-                            <div class="control-item">
-                                <span class="control-key">MOUSE</span>
-                                <span class="control-description">Camera Control</span>
-                            </div>
+                            <div class="control-item"><span class="control-key">WASD</span><span class="control-description">Move Tank</span></div>
+                            <div class="control-item"><span class="control-key">SPACE</span><span class="control-description">Shoot</span></div>
+                            <div class="control-item"><span class="control-key">MOUSE</span><span class="control-description">Camera Control</span></div>
                         </div>
                     </div>
                 </div>
@@ -714,7 +683,7 @@ export function hideLoadingScreen() {
     const loadingScreen = document.getElementById('loading-screen');
     if (loadingScreen) {
         loadingScreen.style.opacity = '0';
-        setTimeout(() => loadingScreen.remove(), 500); // Fade out then remove
+        setTimeout(() => loadingScreen.remove(), 500);
     }
 }
 document.addEventListener('DOMContentLoaded', () => {
@@ -727,24 +696,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const enterScreen = document.getElementById('enter-screen');
     const menuContainer = document.getElementById('menu-container');
 
-    const classicModeButton = document.getElementById('mode-classic-button');
-    const endlessModeButton = document.getElementById('mode-endless-button');
-    const modeDescriptionP = document.getElementById('game-mode-description');
+    // MODIFIED: This logic is now handled by the new modal
+    // const classicModeButton = document.getElementById('mode-classic-button');
+    // const endlessModeButton = document.getElementById('mode-endless-button');
+    // const modeDescriptionP = document.getElementById('game-mode-description');
 
-    function setGameMode(mode) {
-        selectedGameMode = mode;
-        if (mode === 'classic') {
-            classicModeButton.classList.add('active');
-            endlessModeButton.classList.remove('active');
-        } else {
-            endlessModeButton.classList.add('active');
-            classicModeButton.classList.remove('active');
+    // NEW: Game Mode Modal Logic
+    const gameModeModal = document.getElementById('game-mode-modal');
+    const closeModeModalButton = document.getElementById('close-mode-modal-button');
+    const modeSelectButtons = document.querySelectorAll('.mode-select-button');
+
+    modeSelectButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            selectedGameMode = button.dataset.mode;
+            gameModeModal.style.display = 'none';
+            startNewGame(selectedTankModel);
+        });
+    });
+
+    closeModeModalButton.addEventListener('click', () => {
+        gameModeModal.style.display = 'none';
+    });
+
+    // MODIFIED: Centralized click listener for all modals
+    window.addEventListener('click', (event) => {
+        if (event.target == settingsModal) {
+            settingsModal.style.display = 'none';
         }
-        modeDescriptionP.textContent = modeDescriptions[mode];
-    }
-
-    classicModeButton.addEventListener('click', () => setGameMode('classic'));
-    endlessModeButton.addEventListener('click', () => setGameMode('endless'));
+        if (event.target == gameModeModal) {
+            gameModeModal.style.display = 'none';
+        }
+    });
 
 
     enterButton.addEventListener('click', handleGameEntry);
@@ -768,8 +750,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const radioToCheck = document.querySelector(`#quality-options input[value="${gameSettings.quality}"]`);
             if (radioToCheck) radioToCheck.checked = true;
             fogToggle.checked = gameSettings.fog;
-            cameraShakeToggle.checked = gameSettings.cameraShake; // NEW
-            minimapToggle.checked = gameSettings.showMinimap;     // NEW
+            cameraShakeToggle.checked = gameSettings.cameraShake;
+            minimapToggle.checked = gameSettings.showMinimap;
             masterVolumeSlider.value = gameSettings.volumeMaster * 100;
             musicVolumeSlider.value = gameSettings.volumeMusic * 100;
             sfxVolumeSlider.value = gameSettings.volumeSfx * 100;

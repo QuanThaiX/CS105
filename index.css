@@ -673,3 +673,59 @@ input:checked + .slider:before { transform: translateX(26px); }
     from { opacity: 0; transform: translateX(20px); }
     to { opacity: 1; transform: translateX(0); }
 }
+/* ./index.css */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@400;700&display=swap');
+
+/* ... (all existing styles up to the end) ... */
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* --- NEW: Game Mode Modal --- */
+#game-mode-modal .modal-content {
+    max-width: 700px;
+}
+
+.mode-selection-container {
+    display: flex;
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.mode-card {
+    flex: 1;
+    background-color: var(--bg-light);
+    border: 1px solid rgba(58, 134, 255, 0.2);
+    border-radius: 8px;
+    padding: 1.5rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.mode-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 20px var(--accent-blue-glow);
+}
+
+.mode-card h3 {
+    font-family: var(--font-title);
+    font-size: 1.5rem;
+    color: var(--accent-blue);
+    margin-bottom: 1rem;
+}
+
+.mode-card p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    flex-grow: 1;
+    margin-bottom: 1.5rem;
+}
+
+.mode-card .mode-select-button {
+    width: 100%;
+}

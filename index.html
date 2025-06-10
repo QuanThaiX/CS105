@@ -37,16 +37,6 @@
         <!-- Left Menu -->
         <div id="menu-left">
             <h1 class="menu-title">TANK BATTLE</h1>
-
-            <div class="menu-section">
-                <h2 class="menu-subtitle">Game Mode</h2>
-                <div id="game-mode-selector">
-                    <button id="mode-classic-button" class="menu-button-small" data-mode="classic">Classic</button>
-                    <button id="mode-endless-button" class="menu-button-small active" data-mode="endless">Endless</button>
-                </div>
-                <p id="game-mode-description">Survive as long as possible. Enemies will continuously respawn.</p>
-            </div>
-
             <div class="menu-actions">
                 <button id="start-button" class="menu-button">Start Game</button>
                 <button id="continue-button" class="menu-button" disabled>Continue Game</button>
@@ -256,8 +246,26 @@
         </div>
         <button id="apply-settings-button" class="menu-button">Apply Changes</button>
     </div>
+    
 </div>
-
+<div id="game-mode-modal" class="modal-overlay">
+    <div class="modal-content">
+        <span id="close-mode-modal-button" class="close-button">×</span>
+        <h2>Choose Game Mode</h2>
+        <div class="mode-selection-container">
+            <div class="mode-card">
+                <h3>Classic</h3>
+                <p>Defeat all initial enemies on the map to achieve victory. No enemy respawns.</p>
+                <button class="menu-button mode-select-button" data-mode="classic">Play Classic</button>
+            </div>
+            <div class="mode-card">
+                <h3>Endless</h3>
+                <p>Survive for as long as you can. Destroyed enemies will be replaced by new, stronger ones.</p>
+                <button class="menu-button mode-select-button" data-mode="endless">Play Endless</button>
+            </div>
+        </div>
+    </div>
+</div>
     <script type="importmap">
         {
             "imports": {
