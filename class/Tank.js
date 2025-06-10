@@ -46,6 +46,8 @@ class Tank extends GameObject {
   _hoverTime = 0;
   isHoverTank = false;
   initialY = 0;
+  knockbackVelocity = new THREE.Vector3();
+  knockbackDamping = 0.92;
   constructor(id, faction, position, isCollision, tankType = TANKTYPE.V001) {
     super(id, faction, position, isCollision);
     this.tankType = tankType;
@@ -111,7 +113,7 @@ class Tank extends GameObject {
   createPlayerIndicator() {
     if (!this.model) return;
 
-    this.indicatorLight = new THREE.PointLight(0xffffff, 25, 8);
+    this.indicatorLight = new THREE.PointLight(0xffffff, 10, 8);
     this.indicatorLight.position.set(0, 1.5, 0);
 
     this.model.add(this.indicatorLight);
@@ -126,7 +128,7 @@ class Tank extends GameObject {
     this.enemyIndicator.position.set(0, 3.5, 0);
     this.enemyIndicator.rotation.x = Math.PI;
 
-    this.indicatorLight = new THREE.PointLight(0xff0000, 25, 8);
+    this.indicatorLight = new THREE.PointLight(0xff0000, 10, 8);
     this.indicatorLight.position.set(0, 1.5, 0);
 
     this.model.add(this.enemyIndicator);
@@ -311,7 +313,7 @@ this._bulletPosition.copy(this.model.position);
           tank: this,
           position: this._bulletPosition, 
           direction: this._bulletDirection, 
-          speed: 0.5,
+          speed: 0.8,
           color: COLOR.cyan
         });
 
@@ -320,7 +322,7 @@ this._bulletPosition.copy(this.model.position);
           tank: this,
           position: this._bulletPosition,
           direction: this._bulletDirection,
-          speed: 0.5,
+          speed: 0.8,
           color: COLOR.cyan
         });
       } else if (this.tankType === TANKTYPE.V011) {
@@ -328,7 +330,7 @@ this._bulletPosition.copy(this.model.position);
           tank: this,
           position: this._bulletPosition,
           direction: this._bulletDirection,
-          speed: 0.5,
+          speed: 0.8,
           color: COLOR.purple
         });
       }
@@ -337,7 +339,7 @@ this._bulletPosition.copy(this.model.position);
           tank: this,
           position: this._bulletPosition,
           direction: this._bulletDirection,
-          speed: 0.5,
+          speed: 0.8,
           color: COLOR.orange
         });
       }
@@ -628,7 +630,24 @@ this._bulletPosition.copy(this.model.position);
     }
   }
 
-  update() {
+/**
+ * NEW: Applies a force to the tank, causing it to slide.
+ * @param {THREE.Vector3} direction - The normalized direction of the force.
+ * @param {number} force - The magnitude of the force.
+ */
+applyKnockback(direction, force) {
+    // We're adding to any existing knockback velocity
+    this.knockbackVelocity.add(direction.clone().multiplyScalar(force / 100)); // Divide by a factor to make it manageable
+}
+
+update() {
+    if (this.knockbackVelocity.lengthSq() > 0.001) {
+        this.model.position.add(this.knockbackVelocity);
+        this.position.copy(this.model.position);
+        this.knockbackVelocity.multiplyScalar(this.knockbackDamping);
+    } else {
+        this.knockbackVelocity.set(0, 0, 0);
+    }
     this._hoverTime = performance.now() * 0.001;
     if (this.isHoverTank && this.model) {
       this.model.position.y = this.initialY + Math.sin(this._hoverTime * 2) * 0.1;

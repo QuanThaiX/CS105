@@ -3,84 +3,184 @@ import * as THREE from 'three';
 import { EventManager } from './EventManager.js';
 import { EVENT } from '../utils.js';
 import { Game } from './Game.js';
+import { gameSettings } from '../config.js'; // <-- IMPORT gameSettings
+
+class CameraShaker {
+    constructor(camera) {
+        this.camera = camera;
+        this.shakeInfo = {
+            active: false,
+            intensity: 0,
+            duration: 0,
+            startTime: 0,
+        };
+        this.shakeOffset = new THREE.Vector3();
+    }
+
+    shake(intensity, duration) {
+        // NEW: Check the setting before applying any shake
+        if (!gameSettings.cameraShake) return;
+
+        if (this.shakeInfo.active && this.shakeInfo.intensity > intensity) {
+            return;
+        }
+        this.shakeInfo.active = true;
+        this.shakeInfo.intensity = intensity;
+        this.shakeInfo.duration = duration;
+        this.shakeInfo.startTime = performance.now();
+    }
+
+    update() {
+        if (!this.shakeInfo.active || !this.camera) {
+            if (this.shakeOffset.lengthSq() > 0 && this.camera) {
+                this.camera.position.sub(this.shakeOffset);
+                this.shakeOffset.set(0, 0, 0);
+            }
+            return;
+        }
+
+        const now = performance.now();
+        const elapsed = (now - this.shakeInfo.startTime) / 1000;
+
+        if (elapsed >= this.shakeInfo.duration) {
+            this.shakeInfo.active = false;
+            if (this.camera) {
+                this.camera.position.sub(this.shakeOffset);
+            }
+            this.shakeOffset.set(0, 0, 0);
+            return;
+        }
+
+        const progress = elapsed / this.shakeInfo.duration;
+        const currentIntensity = this.shakeInfo.intensity * (1 - progress);
+
+        this.camera.position.sub(this.shakeOffset);
+
+        const x = (Math.random() - 0.5) * 2 * currentIntensity;
+        const y = (Math.random() - 0.5) * 2 * currentIntensity;
+        const z = (Math.random() - 0.5) * 2 * currentIntensity;
+        this.shakeOffset.set(x, y, z);
+
+        this.camera.position.add(this.shakeOffset);
+    }
+}
+
 
 class Effect {
     static instance;
+    cameraShaker;
 
     constructor() {
         if (Effect.instance) {
             return Effect.instance;
         }
         Effect.instance = this;
-        
-        // Bind event handlers once and store them for easy removal later
+
         this.boundHandleTankDestroyed = this.handleTankDestroyed.bind(this);
         this.boundHandleObjectShoot = this.handleObjectShoot.bind(this);
-        
+        this.boundHandleBarrelExploded = this.handleBarrelExploded.bind(this);
+
         this.registerEventListeners();
     }
-    
+
+    initCameraShaker(camera) {
+        this.cameraShaker = new CameraShaker(camera);
+    }
+
+    update() {
+        if (this.cameraShaker) {
+            this.cameraShaker.update();
+        }
+    }
+
     registerEventListeners() {
         EventManager.instance.subscribe(EVENT.TANK_DESTROYED, this.boundHandleTankDestroyed);
         EventManager.instance.subscribe(EVENT.OBJECT_SHOOT, this.boundHandleObjectShoot);
+        EventManager.instance.subscribe(EVENT.BARREL_EXPLODED, this.boundHandleBarrelExploded);
     }
-    
+
+    handleBarrelExploded(data) {
+        const { barrel } = data;
+        const player = Game.instance.playerTank;
+        if (!player || !this.cameraShaker) return;
+
+        const distance = player.position.distanceTo(barrel.position);
+        const maxShakeDistance = 50;
+        if (distance < maxShakeDistance) {
+            const intensity = 0.5 * (1 - (distance / maxShakeDistance));
+            this.cameraShaker.shake(intensity, 0.6);
+        }
+    }
+
     handleTankDestroyed(data) {
         const { tank } = data;
         this.createExplosion(tank.position, 0.7, { particleCount: 800 });
+
+        const player = Game.instance.playerTank;
+        if (!player || !this.cameraShaker) return;
+
+        const distance = player.position.distanceTo(tank.position);
+        const maxShakeDistance = 60;
+        if (distance < maxShakeDistance) {
+            const intensity = 0.6 * (1 - (distance / maxShakeDistance));
+            this.cameraShaker.shake(intensity, 0.7);
+        }
     }
-    
+
     handleObjectShoot(data) {
-        const { position, direction } = data;
+        const { tank, position, direction } = data;
         if (position && direction) {
             this.createMuzzleFlash(position, direction);
         }
+
+        if (tank && tank.faction === 'player' && this.cameraShaker) {
+            this.cameraShaker.shake(0.08, 0.2);
+        }
     }
-    
+
     createExplosion(position, size = 1, options = {}) {
         return new Explosion(Game.instance.scene, position, size, options);
     }
-    
+
     createMuzzleFlash(position, direction, options = {}) {
         return new MuzzleFlash(Game.instance.scene, position, direction, options);
     }
-
 
     dispose() {
         if (EventManager.instance) {
             EventManager.instance.unsubscribe(EVENT.TANK_DESTROYED, this.boundHandleTankDestroyed);
             EventManager.instance.unsubscribe(EVENT.OBJECT_SHOOT, this.boundHandleObjectShoot);
+            EventManager.instance.unsubscribe(EVENT.BARREL_EXPLODED, this.boundHandleBarrelExploded);
         }
-        
-        // Reset the singleton instance
+        this.cameraShaker = null;
         Effect.instance = null;
     }
 }
 
 const EXPLOSION_DEFAULTS = {
     // General
-    particleCount: 500,   
-    maxLife: 1.5,        
-    baseSpeed: 15,       
-    gravity: -9.8,        
+    particleCount: 500,
+    maxLife: 1.5,
+    baseSpeed: 15,
+    gravity: -9.8,
     particleBaseSize: 0.5,
-    colors: [             
-        new THREE.Color(0xffa000), 
-        new THREE.Color(0xff4000), 
-        new THREE.Color(0xffc040), 
+    colors: [
+        new THREE.Color(0xffa000),
+        new THREE.Color(0xff4000),
+        new THREE.Color(0xffc040),
     ],
     // Light
-    addLight: true,      
+    addLight: true,
     lightColor: 0xffa000,
-    lightIntensity: 2000,  
-    lightDistance: 50,    
+    lightIntensity: 2000,
+    lightDistance: 50,
     texture: createParticleTexture(),
     addShockwave: true,
     shockwaveColor: 0xffffff,
-    shockwaveDuration: 0.8, 
-    shockwaveInitialRadius: 2.2, 
-    shockwaveMaxRadius: 15, 
-    shockwaveThickness: 1.5, 
+    shockwaveDuration: 0.8,
+    shockwaveInitialRadius: 0.2,
+    shockwaveMaxRadius: 15,
+    shockwaveThickness: 1.5,
 };
 
 function createParticleTexture(size = 64) {
@@ -133,8 +233,8 @@ class Explosion extends EffectInstance {
         this.geometry = null;
         this.material = null;
         this.points = null;
-        this.shockwave = null; 
-        
+        this.shockwave = null;
+
         this.clock = new THREE.Clock();
         this._animationFrameId = null;
 
@@ -163,11 +263,11 @@ class Explosion extends EffectInstance {
         );
         this.light.position.copy(this.origin);
     }
-    
+
     _createShockwave() {
         const geometry = new THREE.RingGeometry(
-            this.options.shockwaveInitialRadius * this.size, // innerRadius
-            this.options.shockwaveInitialRadius * this.size + 0.2, // outerRadius
+            this.options.shockwaveInitialRadius, // innerRadius
+            this.options.shockwaveInitialRadius - this.options.shockwaveThickness * this.size,
             64 // thetaSegments
         );
 
@@ -179,7 +279,7 @@ class Explosion extends EffectInstance {
         });
 
         this.shockwave = new THREE.Mesh(geometry, material);
-        this.shockwave.position.copy(this.origin).add(new THREE.Vector3(0, 0.1, 0)); 
+        this.shockwave.position.copy(this.origin).add(new THREE.Vector3(0, 0.1, 0));
         this.shockwave.rotation.x = -Math.PI / 2;
     }
 
@@ -214,7 +314,7 @@ class Explosion extends EffectInstance {
 
             const direction = new THREE.Vector3(
                 Math.random() - 0.5,
-                Math.random(), 
+                Math.random(),
                 Math.random() - 0.5
             ).normalize();
 
@@ -233,7 +333,7 @@ class Explosion extends EffectInstance {
             });
         }
     }
-    
+
     _animate() {
         if (!this.alive) return;
         this._animationFrameId = requestAnimationFrame(this._animate);
@@ -254,10 +354,10 @@ class Explosion extends EffectInstance {
                 this.light.visible = false;
             }
         }
-        
+
         if (this.shockwave && this.shockwave.visible) {
             const shockwaveLife = Math.min(elapsedTime / this.options.shockwaveDuration, 1.0);
-            
+
             const currentRadius = THREE.MathUtils.lerp(
                 this.options.shockwaveInitialRadius,
                 this.options.shockwaveMaxRadius * this.size,
@@ -316,7 +416,7 @@ class Explosion extends EffectInstance {
 
         if (this.light && this.scene) this.scene.remove(this.light);
         this.light = null;
-        
+
         if (this.shockwave) {
             if (this.scene) this.scene.remove(this.shockwave);
             this.shockwave.geometry.dispose();
@@ -347,7 +447,7 @@ class MuzzleFlash extends EffectInstance {
         super(scene);
         this.position = position.clone();
         this.direction = direction.clone();
-        
+
         // Default options
         this.options = {
             color: options.color || 0xffaa00,
@@ -358,36 +458,36 @@ class MuzzleFlash extends EffectInstance {
             particleSize: options.particleSize || 0.2,
             ...options
         };
-        
+
         this._createEffect();
-        
+
         setTimeout(() => {
             this.dispose();
         }, this.options.duration);
     }
-    
+
     _createEffect() {
         this.light = new THREE.PointLight(
-            this.options.color, 
-            this.options.intensity, 
+            this.options.color,
+            this.options.intensity,
             this.options.distance
         );
         this.light.position.copy(this.position);
         this.scene.add(this.light);
-        
+
         // Create particles
         const particleGeometry = new THREE.BufferGeometry();
         const posArray = new Float32Array(this.options.particleCount * 3);
-        
+
         for (let i = 0; i < this.options.particleCount; i++) {
             const i3 = i * 3;
             posArray[i3] = this.position.x + (Math.random() - 0.5) * 0.5;
             posArray[i3 + 1] = this.position.y + (Math.random() - 0.5) * 0.5;
             posArray[i3 + 2] = this.position.z + (Math.random() - 0.5) * 0.5;
         }
-        
+
         particleGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        
+
         const particleMaterial = new THREE.PointsMaterial({
             color: this.options.color,
             size: this.options.particleSize,
@@ -395,20 +495,20 @@ class MuzzleFlash extends EffectInstance {
             opacity: 0.8,
             blending: THREE.AdditiveBlending
         });
-        
+
         this.particles = new THREE.Points(particleGeometry, particleMaterial);
         this.scene.add(this.particles);
     }
-    
+
     dispose() {
         if (!this.alive) return;
         super.dispose();
-        
+
         if (this.light && this.scene) {
             this.scene.remove(this.light);
             this.light = null;
         }
-        
+
         if (this.particles && this.scene) {
             this.scene.remove(this.particles);
             if (this.particles.geometry) this.particles.geometry.dispose();

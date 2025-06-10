@@ -357,7 +357,6 @@ function startNewGame(tankTypeToUse) {
     disposeCurrentGame();
 
     try {
-        // MODIFIED: Pass the selected game mode to the Game constructor
         game = new Game({
             tankType: tankTypeToUse,
             gameMode: selectedGameMode
@@ -432,6 +431,10 @@ const masterVolumeSlider = document.getElementById('master-volume-slider');
 const musicVolumeSlider = document.getElementById('music-volume-slider');
 const sfxVolumeSlider = document.getElementById('sfx-volume-slider');
 const fogToggle = document.getElementById('fog-toggle');
+// NEW: Get the new toggle elements
+const cameraShakeToggle = document.getElementById('camera-shake-toggle');
+const minimapToggle = document.getElementById('minimap-toggle');
+
 const masterVolumeValue = document.getElementById('master-volume-value');
 const musicVolumeValue = document.getElementById('music-volume-value');
 const sfxVolumeValue = document.getElementById('sfx-volume-value');
@@ -442,16 +445,18 @@ openSettingsButton.addEventListener('click', () => {
     if (radioToCheck) {
         radioToCheck.checked = true;
     }
-    
-    // NEW: Day/Night Cycle settings
+
     const currentCycle = gameSettings.dayNightCycle;
     const cycleRadioToCheck = document.querySelector(`#day-night-options input[value="${currentCycle}"]`);
     if (cycleRadioToCheck) {
         cycleRadioToCheck.checked = true;
     }
 
-    // Set slider positions and text based on current gameSettings
+    // Set slider and toggle positions based on current gameSettings
     fogToggle.checked = gameSettings.fog;
+    cameraShakeToggle.checked = gameSettings.cameraShake; // NEW
+    minimapToggle.checked = gameSettings.showMinimap;     // NEW
+
     masterVolumeSlider.value = gameSettings.volumeMaster * 100;
     musicVolumeSlider.value = gameSettings.volumeMusic * 100;
     sfxVolumeSlider.value = gameSettings.volumeSfx * 100;
@@ -462,7 +467,6 @@ openSettingsButton.addEventListener('click', () => {
     settingsModal.style.display = 'flex';
 });
 
-// Real-time update listeners for sliders
 function createVolumeUpdater(slider, valueLabel, settingKey) {
     slider.addEventListener('input', () => {
         const volumePercentage = Math.round(slider.value);
@@ -479,21 +483,30 @@ createVolumeUpdater(masterVolumeSlider, masterVolumeValue, 'volumeMaster');
 createVolumeUpdater(musicVolumeSlider, musicVolumeValue, 'volumeMusic');
 createVolumeUpdater(sfxVolumeSlider, sfxVolumeValue, 'volumeSfx');
 
+// Listeners for instant-apply toggles
 fogToggle.addEventListener('change', () => {
     gameSettings.fog = fogToggle.checked;
     eventManager.notify(EVENT.FOG_SETTING_CHANGED, { enabled: gameSettings.fog });
 });
 
-// NEW: Add event listener for day/night cycle changes
+cameraShakeToggle.addEventListener('change', () => { // NEW
+    gameSettings.cameraShake = cameraShakeToggle.checked;
+    eventManager.notify(EVENT.SETTINGS_UPDATED);
+});
+
+minimapToggle.addEventListener('change', () => { // NEW
+    gameSettings.showMinimap = minimapToggle.checked;
+    eventManager.notify(EVENT.SETTINGS_UPDATED);
+});
+
 document.querySelectorAll('#day-night-options input[name="dayNightCycle"]').forEach(radio => {
     radio.addEventListener('change', (event) => {
         gameSettings.dayNightCycle = event.target.value;
-        // Notify systems immediately for instant change
         eventManager.notify(EVENT.SETTINGS_UPDATED);
     });
 });
 
-
+// "Apply" button saves all settings and closes the modal
 applySettingsButton.addEventListener('click', () => {
     const selectedQuality = document.querySelector('#quality-options input[name="quality"]:checked').value;
     let reloadNeeded = false;
@@ -503,12 +516,14 @@ applySettingsButton.addEventListener('click', () => {
         reloadNeeded = true;
     }
 
-    // Day/Night and Fog are applied instantly, but we save them here.
+    // All other settings are updated in real-time, but we save them here.
     gameSettings.dayNightCycle = document.querySelector('#day-night-options input[name="dayNightCycle"]:checked').value;
     gameSettings.fog = fogToggle.checked;
+    gameSettings.cameraShake = cameraShakeToggle.checked; // NEW
+    gameSettings.showMinimap = minimapToggle.checked;     // NEW
 
-    saveSettings(); // Save all current settings
-    eventManager.notify(EVENT.SETTINGS_UPDATED); // Ensure sound volumes are updated
+    saveSettings(); 
+    eventManager.notify(EVENT.SETTINGS_UPDATED); 
 
     settingsModal.style.display = 'none';
 
@@ -619,7 +634,6 @@ function setupEndGameScreenEvents() {
     document.getElementById('win-menu-button').addEventListener('click', () => returnToMainMenu(false));
 }
 
-// *** THIS IS THE CORRECTED FUNCTION ***
 export function startLoadingScreen() {
     if (document.getElementById('loading-screen')) return;
 
@@ -669,9 +683,8 @@ export function hideLoadingScreen() {
     }
 }
 document.addEventListener('DOMContentLoaded', () => {
-    // [FIXED] Load settings first, THEN notify all systems to update themselves.
     loadSettings();
-    eventManager.notify(EVENT.SETTINGS_UPDATED); // This tells SoundManager to apply loaded volumes.
+    eventManager.notify(EVENT.SETTINGS_UPDATED); 
 
     console.log("🎮 DOM loaded, waiting for user interaction...");
 
@@ -679,7 +692,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const enterScreen = document.getElementById('enter-screen');
     const menuContainer = document.getElementById('menu-container');
 
-    // ADDED: Game Mode Selection Logic
     const classicModeButton = document.getElementById('mode-classic-button');
     const endlessModeButton = document.getElementById('mode-endless-button');
     const modeDescriptionP = document.getElementById('game-mode-description');
@@ -721,6 +733,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const radioToCheck = document.querySelector(`#quality-options input[value="${gameSettings.quality}"]`);
             if (radioToCheck) radioToCheck.checked = true;
             fogToggle.checked = gameSettings.fog;
+            cameraShakeToggle.checked = gameSettings.cameraShake; // NEW
+            minimapToggle.checked = gameSettings.showMinimap;     // NEW
             masterVolumeSlider.value = gameSettings.volumeMaster * 100;
             musicVolumeSlider.value = gameSettings.volumeMusic * 100;
             sfxVolumeSlider.value = gameSettings.volumeSfx * 100;

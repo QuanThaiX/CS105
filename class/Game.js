@@ -10,10 +10,8 @@ import { CollisionManager } from './CollisionManager.js';
 import { EventManager } from './EventManager.js';
 import { ProjectilesManager } from './ProjectilesManager.js';
 import { Bot } from './Bot.js';
-import { Rock } from './Rock.js';
 import { Effect } from './EffectManager.js';
-import { Tree } from './Tree.js';
-import { Barrel } from './Barrel.js';
+import { Minimap } from './Minimap.js';
 import { SoundManager } from './SoundManager.js';
 import { SpawnManager } from './SpawnManager.js';
 import { Generator } from './Generator.js';
@@ -76,7 +74,7 @@ class Game {
   rocks = [];
   trees = [];
   barrels = [];
-
+  minimap;
   isCutscenePlaying = false;
   cutsceneClock;
   cutsceneCamStartPos;
@@ -84,7 +82,7 @@ class Game {
   gameMode;
 
   cycleClock;
-  dayDuration = 120; 
+  dayDuration = 120;
 
   boundHandlePlayerDie;
   boundHandleGameOver;
@@ -159,19 +157,19 @@ class Game {
     this.rocks = [];
     this.trees = [];
     this.barrels = [];
-    this.dynamicObjects = []; 
-    this.staticObjects = []; 
+    this.dynamicObjects = [];
+    this.staticObjects = [];
     this.scene = createScene();
     this.renderer = createRenderer();
     this.lights = createLights(this.scene);
     this.sky = createSky(this.scene);
     this.ground = createGround(this.scene, { width: this.gameConfig.WORLD_BOUNDARY, height: this.gameConfig.WORLD_BOUNDARY, repeatX: this.gameConfig.WORLD_BOUNDARY / 20, repeatY: this.gameConfig.WORLD_BOUNDARY / 20 });
     this.powerUpManager = new PowerUpManager();
-
+    this.minimap = new Minimap();
     if (Game.debug) {
       this.debugHelpers = createDebugHelpers(this.scene);
     }
-    
+
     // MODIFIED: Initial environment setup is now centralized
     this.applyEnvironmentSettings();
 
@@ -187,6 +185,11 @@ class Game {
     const { camera, controls } = createCamera(this.scene, this.playerTank.position, this.renderer);
     this.camera = camera;
     this.controls = controls;
+
+    // Initialize the camera shaker in EffectManager now that the camera exists
+    if (this.effectManager) {
+        this.effectManager.initCameraShaker(this.camera);
+    }
 
     EventManager.instance.notify(EVENT.TANK_SPAWNED, {
         tank: this.playerTank,
@@ -271,7 +274,7 @@ class Game {
     if (this.isRunning) {
         pauseScreen.style.display = 'none';
         EventManager.instance.notify(EVENT.GAME_RESUMED, { /* ... */ });
-        this._animate(); 
+        this._animate();
     } else {
         pauseScreen.style.display = 'flex';
         EventManager.instance.notify(EVENT.GAME_PAUSED, { /* ... */ });
@@ -296,12 +299,15 @@ class Game {
   handleSettingsUpdate() {
       console.log('⚙️ Game detected settings update. Applying changes...');
       this.applyEnvironmentSettings();
+      if (this.minimap) {
+          this.minimap.toggleVisibility(gameSettings.showMinimap);
+      }
   }
 
   // NEW: Applies environment settings based on gameSettings.
   applyEnvironmentSettings() {
       if (!this.scene || !this.sky || !this.lights) return;
-      
+
       switch(gameSettings.dayNightCycle) {
           case 'day':
               updateEnvironment(0, this.scene, this.sky, this.lights);
@@ -313,7 +319,7 @@ class Game {
               // The updateLogic loop will handle this. No immediate action needed.
               break;
       }
-      
+
       this.updateFog(); // Update fog based on new settings as well.
   }
 
@@ -563,12 +569,130 @@ class Game {
     };
   }
 
+ /**
+   * Tìm vị trí spawn an toàn cho tank mới
+   * @returns {Promise<Object|null>} Safe spawn position hoặc null nếu không tìm được
+   */
   async findSafeTankSpawnPosition() {
-    // ... (This function remains unchanged)
+    const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
+    const worldBoundary = this.gameConfig.WORLD_BOUNDARY;
+
+    for (let attempt = 0; attempt < respawnConfig.MAX_SPAWN_ATTEMPTS; attempt++) {
+      // Generate random position trong world boundary
+      const angle = Math.random() * Math.PI * 2;
+      const radius = this.generator.getRandomInRange(
+        respawnConfig.MIN_DISTANCE_FROM_PLAYER,
+        worldBoundary / 2 * 0.8
+      );
+
+      const x = radius * Math.cos(angle);
+      const z = radius * Math.sin(angle);
+      const candidatePosition = { x, y: 1, z };
+
+      // Check collision với tất cả objects hiện tại
+      if (await this.isPositionSafeForTank(candidatePosition, respawnConfig.TANK_SIZE, respawnConfig.MIN_DISTANCE_FROM_OBSTACLES)) {
+        return candidatePosition;
+      }
+    }
+
+    // Nếu không tìm được position an toàn, thử tạo ở vị trí backup
+    console.warn("⚠️ Could not find safe position, trying backup positions");
+    const backupPositions = [
+      { x: -100, y: 1, z: -100 },
+      { x: 100, y: 1, z: -100 },
+      { x: -100, y: 1, z: 100 },
+      { x: 100, y: 1, z: 100 },
+      { x: 0, y: 1, z: -150 },
+      { x: 0, y: 1, z: 150 },
+      { x: -150, y: 1, z: 0 },
+      { x: 150, y: 1, z: 0 }
+    ];
+
+    const respawnConfigLocal = this.gameConfig.ENEMY_CONFIG.RESPAWN;
+    for (const backupPos of backupPositions) {
+      if (await this.isPositionSafeForTank(backupPos, respawnConfigLocal.TANK_SIZE, respawnConfigLocal.MIN_DISTANCE_FROM_OBSTACLES)) {
+        console.log("✅ Using backup position for tank spawn");
+        return backupPos;
+      }
+    }
+
+    return null; // Không tìm được vị trí nào an toàn
   }
 
+  /**
+   * Kiểm tra xem vị trí có an toàn cho tank spawn không
+   * @param {Object} position - Position to check {x, y, z}
+   * @param {number} tankSize - Tank size for collision checking
+   * @param {number} minDistance - Minimum distance from obstacles
+   * @returns {Promise<boolean>} True nếu position an toàn
+   */
   async isPositionSafeForTank(position, tankSize, minDistance) {
-    // ... (This function remains unchanged)
+    const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
+    const posVector = new THREE.Vector3(position.x, position.y, position.z);
+
+    // Check distance from player
+    if (this.playerTank) {
+      const playerPos = this.playerTank.position;
+      const distanceFromPlayer = posVector.distanceTo(playerPos);
+      if (distanceFromPlayer < respawnConfig.MIN_DISTANCE_FROM_PLAYER) {
+        return false;
+      }
+    }
+
+    // Check distance from other enemy tanks
+    for (const enemy of this.enemies) {
+      if (enemy && !enemy.disposed) {
+        const distanceFromEnemy = posVector.distanceTo(enemy.position);
+        if (distanceFromEnemy < minDistance * 2) { // Double distance cho tanks
+          return false;
+        }
+      }
+    }
+
+    // Check distance from rocks
+    if (this.rocks) {
+      for (const rock of this.rocks) {
+        if (rock && !rock.disposed) {
+          const distanceFromRock = posVector.distanceTo(rock.position);
+          if (distanceFromRock < minDistance) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // Check distance from trees
+    if (this.trees) {
+      for (const tree of this.trees) {
+        if (tree && !tree.disposed) {
+          const distanceFromTree = posVector.distanceTo(tree.position);
+          if (distanceFromTree < minDistance) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // Check distance from barrels
+    if (this.barrels) {
+      for (const barrel of this.barrels) {
+        if (barrel && !barrel.disposed) {
+          const distanceFromBarrel = posVector.distanceTo(barrel.position);
+          if (distanceFromBarrel < minDistance) {
+            return false;
+          }
+        }
+      }
+    }
+
+    // Check world boundaries
+    const boundary = this.gameConfig.WORLD_BOUNDARY / 2;
+    if (Math.abs(position.x) > boundary - tankSize ||
+        Math.abs(position.z) > boundary - tankSize) {
+      return false;
+    }
+
+    return true; // Position an toàn
   }
 
   isWin() {
@@ -622,14 +746,12 @@ class Game {
   }
 
   updateLogic() {
-    // NEW: Handle dynamic day/night cycle
     if (gameSettings.dayNightCycle === 'dynamic') {
         const elapsedTime = this.cycleClock.getElapsedTime();
         const cycleProgress = (elapsedTime % this.dayDuration) / this.dayDuration;
-        const nightToDayProgress = Math.abs(Math.sin(cycleProgress * Math.PI)); // Creates a smooth loop from 0 -> 1 -> 0
+        const nightToDayProgress = Math.abs(Math.sin(cycleProgress * Math.PI));
         updateEnvironment(nightToDayProgress, this.scene, this.sky, this.lights);
     }
-
 
     const prevPlayerPos = this.playerTank.position.clone();
 
@@ -639,29 +761,22 @@ class Game {
     this.projectilesManager.update();
     this.powerUpManager.update();
     this.playerTank.update();
-    // AFTER: Loop only over dynamic objects
+    this.minimap.update();
+
     for (let i = this.dynamicObjects.length - 1; i >= 0; i--) {
         const obj = this.dynamicObjects[i];
-
         if (obj.isDestroyed) {
-            // If it's an enemy tank, also remove from the enemies list for HUD/AI purposes
             if (obj instanceof Tank && obj.faction === FACTION.ENEMY) {
                 const enemyIndex = this.enemies.indexOf(obj);
                 if (enemyIndex > -1) this.enemies.splice(enemyIndex, 1);
             }
             this.dynamicObjects.splice(i, 1);
-            continue; // Skip to the next object
+            continue;
         }
-        
-        // Only call update if the object actually has the method and isn't disposed
         if (obj && !obj.disposed && typeof obj.update === 'function') {
             obj.update();
         }
       }
-
-    this.bot.update();
-    this.collisionManager.update();
-    this.projectilesManager.update();
 
     const newPlayerPos = this.playerTank.position.clone();
     const delta = new THREE.Vector3().subVectors(newPlayerPos, prevPlayerPos);
@@ -671,14 +786,19 @@ class Game {
     this.controls.update();
 
     updateShadowArea(this.lights.directionalLight, playerPos);
+
+    // Update the camera shaker last, after all other camera manipulations
+    if (this.effectManager) {
+        this.effectManager.update();
+    }
   }
 
   _updateCutscene() {
     const elapsedTime = this.cutsceneClock.getElapsedTime();
-    const cutsceneDuration = 4.0; 
+    const cutsceneDuration = 4.0;
 
     if (!this.cutsceneCamStartPos || !this.playerTank) {
-        this.isCutscenePlaying = false; 
+        this.isCutscenePlaying = false;
         return;
     }
 
@@ -687,24 +807,24 @@ class Game {
 
     const playerPos = this.playerTank.position;
     const endPos = new THREE.Vector3(playerPos.x, playerPos.y + 10, playerPos.z + 15);
-    
+
     this.camera.position.lerpVectors(this.cutsceneCamStartPos, endPos, easedProgress);
 
     const startTarget = new THREE.Vector3(0, 0, 0);
     const endTarget = new THREE.Vector3(playerPos.x, playerPos.y + 1, playerPos.z);
     this.controls.target.lerpVectors(startTarget, endTarget, easedProgress);
-    
-    this.controls.update(); 
+
+    this.controls.update();
 
     if (progress >= 1.0) {
         this.isCutscenePlaying = false;
-        this.controls.target.copy(endTarget); 
-        this.controls.enabled = true; 
-        
+        this.controls.target.copy(endTarget);
+        this.controls.enabled = true;
+
         EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
             message: 'GO!',
             duration: 1500,
-            type: 'heal', 
+            type: 'heal',
         });
     }
   }
@@ -734,7 +854,7 @@ class Game {
     if (this.trees) { this.trees.forEach(o => o.dispose()); this.trees = []; }
     if (this.barrels) { this.barrels.forEach(o => o.dispose()); this.barrels = []; }
     if (this.enemies) { this.enemies.forEach(o => o.dispose()); this.enemies = []; }
-    
+
     this.initGame();
   }
 
@@ -789,12 +909,12 @@ class Game {
 
   start() {
     if (this.isRunning) return;
-    
+
     startLoadingScreen();
 
     setTimeout(() => {
         this.isRunning = true;
-        
+
         EventManager.instance.notify(EVENT.GAME_STARTED, {
             playerTank: this.playerTank,
             score: this.score,
@@ -803,7 +923,7 @@ class Game {
             levelConfig: this.gameConfig,
             gameMode: this.gameMode
         });
-        
+
         if (this.playerTank && this.camera) {
             this.isCutscenePlaying = true;
             this.cutsceneClock.start();
@@ -818,7 +938,7 @@ class Game {
         this._animate();
         hideLoadingScreen();
 
-    }, 1500); 
+    }, 1500);
   }
 
   stop() {
@@ -885,6 +1005,7 @@ class Game {
     this.camera = null;
     if (this.controls) { this.controls.dispose(); this.controls = null; }
     this.lights = null; this.sky = null; this.ground = null; this.debugHelpers = null;
+    if (this.minimap) { this.minimap.dispose(); this.minimap = null; }
     if (this.bot) { this.bot.dispose(); this.bot = null; }
     if (this.collisionManager) { this.collisionManager.dispose(); this.collisionManager = null; }
     if (this.effectManager) { this.effectManager.dispose(); this.effectManager = null; }

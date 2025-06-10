@@ -352,7 +352,11 @@ class Barrel extends GameObject {
                 } else if (object.hp !== undefined) {
                     object.hp = Math.max(0, object.hp - damage);
                 }
-                
+                if (object.applyKnockback && typeof object.applyKnockback === 'function') {
+                    const direction = new THREE.Vector3().subVectors(object.position, this.position).normalize();
+                    const force = this.explosionForce * damageMultiplier; // Force is stronger closer to the blast
+                    object.applyKnockback(direction, force);
+                }
                 EventManager.instance.notify(EVENT.EXPLOSION_DAMAGE, {
                     source: this,
                     target: object,
@@ -468,7 +472,7 @@ class Barrel extends GameObject {
 
 
 
-        const shockwaveGeometry = new THREE.RingGeometry(20, 20.2, 64);
+        const shockwaveGeometry = new THREE.RingGeometry(15, 15.2, 64);
         const shockwaveMaterial = new THREE.MeshBasicMaterial({
             color: 0xffd700,
             transparent: true,

@@ -1,6 +1,6 @@
 // ./class/UIManager.js
 import { EventManager } from './EventManager.js';
-import { EVENT } from '../utils.js';
+import { EVENT, FACTION } from '../utils.js';
 
 class UIManager {
     static instance;
@@ -10,7 +10,6 @@ class UIManager {
             return UIManager.instance;
         }
         UIManager.instance = this;
-
         // Find or create the message container
         this.messageContainer = document.getElementById('message-container');
         if (!this.messageContainer) {
@@ -20,12 +19,20 @@ class UIManager {
             console.warn('UIManager: #message-container was not found in HTML. A new one has been created.');
         }
 
+        this.killFeedContainer = document.getElementById('kill-feed-container');
+        if (!this.killFeedContainer) {
+            this.killFeedContainer = document.createElement('div');
+            this.killFeedContainer.id = 'kill-feed-container';
+            document.getElementById('hud')?.appendChild(this.killFeedContainer);
+        }
+
         this.subscribeToEvents();
         console.log('✅ UI Manager initialized and listening for events.');
     }
 
     subscribeToEvents() {
         EventManager.instance.subscribe(EVENT.UI_SHOW_MESSAGE, this.handleShowMessage.bind(this));
+        EventManager.instance.subscribe(EVENT.TANK_DESTROYED, this.handleKillFeedUpdate.bind(this));
     }
 
     /**
@@ -37,6 +44,7 @@ class UIManager {
      */
     handleShowMessage(data) {
         if (!this.messageContainer) return;
+    
         const { message, duration = 1000, type = 'info' } = data;
 
         // Create the message element
@@ -55,6 +63,62 @@ class UIManager {
                 }
             }, 500); 
         }, duration);
+    }
+    
+    /**
+     * NEW: Handles TANK_DESTROYED to display a kill feed message.
+     * @param {object} data - The event data.
+     * @param {Tank} data.tank - The tank that was destroyed.
+     * @param {GameObject} data.killer - The object that got the kill.
+     */
+    handleKillFeedUpdate(data) {
+        if (!this.killFeedContainer) return;
+        
+        const { tank: victim, killer } = data;
+        if (!victim) return;
+
+        let killerName = 'The Environment';
+        let killerFaction = FACTION.NEUTRAL;
+        let victimName = victim.id;
+        
+        if (killer) {
+            killerName = (killer.faction === FACTION.PLAYER) ? 'Player' : killer.id;
+            killerFaction = killer.faction;
+        }
+        
+        if (victim.faction === FACTION.PLAYER) {
+            victimName = 'Player';
+        }
+
+        const killFeedElement = document.createElement('div');
+        killFeedElement.className = 'kill-feed-item';
+        
+        const killerSpan = document.createElement('span');
+        killerSpan.textContent = killerName;
+        killerSpan.className = `killer faction-${killerFaction}`;
+        
+        const victimSpan = document.createElement('span');
+        victimSpan.textContent = victimName;
+        victimSpan.className = `victim faction-${victim.faction}`;
+
+        const iconSpan = document.createElement('span');
+        iconSpan.className = 'kill-icon';
+        iconSpan.innerHTML = '💥';
+
+        killFeedElement.appendChild(killerSpan);
+        killFeedElement.appendChild(iconSpan);
+        killFeedElement.appendChild(victimSpan);
+
+        this.killFeedContainer.prepend(killFeedElement);
+
+        setTimeout(() => {
+            killFeedElement.classList.add('fade-out');
+            setTimeout(() => {
+                if (killFeedElement.parentNode) {
+                    this.killFeedContainer.removeChild(killFeedElement);
+                }
+            }, 1000);
+        }, 5000);
     }
 }
 

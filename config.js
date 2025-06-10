@@ -50,7 +50,10 @@ const QUALITY_SETTINGS_PROFILES = {
 export const gameSettings = {
     quality: QUALITY.MEDIUM,
     fog: true,
-    dayNightCycle: 'day', // NEW: Added setting, default to 'day'
+    dayNightCycle: 'day',
+    // NEW SETTINGS with default values
+    cameraShake: true,
+    showMinimap: true,
     volumeMaster: 0.8,
     volumeMusic: 0.8,
     volumeSfx: 0.5,
@@ -65,12 +68,16 @@ export function loadSettings() {
             gameSettings.quality = parsed.quality;
         }
 
-        // NEW: Load the day/night cycle setting
         if (['day', 'night', 'dynamic'].includes(parsed.dayNightCycle)) {
             gameSettings.dayNightCycle = parsed.dayNightCycle;
         }
 
         gameSettings.fog = parsed.fog ?? QUALITY_SETTINGS_PROFILES[gameSettings.quality].useFog;
+        
+        // NEW: Load camera shake and minimap settings, defaulting to true if not found
+        gameSettings.cameraShake = parsed.cameraShake ?? true;
+        gameSettings.showMinimap = parsed.showMinimap ?? true;
+        
         gameSettings.volumeMaster = parsed.volumeMaster ?? 0.8;
         gameSettings.volumeMusic = parsed.volumeMusic ?? 0.8;
         gameSettings.volumeSfx = parsed.volumeSfx ?? 0.5;
@@ -109,7 +116,7 @@ export const GAMECONFIG = Object.freeze({
             RADIUS: 0.5,
             PUSH_FORCE: 500,
             SOUND_VOLUME: 0.8,
-            PARTICLE_COUNT: 100,
+            PARTICLE_COUNT: 50,
             CHAIN_REACTION: true
         },
         MIN_SPAWN_RADIUS: 90,
@@ -119,7 +126,6 @@ export const GAMECONFIG = Object.freeze({
         NUM_ENEMIES:5,
         ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003,
              TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006, TANKTYPE.V007, TANKTYPE.V008],
-        // --- FIX: Switched to using type.name for robust comparison ---
         ENEMY_POINT_VALUE: (type) => {
             switch(type.name) {
                 case TANKTYPE.V001.name: return 100;
@@ -133,7 +139,6 @@ export const GAMECONFIG = Object.freeze({
                 default: return 50;
             }
         },
-        // --- FIX: Switched to using type.name for robust comparison ---
         ENEMY_HP: (type) => {
             switch(type.name) {
                 case TANKTYPE.V001.name: return 100;

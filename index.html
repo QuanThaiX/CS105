@@ -96,10 +96,21 @@
     <!-- Game Container -->
     <div id="game-container">
         <div id="hud">
-            <div id="hp">HP: 0</div>
-            <div id="score">Score: 0</div>
-            <div id="high-score">High Score: 0</div>
+            <div id="player-stats">
+                <div id="hp">HP: 0</div>
+                <div id="score">Score: 0</div>
+                <div id="high-score">High Score: 0</div>
+            </div>
+            
+            <!-- NEW: Mini-map container -->
+            <div id="minimap-container">
+                <canvas id="minimap-canvas" width="200" height="200"></canvas>
+            </div>
+
+            <!-- NEW: Kill feed container -->
+            <div id="kill-feed-container"></div>
         </div>
+
     </div>
 <div id="pause-screen" class="endgame-screen" style="display: none;">
     <div class="endgame-content">
@@ -163,8 +174,7 @@
                 </label>
             </div>
         </div>
-        
-        <!-- NEW: Day/Night Cycle Setting -->
+
         <div class="setting-item">
             <h3>Time of Day</h3>
             <p class="setting-description">Set the time of day or enable a dynamic cycle. Changes are applied instantly.</p>
@@ -183,7 +193,31 @@
                 </label>
             </div>
         </div>
+        
+        <!-- NEW: Camera Shake Setting -->
+        <div class="setting-item">
+            <h3>Enable Camera Shake</h3>
+            <p class="setting-description">Adds a shaking effect during explosions and firing for better impact.</p>
+            <div class="options-group">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="camera-shake-toggle">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
 
+        <!-- NEW: Minimap Setting -->
+        <div class="setting-item">
+            <h3>Show Minimap</h3>
+            <p class="setting-description">Displays a top-down map of the battlefield in the corner of the screen.</p>
+            <div class="options-group">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="minimap-toggle">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+        
         <div class="setting-item">
             <h3>Enable Fog</h3>
             <p class="setting-description">Adds atmospheric fog for depth. Can be toggled on/off instantly during gameplay.</p>

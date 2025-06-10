@@ -71,6 +71,7 @@ class Bullet extends GameObject{
 
     const light = new THREE.PointLight(this.color, 20, 20); // Light matches the bullet color
     light.position.set(0, 0, 0);
+    // light.castShadow = true;
     mesh.add(light);
 
     return mesh;
