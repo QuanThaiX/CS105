@@ -159,14 +159,14 @@ class Game {
     this.rocks = [];
     this.trees = [];
     this.barrels = [];
-    this.updatableObjects = [];
+    this.dynamicObjects = []; 
+    this.staticObjects = []; 
     this.scene = createScene();
     this.renderer = createRenderer();
     this.lights = createLights(this.scene);
     this.sky = createSky(this.scene);
     this.ground = createGround(this.scene, { width: this.gameConfig.WORLD_BOUNDARY, height: this.gameConfig.WORLD_BOUNDARY, repeatX: this.gameConfig.WORLD_BOUNDARY / 20, repeatY: this.gameConfig.WORLD_BOUNDARY / 20 });
     this.powerUpManager = new PowerUpManager();
-
 
     if (Game.debug) {
       this.debugHelpers = createDebugHelpers(this.scene);
@@ -222,7 +222,10 @@ class Game {
       this.rocks = await this.generator.createRocks(levelData.rockDefinitions, this.collisionManager);
       this.trees = await this.generator.createTrees(levelData.treeDefinitions, this.collisionManager);
       this.barrels = await this.generator.createBarrels(levelData.barrelDefinitions, this.collisionManager);
-      this.updatableObjects.push(this.playerTank, ...this.enemies, ...this.trees, ...this.rocks, ...this.barrels);
+      this.dynamicObjects.push(this.playerTank, ...this.enemies);
+      this.dynamicObjects.push(...this.barrels);
+      this.staticObjects.push(...this.trees, ...this.rocks);
+
       console.log('✅ Async level generation completed!');
 
       this.rocks.forEach(rock => this.spawnManager.markOccupied(rock.position, 5));
@@ -481,7 +484,7 @@ class Game {
       this.totalEnemiesSpawned++;
 
       this.enemies.push(newEnemyTank);
-      this.updatableObjects.push(newEnemyTank);
+      this.dynamicObjects.push(newEnemyTank);
       this.bot.addTank(newEnemyTank);
       this.collisionManager.add(newEnemyTank);
 
@@ -636,22 +639,25 @@ class Game {
     this.projectilesManager.update();
     this.powerUpManager.update();
     this.playerTank.update();
-    for (let i = this.updatableObjects.length - 1; i >= 0; i--) {
-        const obj = this.updatableObjects[i];
+    // AFTER: Loop only over dynamic objects
+    for (let i = this.dynamicObjects.length - 1; i >= 0; i--) {
+        const obj = this.dynamicObjects[i];
 
         if (obj.isDestroyed) {
+            // If it's an enemy tank, also remove from the enemies list for HUD/AI purposes
             if (obj instanceof Tank && obj.faction === FACTION.ENEMY) {
                 const enemyIndex = this.enemies.indexOf(obj);
                 if (enemyIndex > -1) this.enemies.splice(enemyIndex, 1);
             }
-            this.updatableObjects.splice(i, 1);
-            continue;
+            this.dynamicObjects.splice(i, 1);
+            continue; // Skip to the next object
         }
-
+        
+        // Only call update if the object actually has the method and isn't disposed
         if (obj && !obj.disposed && typeof obj.update === 'function') {
             obj.update();
         }
-    }
+      }
 
     this.bot.update();
     this.collisionManager.update();

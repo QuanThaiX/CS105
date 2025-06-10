@@ -28,7 +28,7 @@ export class PowerUpManager {
             for (let i = 0; i < maxPoolSize; i++) {
                 const powerUp = new PowerUp(`powerup-${type.name}-${i}`, type);
                 this.powerUpPool.push(powerUp);
-                this.game.updatableObjects.push(powerUp);
+                this.game.dynamicObjects.push(powerUp); 
             }
         }
         console.log(`✅ Power-Up Pool created with ${this.powerUpPool.length} objects.`);

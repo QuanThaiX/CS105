@@ -78,7 +78,7 @@ const EXPLOSION_DEFAULTS = {
     addShockwave: true,
     shockwaveColor: 0xffffff,
     shockwaveDuration: 0.8, 
-    shockwaveInitialRadius: 0.2, 
+    shockwaveInitialRadius: 2.2, 
     shockwaveMaxRadius: 15, 
     shockwaveThickness: 1.5, 
 };
@@ -166,8 +166,8 @@ class Explosion extends EffectInstance {
     
     _createShockwave() {
         const geometry = new THREE.RingGeometry(
-            this.options.shockwaveInitialRadius, // innerRadius
-            this.options.shockwaveInitialRadius - this.options.shockwaveThickness * this.size,
+            this.options.shockwaveInitialRadius * this.size, // innerRadius
+            this.options.shockwaveInitialRadius * this.size + 0.2, // outerRadius
             64 // thetaSegments
         );
 

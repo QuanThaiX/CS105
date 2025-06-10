@@ -12,7 +12,7 @@ import { Bullet } from './Bullet.js';
 
 class CollisionManager {
   static instance;
-
+  _reusableBox3 = new THREE.Box3();
   dynamicObjects;
   staticObjects;
   objectsMap; 
@@ -160,23 +160,24 @@ class CollisionManager {
 
 
     update() {
-        if (!this.worker) return;
+      if (!this.worker) return;
 
-        const dynamicPayload = [];
-        for (const obj of this.dynamicObjects) {
-            if (obj.model && !obj.disposed) {
-                const bbox = this.createScaledBoundingBox(obj);
-                if (bbox) {
-                    dynamicPayload.push({
-                        id: obj.id,
-                        bbox: {
-                            min: { x: bbox.min.x, y: bbox.min.y, z: bbox.min.z },
-                            max: { x: bbox.max.x, y: bbox.max.y, z: bbox.max.z }
-                        }
-                    });
-                }
-            }
-        }
+      const dynamicPayload = [];
+      for (const obj of this.dynamicObjects) {
+          if (obj.model && !obj.disposed) {
+              // Re-use the same Box3 object to avoid creating new ones
+              this.createScaledBoundingBox(obj, this._reusableBox3);
+              if (this._reusableBox3 && !this._reusableBox3.isEmpty()) {
+                  dynamicPayload.push({
+                      id: obj.id,
+                      bbox: {
+                          min: { x: this._reusableBox3.min.x, y: this._reusableBox3.min.y, z: this._reusableBox3.min.z },
+                          max: { x: this._reusableBox3.max.x, y: this._reusableBox3.max.y, z: this._reusableBox3.max.z }
+                      }
+                  });
+              }
+          }
+      }
 
         if (!this.staticObjectsSent) {
             // First frame: send everything
@@ -227,7 +228,24 @@ class CollisionManager {
           }
       }
   }
-
+  createScaledBoundingBox(obj, targetBox = new THREE.Box3()) {
+    if (!obj.model) return null;
+    
+    targetBox.setFromObject(obj.model);
+    const scale = this.getHitboxScale(obj);
+    
+    if (scale.x !== 1.0 || scale.y !== 1.0 || scale.z !== 1.0) {
+      const center = new THREE.Vector3();
+      const size = new THREE.Vector3();
+      targetBox.getCenter(center);
+      targetBox.getSize(size);
+      
+      const newSize = new THREE.Vector3(size.x * scale.x, size.y * scale.y, size.z * scale.z);
+      targetBox.setFromCenterAndSize(center, newSize);
+    }
+    
+    return targetBox;
+  }
   isPositionValid(position, objectSize, excludeObjects = []) {
     const testBox = new THREE.Box3().setFromCenterAndSize(
       position,

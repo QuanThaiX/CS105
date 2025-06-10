@@ -1,0 +1,14 @@
+{
+  "name": "tank-battleground",
+  "version": "1.0.0",
+  "description": "3D Tank Battle Simulation",
+  "type": "module",
+  "scripts": {
+    "start": "live-server"
+  },
+  "author": "NULL",
+  "license": "ISC",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}

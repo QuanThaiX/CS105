@@ -39,7 +39,11 @@ class Tank extends GameObject {
   indicatorLight;
   activePowerUps;
   originalStats;
-
+  _forward = new THREE.Vector3(0, 0, 1);
+  _backward = new THREE.Vector3(0, 0, -1);
+  _bulletPosition = new THREE.Vector3();
+  _bulletDirection = new THREE.Vector3(0, 0, 1);
+  _hoverTime = 0;
   isHoverTank = false;
   initialY = 0;
   constructor(id, faction, position, isCollision, tankType = TANKTYPE.V001) {
@@ -190,9 +194,13 @@ class Tank extends GameObject {
         EventManager.instance.notify(EVENT.PLAYER_MOVE, { isMoving: true });
       }
       this.prevPosition.copy(this.position);
-      const forward = new THREE.Vector3(0, 0, 1);
-      forward.applyQuaternion(this.model.quaternion);
-      this.model.position.add(forward.multiplyScalar(distance));
+
+      // BEFORE: const forward = new THREE.Vector3(0, 0, 1);
+      // AFTER: Reuse the helper vector
+      this._forward.set(0, 0, 1);
+      this._forward.applyQuaternion(this.model.quaternion);
+      this.model.position.add(this._forward.multiplyScalar(distance));
+      
       this.position.copy(this.model.position);
     }
   }
@@ -205,9 +213,13 @@ class Tank extends GameObject {
         EventManager.instance.notify(EVENT.PLAYER_MOVE, { isMoving: true });
       }
       this.prevPosition.copy(this.position);
-      const backward = new THREE.Vector3(0, 0, -1);
-      backward.applyQuaternion(this.model.quaternion);
-      this.model.position.add(backward.multiplyScalar(distance));
+      
+      // BEFORE: const backward = new THREE.Vector3(0, 0, -1);
+      // AFTER: Reuse the helper vector
+      this._backward.set(0, 0, -1);
+      this._backward.applyQuaternion(this.model.quaternion);
+      this.model.position.add(this._backward.multiplyScalar(distance));
+
       this.position.copy(this.model.position);
     }
   }
@@ -244,8 +256,7 @@ class Tank extends GameObject {
 
     if (this.model) {
       // Lấy vị trí gốc của đạn từ vị trí tank
-      const bulletPosition = this.model.position.clone();
-
+this._bulletPosition.copy(this.model.position);
       // Thiết lập offset cho vị trí đạn dựa vào loại tank
       let bulletOffsetY = 1.2; // Offset Y mặc định
       let bulletOffsetZ = 4;   // Offset Z mặc định (phía trước tank)
@@ -285,23 +296,21 @@ class Tank extends GameObject {
         bulletOffsetY = 1.5;
         bulletOffsetZ = 4.2;
       }
-      bulletPosition.y += bulletOffsetY;
+      this._bulletPosition.y += bulletOffsetY;
 
       // Tính toán hướng và áp dụng offset Z
-      const forward = new THREE.Vector3(0, 0, 1)
-        .applyQuaternion(this.model.quaternion)
-        .normalize();
-      bulletPosition.add(forward.clone().multiplyScalar(bulletOffsetZ));
-
-      this.lastShotTime = currentTime;
+      this._bulletDirection.set(0, 0, 1).applyQuaternion(this.model.quaternion).normalize();
+    this._bulletPosition.add(this._bulletDirection.clone().multiplyScalar(bulletOffsetZ));
+    
+    this.lastShotTime = currentTime;
       if (this.reloadBar) {
         this.reloadBar.startReload();
       }
       if (this.tankType === TANKTYPE.V009) {
         EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
           tank: this,
-          position: bulletPosition,
-          direction: forward.clone(),
+          position: this._bulletPosition, 
+          direction: this._bulletDirection, 
           speed: 0.5,
           color: COLOR.cyan
         });
@@ -309,16 +318,16 @@ class Tank extends GameObject {
       } else if (this.tankType === TANKTYPE.V010) {
         EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
           tank: this,
-          position: bulletPosition,
-          direction: forward.clone(),
+          position: this._bulletPosition,
+          direction: this._bulletDirection,
           speed: 0.5,
           color: COLOR.cyan
         });
       } else if (this.tankType === TANKTYPE.V011) {
         EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
           tank: this,
-          position: bulletPosition,
-          direction: forward.clone(),
+          position: this._bulletPosition,
+          direction: this._bulletDirection,
           speed: 0.5,
           color: COLOR.purple
         });
@@ -326,8 +335,8 @@ class Tank extends GameObject {
       else {
         EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
           tank: this,
-          position: bulletPosition,
-          direction: forward.clone(),
+          position: this._bulletPosition,
+          direction: this._bulletDirection,
           speed: 0.5,
           color: COLOR.orange
         });
@@ -620,7 +629,12 @@ class Tank extends GameObject {
   }
 
   update() {
-    const time = performance.now() * 0.001;
+    this._hoverTime = performance.now() * 0.001;
+    if (this.isHoverTank && this.model) {
+      this.model.position.y = this.initialY + Math.sin(this._hoverTime * 2) * 0.1;
+      this.model.rotation.x = Math.sin(this._hoverTime * 1.5) * 0.02;
+      this.model.rotation.z = Math.cos(this._hoverTime * 1.2) * 0.02;
+    }
     if (this.isHoverTank && this.model) {
 
       this.model.position.y = this.initialY + Math.sin(time * 2) * 0.1;

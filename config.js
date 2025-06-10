@@ -109,7 +109,7 @@ export const GAMECONFIG = Object.freeze({
             RADIUS: 0.5,
             PUSH_FORCE: 500,
             SOUND_VOLUME: 0.8,
-            PARTICLE_COUNT: 50,
+            PARTICLE_COUNT: 100,
             CHAIN_REACTION: true
         },
         MIN_SPAWN_RADIUS: 90,

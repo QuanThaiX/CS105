@@ -468,7 +468,7 @@ class Barrel extends GameObject {
 
 
 
-        const shockwaveGeometry = new THREE.RingGeometry(1, 1.2, 64);
+        const shockwaveGeometry = new THREE.RingGeometry(20, 20.2, 64);
         const shockwaveMaterial = new THREE.MeshBasicMaterial({
             color: 0xffd700,
             transparent: true,
