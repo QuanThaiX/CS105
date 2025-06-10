@@ -790,11 +790,12 @@ class Game {
     if (this.effectManager) {
         this.effectManager.update();
     }
+
   }
 
   _updateCutscene() {
     const elapsedTime = this.cutsceneClock.getElapsedTime();
-    const cutsceneDuration = 4.0;
+    const cutsceneDuration = 6.0;
 
     if (!this.cutsceneCamStartPos || !this.playerTank) {
         this.isCutscenePlaying = false;

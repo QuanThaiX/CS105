@@ -6,7 +6,6 @@ class Vec3 {
     copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this; }
 }
 
-// --- Worker State ---
 let projectiles = new Map();
 let config = {
     lifeTime: 5000,
@@ -59,14 +58,12 @@ function tick() {
         p.position.y += p.velocity.y;
         p.position.z += p.velocity.z;
 
-        // 2. Check for removal conditions (lifetime or out of bounds)
         const isExpired = now - p.creationTime > config.lifeTime;
         const isOutOfBounds = Math.abs(p.position.x) > boundary || Math.abs(p.position.z) > boundary || p.position.y < -10;
 
         if (isExpired || isOutOfBounds) {
             removals.push(p.id);
         } else {
-            // 3. If still active, add to the update payload for the main thread
             updates.push({
                 id: p.id,
                 newPosition: { x: p.position.x, y: p.position.y, z: p.position.z }

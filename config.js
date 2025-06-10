@@ -96,25 +96,25 @@ export function saveSettings() {
 
 export const GAMECONFIG = Object.freeze({
     DEBUG: false,
-    WORLD_BOUNDARY: 400,
+    WORLD_BOUNDARY: 500,
     QUALITY_PROFILES: QUALITY_SETTINGS_PROFILES,
     SCENERY: {
-        NUM_ROCKS: 60,
+        NUM_ROCKS: 70,
         ROCK_TYPES: ['rock09', 'rock13'],
         ROCK_SCALE_MIN: 3.0,
         ROCK_SCALE_MAX: 12,
-        NUM_TREES: 60,
+        NUM_TREES: 70,
         TREE_TYPES: ['tree01'],
         TREE_SCALE_MIN: 0.9,
         TREE_SCALE_MAX: 2.9,
-        NUM_BARRELS: 20,
+        NUM_BARRELS: 15,
         BARREL_TYPES: ['barrel'],
         BARREL_SCALE_MIN: 3.5,
         BARREL_SCALE_MAX: 4.5,
         BARREL_EXPLOSION: {
             DAMAGE: 150,
             RADIUS: 10,
-            PUSH_FORCE: 500,
+            PUSH_FORCE: 250,
             SOUND_VOLUME: 0.8,
             PARTICLE_COUNT: 50,
             CHAIN_REACTION: true
@@ -123,9 +123,9 @@ export const GAMECONFIG = Object.freeze({
         MAX_SPAWN_RADIUS_FACTOR: 1.,
     },
     ENEMY_CONFIG: {
-        NUM_ENEMIES:4,
+        NUM_ENEMIES:3,
         ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003,
-             TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006, TANKTYPE.V007, TANKTYPE.V008],
+             TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006, TANKTYPE.V007],
         ENEMY_POINT_VALUE: (type) => {
             switch(type.name) {
                 case TANKTYPE.V001.name: return 100;
@@ -135,7 +135,6 @@ export const GAMECONFIG = Object.freeze({
                 case TANKTYPE.V005.name: return 200;
                 case TANKTYPE.V006.name: return 250;
                 case TANKTYPE.V007.name: return 200;
-                case TANKTYPE.V008.name: return 260;
                 default: return 50;
             }
         },
@@ -148,8 +147,6 @@ export const GAMECONFIG = Object.freeze({
                 case TANKTYPE.V005.name: return 180;
                 case TANKTYPE.V006.name: return 350;
                 case TANKTYPE.V007.name: return 230;
-                case TANKTYPE.V008.name: return 230;
-                case TANKTYPE.V009.name: return 360;
                 default: return 150;
             }
         },

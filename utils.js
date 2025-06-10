@@ -251,8 +251,8 @@ const TANK_STATS = Object.freeze({
     V011: {
         hp: 600,
         maxHp: 600,
-        moveSpeed: 0.2,
-        rotateSpeed: 0.075,
+        moveSpeed: 0.18,
+        rotateSpeed: 0.035,
         shootCooldown: 800,
         damage: 80,
         defense: 50,

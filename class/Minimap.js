@@ -108,15 +108,13 @@ class Minimap {
         this.worker.postMessage({ type: 'update', payload: gameState });
     }
 
-    // --- NEW: Handles messages from the worker ---
     handleWorkerMessage(e) {
         const { type, payload } = e.data;
         if (type === 'draw') {
-            this.drawMapFromCommands(payload); // payload is the array of draw commands
+            this.drawMapFromCommands(payload); 
         }
     }
 
-    // --- NEW: The main drawing function, called with pre-calculated commands ---
     drawMapFromCommands(commands) {
         if (!this.ctx) return;
 

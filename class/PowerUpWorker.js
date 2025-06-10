@@ -1,6 +1,4 @@
 // ./class/PowerUpWorker.js
-
-// --- START: SELF-CONTAINED HELPER CLASSES (Copied from other workers) ---
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
     copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this; }
@@ -60,46 +58,55 @@ function getRandomElement(arr) { if (!arr || arr.length === 0) return null; retu
 function getRandomInRange(min, max) { return Math.random() * (max - min) + min; }
 function distanceSq(p1, p2) { const dx = p1.x - p2.x; const dz = p1.z - p2.z; return dx * dx + dz * dz; }
 
+
 /**
- * The core logic for finding a safe place to spawn, now optimized with Octree.
+ * The core logic for finding a safe place to spawn.
+ * This runs entirely within the worker.
  * @returns {object|null} A {x, y, z} position or null if no safe spot is found.
  */
 function findSafeSpawnPosition() {
-    if (!environmentOctree) return null; // Can't find position if Octree isn't ready
+    // ============================ THE FIX ============================
+    // Add this guard clause at the beginning of the function.
+    // If we haven't received any obstacle data from the main thread yet, we cannot
+    // determine a safe position. Return null to wait for the next attempt.
+    if (!gameState.obstacles || gameState.obstacles.length === 0) {
+        console.log('🛠️ PowerUp Worker: Waiting for obstacle data from main thread...');
+        return null;
+    }
+    // ========================= END OF THE FIX ========================
 
     const { worldBoundary, minPlayerDist, minObstacleDist, maxAttempts } = config.spawnRules;
     const boundaryHalf = worldBoundary / 2;
     const minPlayerDistSq = minPlayerDist * minPlayerDist;
-    const checkRadius = minObstacleDist; // The size of the area to check for obstacles
+    const minObstacleDistSq = minObstacleDist * minObstacleDist;
 
     for (let i = 0; i < maxAttempts; i++) {
         const angle = Math.random() * Math.PI * 2;
         const radius = getRandomInRange(minPlayerDist, boundaryHalf * 0.9);
         const x = radius * Math.cos(angle);
         const z = radius * Math.sin(angle);
-        const candidatePos = { x, y: 1.5, z };
+        const candidatePos = { x, y: 1.5, z }; // Assume y=1.5 for powerups
 
-        // 1. Quick check against player position
         if (distanceSq(candidatePos, gameState.playerPos) < minPlayerDistSq) {
             continue;
         }
 
-        // 2. Use Octree to check for nearby obstacles
-        const searchBox = new Box3(
-            new Vec3(x - checkRadius, 0, z - checkRadius),
-            new Vec3(x + checkRadius, 5, z + checkRadius)
-        );
-        const potentialColliders = environmentOctree.retrieve(searchBox);
+        let isSafe = true;
+        for (const obstacle of gameState.obstacles) {
+            if (distanceSq(candidatePos, obstacle.position) < minObstacleDistSq) {
+                isSafe = false;
+                break;
+            }
+        }
 
-        // If the fast Octree check returns nothing, the spot is safe.
-        if (potentialColliders.length === 0) {
+        if (isSafe) {
             return candidatePos;
         }
     }
-    
-    // console.warn("PowerUp Worker: Could not find a safe spawn position.");
+    console.warn('🛠️ PowerUp Worker: Could not find a safe spawn position after max attempts.');
     return null;
 }
+
 
 /**
  * The main message handler for the worker.
