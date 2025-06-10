@@ -206,7 +206,7 @@ const TANK_STATS = Object.freeze({
     V006: {
         hp: 1200,
         maxHp: 1200,
-        moveSpeed: 0.04,
+        moveSpeed: 0.06,
         rotateSpeed: 0.015,
         shootCooldown: 3000,
         damage: 120,
@@ -224,7 +224,7 @@ const TANK_STATS = Object.freeze({
     V008: {
         hp: 1200,
         maxHp: 1200,
-        moveSpeed: 0.04,
+        moveSpeed: 0.06,
         rotateSpeed: 0.04,
         shootCooldown: 4500,
         damage: 140,

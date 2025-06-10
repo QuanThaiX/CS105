@@ -22,7 +22,7 @@ class Minimap {
             viewCone: 'rgba(102, 255, 102, 0.2)',
             enemy: '#F44336',
             barrel: '#FF9800',
-            powerup: '#2196F3',
+            // powerup: '#2196F3',
             obstacle: 'rgba(150, 150, 150, 0.4)'
         };
 
@@ -99,9 +99,9 @@ class Minimap {
             barrels: this.game.barrels
                 .filter(b => !b.hasExploded)
                 .map(b => ({ position: { x: b.position.x, z: b.position.z } })),
-            powerups: this.game.powerUpManager.powerUpPool
-                .filter(p => p.isActive)
-                .map(p => ({ position: { x: p.position.x, z: p.position.z } })),
+            // powerups: this.game.powerUpManager.powerUpPool
+            //     .filter(p => p.isActive)
+            //     .map(p => ({ position: { x: p.position.x, z: p.position.z } })),
             staticObstacles: this.staticObstacles,
         };
 

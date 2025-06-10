@@ -78,7 +78,9 @@ function transformWorldPointToMap(worldX, worldZ, player) {
  * @returns {Array<object>} An array of command objects for the main thread to draw.
  */
 function processGameState(gameState) {
-    const { player, enemies, barrels, powerups, staticObstacles } = gameState;
+    // const { player, enemies, barrels, powerups, staticObstacles } = gameState;
+    const { player, enemies, barrels, staticObstacles } = gameState;
+
     if (!player) return [];
 
     const commands = [];
@@ -116,10 +118,10 @@ function processGameState(gameState) {
         commands.push({ type: 'dot', x: pos.x, y: pos.y, size: 2, entityType: 'barrel' });
     });
 
-    powerups.forEach(p => {
-        const pos = transformWorldPointToMap(p.position.x, p.position.z, player);
-        commands.push({ type: 'dot', x: pos.x, y: pos.y, size: 4, entityType: 'powerup' });
-    });
+    // powerups.forEach(p => {
+    //     const pos = transformWorldPointToMap(p.position.x, p.position.z, player);
+    //     commands.push({ type: 'dot', x: pos.x, y: pos.y, size: 4, entityType: 'powerup' });
+    // });
 
     return commands;
 }

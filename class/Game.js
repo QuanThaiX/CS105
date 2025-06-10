@@ -164,7 +164,7 @@ class Game {
     this.lights = createLights(this.scene);
     this.sky = createSky(this.scene);
     this.ground = createGround(this.scene, { width: this.gameConfig.WORLD_BOUNDARY, height: this.gameConfig.WORLD_BOUNDARY, repeatX: this.gameConfig.WORLD_BOUNDARY / 20, repeatY: this.gameConfig.WORLD_BOUNDARY / 20 });
-    this.powerUpManager = new PowerUpManager();
+    // this.powerUpManager = new PowerUpManager();
     this.minimap = new Minimap();
     if (Game.debug) {
       this.debugHelpers = createDebugHelpers(this.scene);
@@ -759,7 +759,7 @@ class Game {
     this.bot.update();
     this.collisionManager.update();
     this.projectilesManager.update();
-    this.powerUpManager.update();
+    // this.powerUpManager.update();
     this.playerTank.update();
     this.minimap.update();
 
@@ -786,7 +786,6 @@ class Game {
     this.controls.update();
 
     updateShadowArea(this.lights.directionalLight, playerPos);
-
     // Update the camera shaker last, after all other camera manipulations
     if (this.effectManager) {
         this.effectManager.update();
@@ -844,7 +843,7 @@ class Game {
 
   resetGame() {
     this.stop();
-    if (this.powerUpManager) this.powerUpManager.clear();
+    // if (this.powerUpManager) this.powerUpManager.clear();
     this.unregisterEventListeners();
     this.enemiesKilled = 0;
     this.totalEnemiesSpawned = 0;
@@ -975,8 +974,8 @@ class Game {
 
   dispose() {
     this.stop();
-    if (this.powerUpManager) this.powerUpManager.clear();
-    this.powerUpManager = null;
+    // if (this.powerUpManager) this.powerUpManager.clear();
+    // this.powerUpManager = null;
     this.unregisterEventListeners();
     if (this.player) { this.player.dispose(); this.player = null; }
     if (this.rocks) { this.rocks.forEach(o => o.dispose()); this.rocks = []; }

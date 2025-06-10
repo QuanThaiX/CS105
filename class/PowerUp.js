@@ -98,7 +98,6 @@ export class PowerUp extends GameObject {
         this.model.visible = true;
         this.model.scale.set(1, 1, 1); 
 
-        // Move to spawn position
         this.position.copy(position);
         this.position.y = 1.5;
         this.initialY = this.position.y;
@@ -114,7 +113,6 @@ export class PowerUp extends GameObject {
         
         CollisionManager.instance.remove(this); 
         
-        // Move it out of sight
         this.position.set(0, -100, 0);
         this.model.position.copy(this.position);
     }

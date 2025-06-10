@@ -96,18 +96,18 @@ export function saveSettings() {
 
 export const GAMECONFIG = Object.freeze({
     DEBUG: false,
-    WORLD_BOUNDARY: 500,
+    WORLD_BOUNDARY: 400,
     QUALITY_PROFILES: QUALITY_SETTINGS_PROFILES,
     SCENERY: {
-        NUM_ROCKS: 0,
+        NUM_ROCKS: 60,
         ROCK_TYPES: ['rock09', 'rock13'],
         ROCK_SCALE_MIN: 3.0,
         ROCK_SCALE_MAX: 12,
-        NUM_TREES: 0,
+        NUM_TREES: 60,
         TREE_TYPES: ['tree01'],
         TREE_SCALE_MIN: 0.9,
         TREE_SCALE_MAX: 2.9,
-        NUM_BARRELS: 200,
+        NUM_BARRELS: 20,
         BARREL_TYPES: ['barrel'],
         BARREL_SCALE_MIN: 3.5,
         BARREL_SCALE_MAX: 4.5,

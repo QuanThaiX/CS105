@@ -37,7 +37,7 @@ class Tank extends GameObject {
   reloadBar;
   enemyIndicator;
   indicatorLight;
-  activePowerUps;
+  // activePowerUps;
   originalStats;
   _forward = new THREE.Vector3(0, 0, 1);
   _backward = new THREE.Vector3(0, 0, -1);
@@ -77,7 +77,7 @@ class Tank extends GameObject {
 
     this.prevPosition = this.position.clone();
     this.prevRotation = 0;
-    this.activePowerUps = new Map();
+    // this.activePowerUps = new Map();
     this.originalStats = {
       shootCooldown: this.shootCooldown,
       damage: this.damage
@@ -552,9 +552,9 @@ this._bulletPosition.copy(this.model.position);
         if (otherObject.isActive) {
           this.collectPowerUp(otherObject);
           otherObject.collect();
-          if (Game.instance.powerUpManager) {
-             Game.instance.powerUpManager.onPowerUpCollected();
-          }
+          // if (Game.instance.powerUpManager) {
+          //    Game.instance.powerUpManager.onPowerUpCollected();
+          // }
         }
         return;
       }
@@ -574,67 +574,67 @@ this._bulletPosition.copy(this.model.position);
       }
     }
   }
-  collectPowerUp(powerUp) {
-    const type = powerUp.powerUpType;
-    console.log(`Player collected: ${type.name}`);
+  // collectPowerUp(powerUp) {
+  //   const type = powerUp.powerUpType;
+  //   console.log(`Player collected: ${type.name}`);
 
-    EventManager.instance.notify(EVENT.POWERUP_COLLECTED, { tank: this, powerUpType: type });
-    EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
-      message: `${type.name} Activated!`,
-      duration: 2000,
-      type: 'heal' // Use 'heal' style for positive feedback
-    });
+  //   EventManager.instance.notify(EVENT.POWERUP_COLLECTED, { tank: this, powerUpType: type });
+  //   EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
+  //     message: `${type.name} Activated!`,
+  //     duration: 2000,
+  //     type: 'heal' // Use 'heal' style for positive feedback
+  //   });
 
-    // Clear any existing timeout for this power-up type
-    if (this.activePowerUps.has(type.name)) {
-      clearTimeout(this.activePowerUps.get(type.name));
-      this.expirePowerUp(type); // Reset stats before applying new buff
-    }
+  //   // Clear any existing timeout for this power-up type
+  //   if (this.activePowerUps.has(type.name)) {
+  //     clearTimeout(this.activePowerUps.get(type.name));
+  //     this.expirePowerUp(type); // Reset stats before applying new buff
+  //   }
 
-    // Apply the effect
-    switch (type.name) {
-      case POWERUP_TYPE.HEALTH_PACK.name:
-        this.heal(type.value);
-        break;
-      case POWERUP_TYPE.SHIELD.name:
-        // For a shield, we can give temporary extra HP or a damage reduction flag
-        this.defense *= 2; // Double defense
-        break;
-      case POWERUP_TYPE.RAPID_FIRE.name:
-        this.shootCooldown /= 2; // Halve cooldown
-        break;
-      case POWERUP_TYPE.DAMAGE_BOOST.name:
-        this.damage *= 1.5; // 50% more damage
-        break;
-    }
+  //   // Apply the effect
+  //   switch (type.name) {
+  //     case POWERUP_TYPE.HEALTH_PACK.name:
+  //       this.heal(type.value);
+  //       break;
+  //     case POWERUP_TYPE.SHIELD.name:
+  //       // For a shield, we can give temporary extra HP or a damage reduction flag
+  //       this.defense *= 2; // Double defense
+  //       break;
+  //     case POWERUP_TYPE.RAPID_FIRE.name:
+  //       this.shootCooldown /= 2; // Halve cooldown
+  //       break;
+  //     case POWERUP_TYPE.DAMAGE_BOOST.name:
+  //       this.damage *= 1.5; // 50% more damage
+  //       break;
+  //   }
 
-    // Set a timer to remove the effect (if it has a duration)
-    if (type.duration > 0) {
-      const timeoutId = setTimeout(() => {
-        this.expirePowerUp(type);
-      }, type.duration);
-      this.activePowerUps.set(type.name, timeoutId);
-    }
-  }
+  //   // Set a timer to remove the effect (if it has a duration)
+  //   if (type.duration > 0) {
+  //     const timeoutId = setTimeout(() => {
+  //       this.expirePowerUp(type);
+  //     }, type.duration);
+  //     this.activePowerUps.set(type.name, timeoutId);
+  //   }
+  // }
 
-  expirePowerUp(powerUpType) {
-    console.log(`${powerUpType.name} expired.`);
-    this.activePowerUps.delete(powerUpType.name);
-    EventManager.instance.notify(EVENT.POWERUP_EXPIRED, { tank: this, powerUpType });
+  // expirePowerUp(powerUpType) {
+  //   console.log(`${powerUpType.name} expired.`);
+  //   this.activePowerUps.delete(powerUpType.name);
+  //   EventManager.instance.notify(EVENT.POWERUP_EXPIRED, { tank: this, powerUpType });
 
-    // Revert the stat changes
-    switch (powerUpType.name) {
-      case POWERUP_TYPE.SHIELD.name:
-        this.defense = this.originalStats.defense;
-        break;
-      case POWERUP_TYPE.RAPID_FIRE.name:
-        this.shootCooldown = this.originalStats.shootCooldown;
-        break;
-      case POWERUP_TYPE.DAMAGE_BOOST.name:
-        this.damage = this.originalStats.damage;
-        break;
-    }
-  }
+  //   // Revert the stat changes
+  //   switch (powerUpType.name) {
+  //     case POWERUP_TYPE.SHIELD.name:
+  //       this.defense = this.originalStats.defense;
+  //       break;
+  //     case POWERUP_TYPE.RAPID_FIRE.name:
+  //       this.shootCooldown = this.originalStats.shootCooldown;
+  //       break;
+  //     case POWERUP_TYPE.DAMAGE_BOOST.name:
+  //       this.damage = this.originalStats.damage;
+  //       break;
+  //   }
+  // }
 
 /**
  * NEW: Applies a force to the tank, causing it to slide.
