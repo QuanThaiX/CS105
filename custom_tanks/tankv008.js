@@ -4,14 +4,30 @@ export function createTank() {
     const tank = new THREE.Group();
     tank.name = "Tank_V008_Juggernaut";
 
+    const textureLoader = new THREE.TextureLoader();
+    const tankTexture = textureLoader.load('./assets/tankv008/tankv008.jpg');
+    
+    tankTexture.wrapS = THREE.RepeatWrapping;
+    tankTexture.wrapT = THREE.RepeatWrapping;
+
+    const bodyTexture = tankTexture.clone();
+    bodyTexture.needsUpdate = true;
+    bodyTexture.repeat.set(1, 0.5); 
+    bodyTexture.offset.set(0, 0.5);
+
+    const trackTexture = tankTexture.clone();
+    trackTexture.needsUpdate = true;
+    trackTexture.repeat.set(1, 0.5); 
+    trackTexture.offset.set(0, 0);
+    
     const bodyMaterial = new THREE.MeshStandardMaterial({
-        color: 0x4a535b, metalness: 0.8, roughness: 0.5
+        map: tankTexture, metalness: 0.8, roughness: 0.9
     });
     const trackMaterial = new THREE.MeshStandardMaterial({
         color: 0x1c1c1c, metalness: 0.4, roughness: 0.8
     });
     const detailMaterial = new THREE.MeshStandardMaterial({
-        color: 0x333333, metalness: 0.9, roughness: 0.3
+        color: 0x000000, map: tankTexture, metalness: 0.9, roughness: 0.3
     });
 
     const hull = new THREE.Group(); hull.name = "Hull";

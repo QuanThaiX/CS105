@@ -127,36 +127,51 @@ class CollisionManager {
     return box;
   }
 
-   handleCollisionPair(objA, objB) {
-    let bullet = null;
-    let target = null;
+    handleCollisionPair(objA, objB) {
+        let bullet = null;
+        let target = null;
 
-    if (objA instanceof Bullet) {
-      bullet = objA; target = objB;
-    } else if (objB instanceof Bullet) {
-      bullet = objB; target = objA;
-    }
-    
-    if (bullet) {
-      if (bullet.hasCollided) return;
-      if (target instanceof Tank && bullet.faction !== target.faction) {
-        target.takeDamage(bullet.damage, bullet);
-        bullet.onHit(target);
-      }
-      else if (target instanceof Rock || target instanceof Tree) {
-        bullet.onHit(target);
-      }
-      else if (target instanceof Barrel && !target.hasExploded) {
-          if (bullet.faction !== 'neutral') {
-              target.onBulletHit(bullet);
-          }
-          bullet.onHit(target);
-      }
-      return;
-    }
+        if (objA instanceof Bullet) {
+            bullet = objA; target = objB;
+        } else if (objB instanceof Bullet) {
+            bullet = objB; target = objA;
+        }
 
-    EventManager.instance.notify(EVENT.COLLISION, { objA, objB });
-  }
+        if (bullet) {
+            if (bullet.hasCollided || bullet.shooter === target) return;
+
+            let wasHit = false;
+            if (target instanceof Tank && bullet.faction !== target.faction) {
+                target.takeDamage(bullet.damage, bullet.shooter); // Use bullet.shooter here
+                wasHit = true;
+            }
+            else if (target instanceof Rock || target instanceof Tree) {
+                wasHit = true;
+            }
+            else if (target instanceof Barrel && !target.hasExploded) {
+                if (bullet.faction !== 'neutral') {
+                    target.onBulletHit(bullet);
+                }
+                wasHit = true;
+            }
+
+            // --- THE FIX ---
+            // If a valid hit occurred, call onHit() and notify the system.
+            if (wasHit) {
+                bullet.onHit(target);
+                EventManager.instance.notify(EVENT.BULLET_HIT, {
+                    bullet: bullet,
+                    target: target,
+                    hitPoint: bullet.position.clone() // Provide the impact point
+                });
+            }
+            // --- END OF FIX ---
+            return;
+        }
+
+        // This is only called for non-bullet collisions now.
+        EventManager.instance.notify(EVENT.COLLISION, { objA, objB });
+    }
 
 
     update() {

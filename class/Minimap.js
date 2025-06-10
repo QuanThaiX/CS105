@@ -17,7 +17,6 @@ class Minimap {
 
         this.colors = {
             background: 'rgba(20, 30, 45, 0.6)',
-            grid: 'rgba(100, 150, 200, 0.1)',
             border: '#155e31',
             player: '#66ff66',
             viewCone: 'rgba(102, 255, 102, 0.2)',
@@ -29,8 +28,32 @@ class Minimap {
 
         this.staticObstacles = [];
         this.staticGeometryProcessed = false;
+
+        // --- NEW: Worker Implementation ---
+        this.worker = null;
+        if (typeof Worker !== 'undefined') {
+            this.worker = new Worker('./class/MinimapWorker.js', { type: 'module' });
+            this.worker.onmessage = this.handleWorkerMessage.bind(this);
+            this.worker.onerror = (e) => console.error("Minimap Worker Error:", e);
+
+            // Initialize worker
+            this.worker.postMessage({
+                type: 'init',
+                payload: {
+                    canvasWidth: this.canvas.width,
+                    mapSize: this.mapSize,
+                }
+            });
+            console.log("🗺️ Minimap Worker initialized.");
+        } else {
+            console.warn("Minimap: Web Workers not supported. Calculations will run on the main thread (not implemented).");
+        }
+
+        // Set initial visibility based on settings
+        this.toggleVisibility(gameSettings.showMinimap);
     }
 
+    // This runs once to gather static data. The result is then sent to the worker every frame.
     processStaticGeometry() {
         if (this.staticGeometryProcessed) return;
         const gsm = this.game.getGameStateManager();
@@ -46,17 +69,16 @@ class Minimap {
             }
         });
         this.staticGeometryProcessed = true;
-        console.log(`Minimap: Processed ${this.staticObstacles.length} static obstacles.`);
+        console.log(`Minimap: Processed ${this.staticObstacles.length} static obstacles for worker.`);
     }
 
-    worldToMapScale(val) {
-        return val / this.mapSize * this.canvas.width;
-    }
-
+    // The main update function now gathers data and sends it to the worker.
     update() {
-        if (!this.ctx || !this.game.isRunning) return;
-        
-        if (!this.staticGeometryProcessed) this.processStaticGeometry();
+        if (!this.ctx || !this.game.isRunning || !this.worker) return;
+
+        if (!this.staticGeometryProcessed) {
+            this.processStaticGeometry();
+        }
 
         const player = this.game.playerTank;
         if (!player || !player.model) return;
@@ -64,61 +86,90 @@ class Minimap {
         const gsm = this.game.getGameStateManager();
         if (!gsm) return;
 
+        // --- Serialize game state for the worker ---
+        const gameState = {
+            player: {
+                position: { x: player.position.x, z: player.position.z },
+                rotationY: player.model.rotation.y,
+            },
+            enemies: gsm.getEnemyTanks().map(e => ({
+                position: { x: e.position.x, z: e.position.z },
+                rotationY: e.model.rotation.y
+            })),
+            barrels: this.game.barrels
+                .filter(b => !b.hasExploded)
+                .map(b => ({ position: { x: b.position.x, z: b.position.z } })),
+            powerups: this.game.powerUpManager.powerUpPool
+                .filter(p => p.isActive)
+                .map(p => ({ position: { x: p.position.x, z: p.position.z } })),
+            staticObstacles: this.staticObstacles,
+        };
+
+        this.worker.postMessage({ type: 'update', payload: gameState });
+    }
+
+    // --- NEW: Handles messages from the worker ---
+    handleWorkerMessage(e) {
+        const { type, payload } = e.data;
+        if (type === 'draw') {
+            this.drawMapFromCommands(payload); // payload is the array of draw commands
+        }
+    }
+
+    // --- NEW: The main drawing function, called with pre-calculated commands ---
+    drawMapFromCommands(commands) {
+        if (!this.ctx) return;
+
         const canvasWidth = this.canvas.width;
         const canvasHeight = this.canvas.height;
         const mapCenterX = canvasWidth / 2;
         const mapCenterY = canvasHeight / 2;
 
+        // 1. Clear and clip canvas
         this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
         this.ctx.save();
         this.ctx.beginPath();
         this.ctx.arc(mapCenterX, mapCenterY, mapCenterX, 0, Math.PI * 2);
         this.ctx.clip();
-        
+
+        // 2. Draw background
         this.ctx.fillStyle = this.colors.background;
         this.ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-        this.ctx.save();
-        
-        this.ctx.translate(mapCenterX, mapCenterY);
-        this.ctx.scale(-1, -1);
-        this.ctx.rotate(player.model.rotation.y);
-        
-        this.ctx.translate(-this.worldToMapScale(player.position.x), -this.worldToMapScale(player.position.z));
+        // 3. Execute draw commands from worker
+        commands.forEach(cmd => {
+            const color = this.colors[cmd.entityType];
+            if (!color) return;
 
-        this.drawGrid();
-
-        this.ctx.fillStyle = this.colors.obstacle;
-        this.staticObstacles.forEach(obs => {
-            const mapX = this.worldToMapScale(obs.x);
-            const mapY = this.worldToMapScale(obs.z);
-            const mapSize = this.worldToMapScale(obs.size);
-            this.ctx.fillRect(mapX - mapSize / 2, mapY - mapSize / 2, mapSize, mapSize);
+            switch (cmd.type) {
+                case 'rect':
+                    this.ctx.fillStyle = color;
+                    this.ctx.fillRect(cmd.x, cmd.y, cmd.width, cmd.height);
+                    break;
+                case 'dot':
+                    this.ctx.fillStyle = color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(cmd.x, cmd.y, cmd.size, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    break;
+                case 'triangle':
+                    this.drawTriangleOnCanvas(cmd.x, cmd.y, cmd.rotation, color, 5);
+                    break;
+            }
         });
-        
-        gsm.getEnemyTanks().forEach(e => this.drawTriangle(e.position.x, e.position.z, e.model.rotation.y, this.colors.enemy));
-        this.game.barrels.forEach(b => !b.hasExploded && this.drawDot(b.position.x, b.position.z, this.colors.barrel, 2));
-        this.game.powerUpManager.powerUpPool.forEach(p => p.isActive && this.drawDot(p.position.x, p.position.z, this.colors.powerup, 4));
 
-        // Restore from the world transformation (removes the scale, rotate, and translate)
-        this.ctx.restore();
-
-        // --- 4. Draw UI elements that are fixed relative to the player (on top) ---
-        // These are drawn on the original, non-transformed canvas where Y+ is "down".
+        // 4. Draw UI elements that are fixed relative to the player
         this.ctx.fillStyle = this.colors.viewCone;
         this.ctx.beginPath();
         this.ctx.moveTo(mapCenterX, mapCenterY);
-        this.ctx.arc(mapCenterX, mapCenterY, mapCenterX * 1.5, -this.viewConeAngle / 2 - Math.PI/2, this.viewConeAngle / 2 - Math.PI/2);
+        this.ctx.arc(mapCenterX, mapCenterY, mapCenterX * 1.5, -this.viewConeAngle / 2 - Math.PI / 2, this.viewConeAngle / 2 - Math.PI / 2);
         this.ctx.closePath();
         this.ctx.fill();
-        
-        this.drawPlayerIcon(mapCenterX, mapCenterY, this.colors.player, 6);
-        
-        // Restore from the circular clipping mask
-        this.ctx.restore();
 
-        // --- 5. Draw the border on top of everything ---
+        this.drawPlayerIcon(mapCenterX, mapCenterY, this.colors.player, 6);
+
+        // 5. Restore from clipping mask and draw border
+        this.ctx.restore();
         this.ctx.strokeStyle = this.colors.border;
         this.ctx.lineWidth = 4;
         this.ctx.beginPath();
@@ -126,31 +177,6 @@ class Minimap {
         this.ctx.stroke();
     }
 
-    drawGrid() {
-        this.ctx.strokeStyle = this.colors.grid;
-        this.ctx.lineWidth = 1;
-        const step = this.worldToMapScale(50);
-        const numLines = (this.mapSize / 50) * 2;
-        const totalSize = numLines * step;
-        this.ctx.beginPath();
-        for (let i = -numLines/2; i <= numLines/2; i++) {
-            this.ctx.moveTo(i * step, -totalSize/2);
-            this.ctx.lineTo(i * step, totalSize/2);
-            this.ctx.moveTo(-totalSize/2, i * step);
-            this.ctx.lineTo(totalSize/2, i * step);
-        }
-        this.ctx.stroke();
-    }
-
-    drawDot(worldX, worldZ, color, size = 3) {
-        const mapX = this.worldToMapScale(worldX);
-        const mapY = this.worldToMapScale(worldZ); // No change needed here, the main transform handles it
-        this.ctx.fillStyle = color;
-        this.ctx.beginPath();
-        this.ctx.arc(mapX, mapY, size, 0, Math.PI * 2);
-        this.ctx.fill();
-    }
-    
     drawPlayerIcon(mapX, mapY, color, size) {
         this.ctx.save();
         this.ctx.translate(mapX, mapY);
@@ -158,7 +184,7 @@ class Minimap {
         this.ctx.strokeStyle = 'rgba(0,0,0,0.5)';
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        this.ctx.moveTo(0, -size * 1.2); // Draw pointing "up" in the Y-down system
+        this.ctx.moveTo(0, -size * 1.2);
         this.ctx.lineTo(size, size);
         this.ctx.lineTo(-size, size);
         this.ctx.closePath();
@@ -166,13 +192,11 @@ class Minimap {
         this.ctx.stroke();
         this.ctx.restore();
     }
-    
-    drawTriangle(worldX, worldZ, rotationY, color, size = 5) {
-        const mapX = this.worldToMapScale(worldX);
-        const mapY = this.worldToMapScale(worldZ); // No change needed here
+
+    drawTriangleOnCanvas(canvasX, canvasY, rotation, color, size = 5) {
         this.ctx.save();
-        this.ctx.translate(mapX, mapY);
-        this.ctx.rotate(rotationY);
+        this.ctx.translate(canvasX, canvasY);
+        this.ctx.rotate(rotation);
         this.ctx.fillStyle = color;
         this.ctx.beginPath();
         this.ctx.moveTo(0, -size);
@@ -183,7 +207,18 @@ class Minimap {
         this.ctx.restore();
     }
 
+    // NEW: Method to show/hide the minimap canvas
+    toggleVisibility(show) {
+        if (this.canvas) {
+            this.canvas.style.display = show ? 'block' : 'none';
+        }
+    }
+
     dispose() {
+        if (this.worker) {
+            this.worker.terminate();
+        }
+        this.worker = null;
         this.ctx = null;
         this.canvas = null;
     }

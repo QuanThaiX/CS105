@@ -2,10 +2,27 @@ import * as THREE from 'three';
 
 export function createTank() {
     const tank = new THREE.Group();
-    tank.name = "TankM08_Tarantula_MaxVisuality";
-    // --- Materials ---
+    tank.name = "TankM011_Tarantula_MaxVisuality";
+
+    const textureLoader = new THREE.TextureLoader();
+    const tankTexture = textureLoader.load('./assets/tankv010/tankv011.jpg');
+    
+    tankTexture.wrapS = THREE.RepeatWrapping;
+    tankTexture.wrapT = THREE.RepeatWrapping;
+
+    const bodyTexture = tankTexture.clone();
+    bodyTexture.needsUpdate = true;
+    bodyTexture.repeat.set(1, 0.5); 
+    bodyTexture.offset.set(0, 0.5);
+
+    const trackTexture = tankTexture.clone();
+    trackTexture.needsUpdate = true;
+    trackTexture.repeat.set(1, 0.5); 
+    trackTexture.offset.set(0, 0);
+
     const bodyMaterial = new THREE.MeshStandardMaterial({
-        color: 0x555555,
+        // color: 0x555555,
+        map: tankTexture,
         metalness: 0.95,
         roughness: 0.4,
         flatShading: true,
@@ -83,7 +100,7 @@ export function createTank() {
         cannonGroup.add(ring);
     }
 
-    let indicatorLight = new THREE.PointLight(0x800080, 50, 8); 
+    let indicatorLight = new THREE.PointLight(0x8000110, 50, 8); 
     indicatorLight.position.set(0, 1.5, 0); 
 
     tank.add(indicatorLight);

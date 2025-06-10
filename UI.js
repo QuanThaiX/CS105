@@ -1,7 +1,7 @@
 // ./UI.js
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js'; // <-- MODIFIED: Added RGBELoader
 import { Game } from './class/Game.js';
 import { UIManager } from './class/UIManager.js'; // Import the new UIManager
 import { EVENT, COLOR, TANKTYPE, TANK_STATS, loadTankModel } from './utils.js';
@@ -35,7 +35,7 @@ const modeDescriptions = {
 };
 
 const tankStatsData = {
-    [TANKTYPE.V001.name]: { power: 80, speed: 100, defense: 70, hp: 50, firerate: 85 },
+    [TANKTYPE.V001.name]: { power: 80, speed: 80, defense: 70, hp: 50, firerate: 85 },
     [TANKTYPE.V002.name]: { power: 110, speed: 70, defense: 90, hp: 80, firerate: 78 },
     [TANKTYPE.V003.name]: { power: 120, speed: 80, defense: 85, hp: 60, firerate: 75 },
     [TANKTYPE.V004.name]: { power: 90, speed: 70, defense: 60, hp: 70, firerate: 65 },
@@ -43,7 +43,7 @@ const tankStatsData = {
     [TANKTYPE.V006.name]: { power: 120, speed: 40, defense: 100, hp: 120, firerate: 70 },
     [TANKTYPE.V007.name]: { power: 130, speed: 90, defense: 75, hp: 85, firerate: 82 },
     [TANKTYPE.V008.name]: { power: 140, speed: 40, defense: 90, hp: 120, firerate: 55 },
-    [TANKTYPE.V009.name]: { power: 110, speed: 70, defense: 80, hp: 90, firerate: 84 },
+    [TANKTYPE.V009.name]: { power: 55, speed: 90, defense: 80, hp: 90, firerate: 84 },
     [TANKTYPE.V010.name]: { power: 90, speed: 120, defense: 74, hp: 85, firerate: 79 },
     [TANKTYPE.V011.name]: { power: 80, speed: 150, defense: 50, hp: 50, firerate: 110 },
 };
@@ -91,49 +91,82 @@ async function initMenuScene() {
     const qualityProfile = GAMECONFIG.QUALITY_PROFILES[gameSettings.quality];
 
     menuScene = new THREE.Scene();
-    menuScene.background = new THREE.Color(0x111827);
-    if (gameSettings.fog) {
-        menuScene.fog = new THREE.Fog(0x111827, 1, 300);
+
+    // --- NEW: Professional Lighting & Environment Setup ---
+
+    // 1. Environment Lighting (HDRI for realistic reflections and ambient light)
+    if (qualityProfile.useSky) { // Only load HDRI on higher quality settings
+        new RGBELoader()
+            .setPath('assets/hdr/') // Make sure you have this folder and the .hdr file
+            .load(
+                'venice_sunset_1k.hdr',
+                (texture) => { // On success
+                    texture.mapping = THREE.EquirectangularReflectionMapping;
+                    menuScene.environment = texture; // Use for reflections
+                    menuScene.background = texture; // Use as the background
+                    menuScene.backgroundBlurriness = 0.5; // Blur the background to keep focus on the tank
+                },
+                undefined, // onProgress callback
+                () => { // On error
+                    console.warn("Could not load HDRI. Falling back to simple lighting.");
+                    menuScene.background = new THREE.Color(0x111827);
+                    const hemiLight = new THREE.HemisphereLight(0x8899bb, 0x444444, 2);
+                    hemiLight.position.set(0, 20, 0);
+                    menuScene.add(hemiLight);
+                }
+            );
+    } else {
+        // Fallback for lower quality: Dark background and simple HemisphereLight
+        menuScene.background = new THREE.Color(0x111827);
+        const hemiLight = new THREE.HemisphereLight(0x8899bb, 0x444444, 2);
+        hemiLight.position.set(0, 20, 0);
+        menuScene.add(hemiLight);
     }
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
-    hemiLight.position.set(0, 20, 0);
-    menuScene.add(hemiLight);
 
-    const keyLight_1 = new THREE.DirectionalLight(COLOR.white, 2.5);
-    keyLight_1.position.set(5, 5, 8);
-    keyLight_1.castShadow = true;
-    keyLight_1.shadow.mapSize.width = qualityProfile.shadowMapSize;
-    keyLight_1.shadow.mapSize.height = qualityProfile.shadowMapSize;
-    const shadowSize = 2.5;
-    keyLight_1.shadow.camera.left = -shadowSize;
-    keyLight_1.shadow.camera.right = shadowSize;
-    keyLight_1.shadow.camera.top = shadowSize;
-    keyLight_1.shadow.camera.bottom = -shadowSize;
-    keyLight_1.shadow.bias = -0.0001;
+    // 2. Key Light (Main light source, casts primary shadows)
+    const keyLight = new THREE.DirectionalLight(0xfff0dd, 3.5); // Warm white light
+    keyLight.position.set(8, 10, 8);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = qualityProfile.shadowMapSize;
+    keyLight.shadow.mapSize.height = qualityProfile.shadowMapSize;
+    const shadowSize = 4; // Tighter shadow area for better quality
+    keyLight.shadow.camera.left = -shadowSize;
+    keyLight.shadow.camera.right = shadowSize;
+    keyLight.shadow.camera.top = shadowSize;
+    keyLight.shadow.camera.bottom = -shadowSize;
+    keyLight.shadow.bias = -0.0002;
+    keyLight.shadow.radius = 2; // Softens shadow edges
+    menuScene.add(keyLight);
+    menuScene.add(keyLight.target);
+    keyLight.target.position.set(0, 0.5, 0);
 
-    const secFillLight = new THREE.DirectionalLight(0xaaccff, 10);
-    secFillLight.position.set(0, 15, 0);
-    secFillLight.castShadow = true;
-    menuScene.add(secFillLight);
-    menuScene.add(keyLight_1);
+    // 3. Fill Light (Softer, cool-colored light to fill in shadows)
+    const fillLight = new THREE.DirectionalLight(0xdddeff, 1.0);
+    fillLight.position.set(-8, 5, 5);
+    menuScene.add(fillLight);
+    menuScene.add(fillLight.target);
+    fillLight.target.position.set(0, 0.5, 0);
 
+    // 4. Rim Light (Back light to create highlights and separate from background)
+    const rimLight = new THREE.DirectionalLight(0x89d5ff, 4.0);
+    rimLight.position.set(2, 4, -10);
+    menuScene.add(rimLight);
+    menuScene.add(rimLight.target);
+    rimLight.target.position.set(0, 0.5, 0);
 
-    if (qualityProfile.extraLights) {
-        const fillLight = new THREE.DirectionalLight(0xaaccff, 5.5);
-        fillLight.position.set(-5, 2, -4);
-        menuScene.add(fillLight);
-
-
-        const rimLight = new THREE.DirectionalLight(0xffffff, 5.5);
-        rimLight.position.set(0, 4, -10);
-        menuScene.add(rimLight);
-    }
+    // --- End of new lighting setup ---
 
     const tankDisplayDiv = document.getElementById('tank-display');
     const displayWidth = tankDisplayDiv.clientWidth;
     const displayHeight = tankDisplayDiv.clientHeight;
     menuCamera = new THREE.PerspectiveCamera(45, displayWidth / displayHeight, 0.1, 100);
     menuCamera.position.set(0, 1.5, 6);
+
+    // 5. Interactive "Headlight" (Parented to the camera)
+    const cameraLight = new THREE.PointLight(0xffffff, 0.4, 20); // Soft, white, short-range
+    menuCamera.add(cameraLight); // Attach the light directly to the camera
+    menuScene.add(menuCamera); // The camera itself must be in the scene for the light to work
+
     menuRenderer = new THREE.WebGLRenderer({
         antialias: qualityProfile.antialias,
         powerPreference: "high-performance"
@@ -165,7 +198,8 @@ async function initMenuScene() {
     const groundMaterial = new THREE.MeshStandardMaterial({
         color: 0x222222,
         roughness: 0.8,
-        metalness: 0.2
+        metalness: 0.2,
+        envMapIntensity: 0.5 // Allow ground to receive some reflection from the HDRI
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
@@ -176,6 +210,7 @@ async function initMenuScene() {
     loadTankForMenu(availableTanks[currentTankIndex]);
     animateMenu();
 }
+
 
 function disposeTankModel() {
     if (tankModel) {
@@ -522,8 +557,8 @@ applySettingsButton.addEventListener('click', () => {
     gameSettings.cameraShake = cameraShakeToggle.checked; // NEW
     gameSettings.showMinimap = minimapToggle.checked;     // NEW
 
-    saveSettings(); 
-    eventManager.notify(EVENT.SETTINGS_UPDATED); 
+    saveSettings();
+    eventManager.notify(EVENT.SETTINGS_UPDATED);
 
     settingsModal.style.display = 'none';
 
@@ -684,7 +719,7 @@ export function hideLoadingScreen() {
 }
 document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
-    eventManager.notify(EVENT.SETTINGS_UPDATED); 
+    eventManager.notify(EVENT.SETTINGS_UPDATED);
 
     console.log("🎮 DOM loaded, waiting for user interaction...");
 

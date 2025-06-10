@@ -1,25 +1,36 @@
 import * as THREE from 'three';
 
-/**
- * Creates the V010 "Spectre" Sci-Fi Hover Tank - Max Visuality Version
- *
- * This version adds significant detail and active effects for maximum visual impact.
- * - Layered Armor: Hull has separate side-skirt armor plates for depth.
- * - Detailed Turret: Includes a cannon mantlet and side sensor pods.
- * - Rear Engine Block: A dedicated engine section with a large, pulsating glow.
- * - Active Thruster Cones: Visual effect for the hover pads, making them look active.
- * - Greebling: Small detail lights added to the hull.
- * - Pulsating Animations: Engine and thruster glows now have a life-like pulse.
- *
- * @returns {THREE.Group} The highly detailed tank model group.
- */
 export function createTank() {
     const tank = new THREE.Group();
     tank.name = "TankV010_Spectre_MaxVisuality";
 
-    // --- Materials ---
+
+    const textureLoader = new THREE.TextureLoader();
+    const tankTexture = textureLoader.load('./assets/tankv010/tankv010.jpg');
+    
+    tankTexture.wrapS = THREE.RepeatWrapping;
+    tankTexture.wrapT = THREE.RepeatWrapping;
+
+    const bodyTexture = tankTexture.clone();
+    bodyTexture.needsUpdate = true;
+    bodyTexture.repeat.set(1, 0.5); 
+    bodyTexture.offset.set(0, 0.5);
+
+    const trackTexture = tankTexture.clone();
+    trackTexture.needsUpdate = true;
+    trackTexture.repeat.set(1, 0.5); 
+    trackTexture.offset.set(0, 0);
+
+    const hullMaterial = new THREE.MeshStandardMaterial({
+        // color: 0x555555, // Darker, more gunmetal color
+        map: bodyTexture,
+        metalness: 0.95,
+        roughness: 0.4,
+        flatShading: true,
+    });
     const bodyMaterial = new THREE.MeshStandardMaterial({
         color: 0x555555, // Darker, more gunmetal color
+        // map: bodyTexture,
         metalness: 0.95,
         roughness: 0.4,
         flatShading: true,
@@ -67,7 +78,7 @@ export function createTank() {
 
     const extrudeSettings = { depth: 0.4, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.1, bevelSegments: 1 };
     const hullGeo = new THREE.ExtrudeGeometry(hullShape, extrudeSettings);
-    const hull = new THREE.Mesh(hullGeo, bodyMaterial);
+    const hull = new THREE.Mesh(hullGeo, hullMaterial);
     hull.rotation.x = -Math.PI / 2;
     hull.castShadow = true;
     hull.receiveShadow = true;

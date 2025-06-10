@@ -316,7 +316,6 @@ this._bulletPosition.copy(this.model.position);
           speed: 0.8,
           color: COLOR.cyan
         });
-
       } else if (this.tankType === TANKTYPE.V010) {
         EventManager.instance.notify(EVENT.OBJECT_SHOOT, {
           tank: this,
@@ -543,15 +542,22 @@ this._bulletPosition.copy(this.model.position);
 
     if (objA === this || objB === this) {
       const otherObject = objA === this ? objB : objA;
+
+      if (otherObject instanceof Bullet && otherObject.shooter === this) {
+          return;
+      }
+
+
       if (otherObject instanceof PowerUp && this.faction === FACTION.PLAYER) {
-        if (otherObject.isActive) { 
+        if (otherObject.isActive) {
           this.collectPowerUp(otherObject);
-          otherObject.collect(); 
-          Game.instance.powerUpManager.onPowerUpCollected();
+          otherObject.collect();
+          if (Game.instance.powerUpManager) {
+             Game.instance.powerUpManager.onPowerUpCollected();
+          }
         }
         return;
       }
-      // Ensure tank reverts position when colliding with solid objects
       if (otherObject instanceof Tank ||
         otherObject instanceof Rock ||
         otherObject instanceof Tree ||

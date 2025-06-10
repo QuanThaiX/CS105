@@ -1,178 +1,125 @@
 // ./class/MinimapWorker.js
 
-// --- Worker Globals ---
-let ctx = null;
-let config = {};
-let colors = {};
-let gameState = {
-    player: null,
-    enemies: [],
-    barrels: [],
-    powerUps: []
-};
-let isPaused = false;
-let drawInterval = null;
-
-// --- Drawing Functions (copied from original Minimap.js) ---
-
-function worldToMapScale(val) {
-    return val / config.mapSize * config.canvasSize;
-}
-
-function drawGrid() {
-    ctx.strokeStyle = colors.grid;
-    ctx.lineWidth = 1;
-    const step = worldToMapScale(50);
-    const numLines = (config.mapSize / 50) * 2;
-    const totalSize = numLines * step;
-    ctx.beginPath();
-    for (let i = -numLines / 2; i <= numLines / 2; i++) {
-        ctx.moveTo(i * step, -totalSize / 2);
-        ctx.lineTo(i * step, totalSize / 2);
-        ctx.moveTo(-totalSize / 2, i * step);
-        ctx.lineTo(totalSize / 2, i * step);
+// A simple Vec2 for 2D calculations
+class Vec2 {
+    constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
     }
-    ctx.stroke();
 }
 
-function drawDot(worldX, worldZ, color, size = 3) {
-    const mapX = worldToMapScale(worldX);
-    const mapY = worldToMapScale(worldZ);
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(mapX, mapY, size, 0, Math.PI * 2);
-    ctx.fill();
-}
+// Worker state
+let canvasWidth = 200;
+let mapSize = 500;
 
-function drawPlayerIcon(mapX, mapY, color, size) {
-    ctx.save();
-    ctx.translate(mapX, mapY);
-    ctx.fillStyle = color;
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -size * 1.2);
-    ctx.lineTo(size, size);
-    ctx.lineTo(-size, size);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-}
-
-function drawTriangle(worldX, worldZ, rotationY, color, size = 5) {
-    const mapX = worldToMapScale(worldX);
-    const mapY = worldToMapScale(worldZ);
-    ctx.save();
-    ctx.translate(mapX, mapY);
-    ctx.rotate(rotationY);
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(0, -size);
-    ctx.lineTo(size, size);
-    ctx.lineTo(-size, size);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-}
-
-function drawStaticObstacles() {
-    if (!gameState.staticObstacles) return;
-    ctx.fillStyle = colors.obstacle;
-    gameState.staticObstacles.forEach(obs => {
-        const mapX = worldToMapScale(obs.x);
-        const mapY = worldToMapScale(obs.z);
-        const mapSize = worldToMapScale(obs.size);
-        ctx.fillRect(mapX - mapSize / 2, mapY - mapSize / 2, mapSize, mapSize);
-    });
-}
-
-
-// --- Main Drawing Loop for the Worker ---
-
-function draw() {
-    if (isPaused || !ctx || !gameState.player) {
-        return;
-    }
-
-    const canvasWidth = config.canvasSize;
-    const canvasHeight = config.canvasSize;
-    const mapCenterX = canvasWidth / 2;
-    const mapCenterY = canvasHeight / 2;
-
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(mapCenterX, mapCenterY, mapCenterX, 0, Math.PI * 2);
-    ctx.clip();
-    
-    ctx.fillStyle = colors.background;
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-    ctx.save();
-    
-    ctx.translate(mapCenterX, mapCenterY);
-    ctx.scale(-1, -1);
-    ctx.rotate(gameState.player.rotationY);
-    
-    ctx.translate(-worldToMapScale(gameState.player.position.x), -worldToMapScale(gameState.player.position.z));
-
-    drawGrid();
-    drawStaticObstacles();
-    
-    gameState.enemies.forEach(e => drawTriangle(e.position.x, e.position.z, e.rotationY, colors.enemy));
-    gameState.barrels.forEach(b => drawDot(b.position.x, b.position.z, colors.barrel, 2));
-    gameState.powerUps.forEach(p => drawDot(p.position.x, p.position.z, colors.powerup, 4));
-
-    ctx.restore();
-
-    ctx.fillStyle = colors.viewCone;
-    ctx.beginPath();
-    ctx.moveTo(mapCenterX, mapCenterY);
-    ctx.arc(mapCenterX, mapCenterY, mapCenterX * 1.5, -config.viewConeAngle / 2 - Math.PI/2, config.viewConeAngle / 2 - Math.PI/2);
-    ctx.closePath();
-    ctx.fill();
-    
-    drawPlayerIcon(mapCenterX, mapCenterY, colors.player, 6);
-    
-    ctx.restore();
-
-    ctx.strokeStyle = colors.border;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(mapCenterX, mapCenterY, mapCenterX - 2, 0, Math.PI * 2);
-    ctx.stroke();
-}
-
-
-// --- Worker Message Handler ---
-
-self.onmessage = (e) => {
+// Main message handler
+self.onmessage = function(e) {
     const { type, payload } = e.data;
 
     switch (type) {
         case 'init':
-            // One-time setup
-            config = payload.config;
-            colors = payload.colors;
-            const canvas = payload.canvas; // This is the OffscreenCanvas
-            ctx = canvas.getContext('2d');
-            config.canvasSize = canvas.width; // Store canvas size in config
-            
-            // Start the drawing loop inside the worker
-            if (drawInterval) clearInterval(drawInterval);
-            drawInterval = setInterval(draw, 33); // Draw at ~30 FPS
+            // Initialize worker with canvas and world dimensions
+            canvasWidth = payload.canvasWidth;
+            mapSize = payload.mapSize;
             break;
-
-        case 'updateState':
-            // Receive fresh game state from main thread
-            gameState = payload;
-            break;
-
-        case 'setPaused':
-            // Pause/resume the drawing loop
-            isPaused = payload.isPaused;
+        case 'update':
+            // Process the game state and send back drawing commands
+            if (payload) {
+                const drawCommands = processGameState(payload);
+                self.postMessage({ type: 'draw', payload: drawCommands });
+            }
             break;
     }
 };
+
+/**
+ * Transforms a world point (x, z) into a final canvas coordinate,
+ * by replicating the main thread's canvas transforms mathematically.
+ * @param {number} worldX - The world X coordinate of the object.
+ * @param {number} worldZ - The world Z coordinate of the object.
+ * @param {object} player - The player state { position: {x, z}, rotationY }.
+ * @returns {Vec2} The final 2D coordinate for drawing on the canvas.
+ */
+function transformWorldPointToMap(worldX, worldZ, player) {
+    const scaleFactor = canvasWidth / mapSize;
+    const mapCenterX = canvasWidth / 2;
+    const mapCenterY = canvasWidth / 2;
+
+    // 1. Get object position relative to player in world scale
+    const relativeX = worldX - player.position.x;
+    const relativeZ = worldZ - player.position.z;
+
+    // 2. Convert to map scale
+    const mapRelativeX = relativeX * scaleFactor;
+    const mapRelativeZ = relativeZ * scaleFactor;
+
+    // 3. Apply the equivalent of `ctx.scale(-1, -1)`
+    const scaledX = -mapRelativeX;
+    const scaledZ = -mapRelativeZ;
+
+    // 4. Apply the equivalent of `ctx.rotate(player.rotationY)`
+    const playerRotation = player.rotationY;
+    const cosR = Math.cos(playerRotation);
+    const sinR = Math.sin(playerRotation);
+    const rotatedX = scaledX * cosR - scaledZ * sinR;
+    const rotatedZ = scaledX * sinR + scaledZ * cosR;
+
+    // 5. Apply the equivalent of `ctx.translate(mapCenterX, mapCenterY)`
+    const finalX = rotatedX + mapCenterX;
+    const finalY = rotatedZ + mapCenterY;
+
+    return new Vec2(finalX, finalY);
+}
+
+
+/**
+ * Processes the full game state to generate an array of drawing commands.
+ * @param {object} gameState - The current state of the game.
+ * @returns {Array<object>} An array of command objects for the main thread to draw.
+ */
+function processGameState(gameState) {
+    const { player, enemies, barrels, powerups, staticObstacles } = gameState;
+    if (!player) return [];
+
+    const commands = [];
+
+    // --- Process static obstacles ---
+    staticObstacles.forEach(obs => {
+        const pos = transformWorldPointToMap(obs.x, obs.z, player);
+        const size = (obs.size / mapSize) * canvasWidth;
+        commands.push({
+            type: 'rect',
+            x: pos.x - size / 2,
+            y: pos.y - size / 2,
+            width: size,
+            height: size,
+            entityType: 'obstacle'
+        });
+    });
+
+    // --- Process dynamic entities ---
+    enemies.forEach(e => {
+        const pos = transformWorldPointToMap(e.position.x, e.position.z, player);
+        // The rotation of the icon on the map is relative to the player's rotation
+        const finalRotation = e.rotationY - player.rotationY;
+        commands.push({
+            type: 'triangle',
+            x: pos.x,
+            y: pos.y,
+            rotation: finalRotation,
+            entityType: 'enemy'
+        });
+    });
+
+    barrels.forEach(b => {
+        const pos = transformWorldPointToMap(b.position.x, b.position.z, player);
+        commands.push({ type: 'dot', x: pos.x, y: pos.y, size: 2, entityType: 'barrel' });
+    });
+
+    powerups.forEach(p => {
+        const pos = transformWorldPointToMap(p.position.x, p.position.z, player);
+        commands.push({ type: 'dot', x: pos.x, y: pos.y, size: 4, entityType: 'powerup' });
+    });
+
+    return commands;
+}

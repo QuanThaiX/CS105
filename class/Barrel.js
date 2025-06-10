@@ -19,7 +19,7 @@ class Barrel extends GameObject {
         // Explosion properties
         this.canExplode = true;
         this.hasExploded = false;
-        this.explosionRadius = GAMECONFIG.SCENERY.BARREL_EXPLOSION.RADIUS * this.scale;
+        this.explosionRadius = GAMECONFIG.SCENERY.BARREL_EXPLOSION.RADIUS;
         this.explosionDamage = GAMECONFIG.SCENERY.BARREL_EXPLOSION.DAMAGE;
         this.explosionForce = GAMECONFIG.SCENERY.BARREL_EXPLOSION.PUSH_FORCE;
         this.maxHP = 50;
@@ -422,7 +422,7 @@ class Barrel extends GameObject {
         scene.add(flashLight);
 
 
-        const particleCount = 1000;
+        const particleCount = 450;
         const particlesGeometry = new THREE.BufferGeometry();
         const posArray = new Float32Array(particleCount * 3);
         const velocities = [];
@@ -458,7 +458,7 @@ class Barrel extends GameObject {
         particlesGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
 
         const particleMaterial = new THREE.PointsMaterial({
-            size: 0.9,
+            size: 0.7,
             vertexColors: true,
             blending: THREE.AdditiveBlending,
             transparent: true,
@@ -472,7 +472,7 @@ class Barrel extends GameObject {
 
 
 
-        const shockwaveGeometry = new THREE.RingGeometry(15, 15.2, 64);
+        const shockwaveGeometry = new THREE.RingGeometry(this.explosionRadius * 0.8, this.explosionRadius * 0.85, 64);
         const shockwaveMaterial = new THREE.MeshBasicMaterial({
             color: 0xffd700,
             transparent: true,
