@@ -180,15 +180,27 @@ class CollisionManager {
       const dynamicPayload = [];
       for (const obj of this.dynamicObjects) {
           if (obj.model && !obj.disposed) {
-              // Re-use the same Box3 object to avoid creating new ones
-              this.createScaledBoundingBox(obj, this._reusableBox3);
+              this._reusableBox3.setFromObject(obj.model);
+              const scale = this.getHitboxScale(obj);
+              if (scale.x !== 1.0 || scale.y !== 1.0 || scale.z !== 1.0) {
+                  const center = new THREE.Vector3();
+                  const size = new THREE.Vector3();
+                  this._reusableBox3.getCenter(center);
+                  this._reusableBox3.getSize(size);
+                  const newSize = new THREE.Vector3(size.x * scale.x, size.y * scale.y, size.z * scale.z);
+                  this._reusableBox3.setFromCenterAndSize(center, newSize);
+              }
+
               if (this._reusableBox3 && !this._reusableBox3.isEmpty()) {
                   dynamicPayload.push({
                       id: obj.id,
                       bbox: {
                           min: { x: this._reusableBox3.min.x, y: this._reusableBox3.min.y, z: this._reusableBox3.min.z },
                           max: { x: this._reusableBox3.max.x, y: this._reusableBox3.max.y, z: this._reusableBox3.max.z }
-                      }
+                      },
+                      // --- THAY ĐỔI Ở ĐÂY ---
+                      // Gửi thêm thông tin để worker biết đây là thùng phuy
+                      isBarrel: obj instanceof Barrel 
                   });
               }
           }
@@ -236,10 +248,18 @@ class CollisionManager {
           for (const pair of payload.pairs) {
               const objA = this.objectsMap.get(pair.idA);
               const objB = this.objectsMap.get(pair.idB);
-              
+
               if (objA && objB && !objA.disposed && !objB.disposed) {
                   this.handleCollisionPair(objA, objB);
               }
+          }
+      } 
+      else if (type === 'explosion_results') {
+          const barrel = this.objectsMap.get(payload.sourceId);
+          const explosionSource = payload.explosionSourceId ? this.objectsMap.get(payload.explosionSourceId) : null;
+          
+          if (barrel && barrel.applyWorkerExplosionResults) {
+              barrel.applyWorkerExplosionResults(payload.affectedObjects, explosionSource);
           }
       }
   }

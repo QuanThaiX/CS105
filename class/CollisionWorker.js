@@ -1,37 +1,73 @@
 // ./class/CollisionWorker.js
+
+// --- START: SELF-CONTAINED HELPER CLASSES (No external dependencies) ---
+
+/**
+ * A lightweight, dependency-free 3D vector class for use within the worker.
+ */
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) {
-        this.x = x; this.y = y; this.z = z;
+        this.x = x;
+        this.y = y;
+        this.z = z;
     }
-    addVectors(a, b) {
-        this.x = a.x + b.x; this.y = a.y + b.y; this.z = a.z + b.z;
+    copy(v) {
+        this.x = v.x;
+        this.y = v.y;
+        this.z = v.z;
         return this;
     }
-    subVectors(a, b) {
-        this.x = a.x - b.x; this.y = a.y - b.y; this.z = a.z - b.z;
+    addVectors(a, b) {
+        this.x = a.x + b.x;
+        this.y = a.y + b.y;
+        this.z = a.z + b.z;
         return this;
     }
     multiplyScalar(s) {
-        this.x *= s; this.y *= s; this.z *= s;
+        this.x *= s;
+        this.y *= s;
+        this.z *= s;
         return this;
+    }
+    distanceTo(v) {
+        const dx = this.x - v.x;
+        const dy = this.y - v.y;
+        const dz = this.z - v.z;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 }
 
+/**
+ * A lightweight, dependency-free 3D bounding box for use within the worker.
+ */
 class Box3 {
     constructor(min = new Vec3(Infinity, Infinity, Infinity), max = new Vec3(-Infinity, -Infinity, -Infinity)) {
         this.min = min;
         this.max = max;
     }
+
+    setFromCenterAndSize(center, size) {
+        const halfSize = new Vec3(size.x / 2, size.y / 2, size.z / 2);
+        this.min.copy(center).addVectors(center, halfSize.multiplyScalar(-1));
+        this.max.copy(center).addVectors(center, halfSize);
+        return this;
+    }
+
+    // Simplified getCenter for worker
     getCenter(target) {
         return target.addVectors(this.min, this.max).multiplyScalar(0.5);
     }
+
     intersectsBox(box) {
         return !(box.max.x < this.min.x || box.min.x > this.max.x ||
-                 box.max.y < this.min.y || box.min.y > this.max.y ||
-                 box.max.z < this.min.z || box.min.z > this.max.z);
+            box.max.y < this.min.y || box.min.y > this.max.y ||
+            box.max.z < this.min.z || box.min.z > this.max.z);
     }
 }
 
+/**
+ * A lightweight, dependency-free Octree implementation for fast spatial lookups.
+ */
 class Octree {
     constructor(bounds, maxObjects = 8, maxLevels = 8, level = 0) {
         this.bounds = bounds;
@@ -44,18 +80,20 @@ class Octree {
 
     subdivide() {
         const { min, max } = this.bounds;
-        const halfSize = new Vec3().subVectors(max, min).multiplyScalar(0.5);
+        const halfSize = new Vec3().addVectors(max, min).multiplyScalar(0.5);
         const center = new Vec3().addVectors(min, halfSize);
 
         const childrenBounds = [
-            new Box3(new Vec3(center.x, min.y, center.z), new Vec3(max.x, center.y, max.z)),
-            new Box3(new Vec3(min.x, min.y, center.z), new Vec3(center.x, center.y, max.z)),
-            new Box3(new Vec3(min.x, min.y, min.z), new Vec3(center.x, center.y, center.z)),
-            new Box3(new Vec3(center.x, min.y, min.z), new Vec3(max.x, center.y, center.z)),
+            // Top half
             new Box3(new Vec3(center.x, center.y, center.z), new Vec3(max.x, max.y, max.z)),
             new Box3(new Vec3(min.x, center.y, center.z), new Vec3(center.x, max.y, max.z)),
             new Box3(new Vec3(min.x, center.y, min.z), new Vec3(center.x, max.y, center.z)),
             new Box3(new Vec3(center.x, center.y, min.z), new Vec3(max.x, max.y, max.z)),
+            // Bottom half
+            new Box3(new Vec3(center.x, min.y, center.z), new Vec3(max.x, center.y, max.z)),
+            new Box3(new Vec3(min.x, min.y, center.z), new Vec3(center.x, center.y, max.z)),
+            new Box3(new Vec3(min.x, min.y, min.z), new Vec3(center.x, center.y, center.z)),
+            new Box3(new Vec3(center.x, min.y, min.z), new Vec3(max.x, center.y, center.z))
         ];
 
         for (let i = 0; i < 8; i++) {
@@ -69,32 +107,43 @@ class Octree {
 
         const fitsInTop = bbox.min.y >= center.y;
         const fitsInBottom = bbox.max.y <= center.y;
+
+        if (fitsInTop) {
+            index = 0; 
+        } else if (fitsInBottom) {
+            index = 4;
+        } else {
+            return -1; 
+        }
+
         const fitsInFront = bbox.min.z >= center.z;
         const fitsInBack = bbox.max.z <= center.z;
+
+        if (fitsInFront) {
+        } else if (fitsInBack) {
+            index += 2;
+        } else {
+            return -1; 
+        }
+
         const fitsInRight = bbox.min.x >= center.x;
         const fitsInLeft = bbox.max.x <= center.x;
 
-        if (fitsInBottom) {
-            if (fitsInFront) {
-                if (fitsInRight) index = 0; else if (fitsInLeft) index = 1;
-            } else if (fitsInBack) {
-                if (fitsInLeft) index = 2; else if (fitsInRight) index = 3;
-            }
-        } else if (fitsInTop) {
-            if (fitsInFront) {
-                if (fitsInRight) index = 4; else if (fitsInLeft) index = 5;
-            } else if (fitsInBack) {
-                if (fitsInLeft) index = 6; else if (fitsInRight) index = 7;
-            }
+        if (fitsInRight) {
+             // Nằm ở bên phải, không cộng thêm
+        } else if (fitsInLeft) {
+            index += 1; // Nằm ở bên trái, cộng 1
+        } else {
+            return -1; // Nằm ở cả trái và phải
         }
+
         return index;
     }
-
-    insert(obj, bbox) {
+    insert(obj) {
         if (this.nodes.length > 0) {
-            const index = this.getIndex(bbox);
+            const index = this.getIndex(obj.bbox);
             if (index !== -1) {
-                this.nodes[index].insert(obj, bbox);
+                this.nodes[index].insert(obj);
                 return;
             }
         }
@@ -105,13 +154,13 @@ class Octree {
             if (this.nodes.length === 0) {
                 this.subdivide();
             }
+
             let i = 0;
             while (i < this.objects.length) {
                 const currentObj = this.objects[i];
-                const currentBBox = new Box3(new Vec3(currentObj.bbox.min.x, currentObj.bbox.min.y, currentObj.bbox.min.z), new Vec3(currentObj.bbox.max.x, currentObj.bbox.max.y, currentObj.bbox.max.z));
-                const index = this.getIndex(currentBBox);
+                const index = this.getIndex(currentObj.bbox);
                 if (index !== -1) {
-                    this.nodes[index].insert(currentObj, currentBBox);
+                    this.nodes[index].insert(currentObj);
                     this.objects.splice(i, 1);
                 } else {
                     i++;
@@ -120,17 +169,23 @@ class Octree {
         }
     }
 
-    retrieve(obj, bbox) {
+    retrieve(obj) {
         let returnObjects = [...this.objects];
-        const index = this.getIndex(bbox);
 
-        if (index !== -1 && this.nodes.length > 0) {
-            returnObjects.push(...this.nodes[index].retrieve(obj, bbox));
-        } else if (index === -1 && this.nodes.length > 0) { // Spans multiple children
-            for (let i = 0; i < this.nodes.length; i++) {
-                returnObjects.push(...this.nodes[i].retrieve(obj, bbox));
+        if (this.nodes.length > 0) {
+            const index = this.getIndex(obj.bbox);
+            if (index !== -1) {
+                returnObjects.push(...this.nodes[index].retrieve(obj));
+            } else {
+                // If the object spans multiple nodes, check all of them
+                for (let i = 0; i < this.nodes.length; i++) {
+                    if (obj.bbox.intersectsBox(this.nodes[i].bounds)) {
+                        returnObjects.push(...this.nodes[i].retrieve(obj));
+                    }
+                }
             }
         }
+
         return returnObjects;
     }
 
@@ -143,90 +198,182 @@ class Octree {
     }
 }
 
-let octree;
-let worldBounds;
-// NEW: Persistent object lists
+// --- END: SELF-CONTAINED HELPER CLASSES ---
+
+
+// --- Worker State ---
+let worldOctree;
 let staticObjects = new Map();
 let dynamicObjects = new Map();
+/**
+ * Converts a plain bbox object from the main thread into a Box3 instance for calculations.
+ * @param {object} bboxPayload - The {min: {x,y,z}, max: {x,y,z}} object.
+ * @returns {Box3} An instance of our worker's Box3 class.
+ */
+function createBox3FromPayload(bboxPayload) {
+    return new Box3(
+        new Vec3(bboxPayload.min.x, bboxPayload.min.y, bboxPayload.min.z),
+        new Vec3(bboxPayload.max.x, bboxPayload.max.y, bboxPayload.max.z)
+    );
+}
 
-
-// --- Worker Main Logic ---
-self.onmessage = function(e) {
-    const { type, payload } = e.data;
-
-    switch (type) {
-        case 'init':
-            const boundsData = payload.worldBounds;
-            worldBounds = new Box3(new Vec3(boundsData.min.x, boundsData.min.y, boundsData.min.z), new Vec3(boundsData.max.x, boundsData.max.y, boundsData.max.z));
-            octree = new Octree(worldBounds, 8, 8);
-            staticObjects.clear();
-            dynamicObjects.clear();
-            break;
-
-        case 'full_update':
-            // Received on the first frame
-            staticObjects.clear();
-            dynamicObjects.clear();
-            payload.staticObjects.forEach(obj => staticObjects.set(obj.id, obj));
-            payload.dynamicObjects.forEach(obj => dynamicObjects.set(obj.id, obj));
-            runCollisionCheck();
-            break;
-            
-        case 'dynamic_update':
-            // Received on subsequent frames
-            dynamicObjects.clear();
-            payload.dynamicObjects.forEach(obj => dynamicObjects.set(obj.id, obj));
-            runCollisionCheck();
-            break;
-
-        case 'object_became_static':
-            // Handle a barrel exploding
-            dynamicObjects.delete(payload.id);
-            staticObjects.set(payload.id, payload);
-            // No need to run collision check here, it will happen on next update
-            break;
+/**
+ * Rebuilds the Octree from scratch using all known static and dynamic objects.
+ */
+function rebuildOctree() {
+    worldOctree.clear();
+    for (const obj of staticObjects.values()) {
+        worldOctree.insert(obj);
     }
-};
-
-function runCollisionCheck() {
-    if (!octree) return;
-
-    // 1. Rebuild Octree efficiently
-    octree.clear();
-    for (const objData of staticObjects.values()) {
-        const bbox = new Box3(new Vec3(objData.bbox.min.x, objData.bbox.min.y, objData.bbox.min.z), new Vec3(objData.bbox.max.x, objData.bbox.max.y, objData.bbox.max.z));
-        octree.insert(objData, bbox);
+    for (const obj of dynamicObjects.values()) {
+        worldOctree.insert(obj);
     }
-    for (const objData of dynamicObjects.values()) {
-        const bbox = new Box3(new Vec3(objData.bbox.min.x, objData.bbox.min.y, objData.bbox.min.z), new Vec3(objData.bbox.max.x, objData.bbox.max.y, objData.bbox.max.z));
-        octree.insert(objData, bbox);
+}
+function processExplosion(payload, octree) {
+    if (!octree) {
+        console.error("Collision Worker: Octree is not available to process explosion.");
+        return;
     }
 
-    // 2. Perform collision checks (only need to check dynamic objects against the whole tree)
-    const collisionPairs = [];
-    const processedPairs = new Set();
+    const { sourceId, explosionSourceId, position, radius, damage, force, chainReaction } = payload;
     
-    for (const objA of dynamicObjects.values()) {
-        const boxA = new Box3(new Vec3(objA.bbox.min.x, objA.bbox.min.y, objA.bbox.min.z), new Vec3(objA.bbox.max.x, objA.bbox.max.y, objA.bbox.max.z));
-        const potentialColliders = octree.retrieve(objA, boxA);
-
-        for (const objB of potentialColliders) {
-            if (objA.id === objB.id) continue;
-
-            const pairKey = objA.id < objB.id ? `${objA.id}-${objB.id}` : `${objB.id}-${objA.id}`;
-            if (processedPairs.has(pairKey)) continue;
-            processedPairs.add(pairKey);
+    const explosionCenter = new Vec3(position.x, position.y, position.z);
+    const searchBox = new Box3(
+        new Vec3(position.x - radius, position.y - radius, position.z - radius),
+        new Vec3(position.x + radius, position.y + radius, position.z + radius)
+    );
+    
+    const potentialVictims = octree.retrieve({ bbox: searchBox });
+    const affectedObjects = [];
+    
+    for (const victim of potentialVictims) {
+        if (victim.id === sourceId) continue;
+        
+        const victimPosition = victim.bbox.getCenter(new Vec3());
+        const distance = explosionCenter.distanceTo(victimPosition);
+        
+        if (distance <= radius) {
+            const damageMultiplier = Math.max(0, 1 - (distance / radius));
+            const actualDamage = Math.floor(damage * damageMultiplier);
+            const actualForce = force * damageMultiplier;
             
-            // Note: objB from retrieve doesn't have its box pre-calculated, so we do it here.
-            const boxB = new Box3(new Vec3(objB.bbox.min.x, objB.bbox.min.y, objB.bbox.min.z), new Vec3(objB.bbox.max.x, objB.bbox.max.y, objB.bbox.max.z));
+            const isVictimABarrel = victim.isBarrel || false;
             
-            if (boxA.intersectsBox(boxB)) {
-                collisionPairs.push({ idA: objA.id, idB: objB.id });
+            if (actualDamage > 0) {
+                 affectedObjects.push({
+                    objectId: victim.id,
+                    distance: distance,
+                    damage: actualDamage,
+                    force: actualForce,
+                    isBarrel: chainReaction && isVictimABarrel, 
+                });
             }
         }
     }
+    
+    self.postMessage({
+        type: 'explosion_results',
+        payload: {
+            sourceId: sourceId,
+            explosionSourceId: explosionSourceId,
+            affectedObjects: affectedObjects,
+        }
+    });
+}
+/**
+ * The core collision detection logic using the Octree.
+ */
+function checkCollisions() {
+    const collisionPairs = [];
+    // A Set is used to prevent checking the same pair twice (e.g., A-B and B-A).
+    const checkedPairs = new Set();
 
+    // Iterate through only the dynamic objects, as static-static collisions are not needed.
+    for (const objA of dynamicObjects.values()) {
+        // Retrieve only the objects that are spatially close to objA. THIS IS THE OPTIMIZATION.
+        const potentialColliders = worldOctree.retrieve(objA);
+
+        for (const objB of potentialColliders) {
+            // Don't check an object against itself.
+            if (objA.id === objB.id) continue;
+
+            // Create a unique key for the pair to avoid duplicates.
+            const pairKey = objA.id < objB.id ? `${objA.id}-${objB.id}` : `${objB.id}-${objA.id}`;
+            if (checkedPairs.has(pairKey)) continue;
+
+            // Perform the final, precise bounding box check.
+            if (objA.bbox.intersectsBox(objB.bbox)) {
+                collisionPairs.push({ idA: objA.id, idB: objB.id });
+            }
+
+            checkedPairs.add(pairKey);
+        }
+    }
+
+    // If any collisions were found, send them back to the main thread.
     if (collisionPairs.length > 0) {
         self.postMessage({ type: 'collisions', payload: { pairs: collisionPairs } });
     }
 }
+
+
+self.onmessage = (e) => {
+    const { type, payload } = e.data;
+    switch (type) {
+        case 'init':
+            const worldBounds = createBox3FromPayload(payload.worldBounds);
+            worldOctree = new Octree(worldBounds, 8, 4);
+            // isInitialized = true; 
+            break;
+
+        case 'full_update':
+            staticObjects.clear();
+            dynamicObjects.clear();
+            
+            payload.staticObjects.forEach(obj => {
+                obj.bbox = createBox3FromPayload(obj.bbox);
+                staticObjects.set(obj.id, obj);
+            });
+            payload.dynamicObjects.forEach(obj => {
+                obj.bbox = createBox3FromPayload(obj.bbox);
+                // Gán thuộc tính isBarrel cho đối tượng trong worker
+                obj.isBarrel = payload.dynamicObjects.find(d => d.id === obj.id)?.isBarrel || false;
+                dynamicObjects.set(obj.id, obj);
+            });
+            
+            rebuildOctree();
+            checkCollisions();
+            break;
+
+        case 'dynamic_update':
+            worldOctree.clear();
+            
+            dynamicObjects.clear();
+            payload.dynamicObjects.forEach(obj => {
+                obj.bbox = createBox3FromPayload(obj.bbox);
+                // Gán thuộc tính isBarrel cho đối tượng trong worker
+                obj.isBarrel = payload.dynamicObjects.find(d => d.id === obj.id)?.isBarrel || false;
+                dynamicObjects.set(obj.id, obj);
+});
+
+            rebuildOctree();
+            checkCollisions();
+            break;
+            
+        case 'object_became_static':
+            if(dynamicObjects.has(payload.id)) {
+                dynamicObjects.delete(payload.id);
+                const staticObj = {
+                    id: payload.id,
+                    bbox: createBox3FromPayload(payload.bbox),
+                    isBarrel: true // Thùng phuy đã nổ chắc chắn là thùng phuy
+                };
+                staticObjects.set(payload.id, staticObj);
+            }
+            break;
+            
+        case 'process_explosion':
+            processExplosion(payload, worldOctree);
+            break;
+    }
+};

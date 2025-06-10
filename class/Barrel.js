@@ -262,29 +262,105 @@ class Barrel extends GameObject {
     }
 
     /**
-     * Trigger barrel explosion with area damage
+     * Trigger barrel explosion.
+     * NEW: This function now offloads damage calculation to the CollisionWorker.
      * @param {GameObject} explosionSource - What caused the explosion
      */
     explode(explosionSource = null) {
         if (this.hasExploded || !this.canExplode) return;
-        CollisionManager.instance.notifyObjectStateChange(this);
+        
+        // --- 1. Update state immediately on main thread ---
         this.hasExploded = true;
-        console.log(`💥 Barrel ${this.id} exploded! Radius: ${this.explosionRadius}`);
-        
-        // Play explosion sound
+        CollisionManager.instance.notifyObjectStateChange(this);
+        console.log(`💥 Barrel ${this.id} is exploding! Offloading damage calculation to worker.`);
+
         this.playExplosionSound();
+        this.createExplosionEffects(); 
+
+        const collisionManager = CollisionManager.instance;
+        if (collisionManager && collisionManager.worker) {
+            collisionManager.worker.postMessage({
+                type: 'process_explosion',
+                payload: {
+                    sourceId: this.id,
+                    explosionSourceId: explosionSource ? explosionSource.id : null,
+                    position: { x: this.position.x, y: this.position.y, z: this.position.z },
+                    radius: this.explosionRadius + 10,
+                    damage: this.explosionDamage,
+                    force: this.explosionForce,
+                    chainReaction: GAMECONFIG.SCENERY.BARREL_EXPLOSION.CHAIN_REACTION
+                }
+            });
+        } else {
+            // Fallback for when worker is not available (should not happen in normal flow)
+            console.warn("Collision worker not available. Applying explosion damage on main thread (fallback).");
+            const damageDealt = this.applyExplosionDamageLegacy(explosionSource);
+            console.log(damageDealt)
+            this.notifyExplosionEvent(damageDealt, explosionSource);
+        }
+
+        this.destroy(); 
+    }
+    
+ 
+    /**
+     * Called by CollisionManager when the worker sends back the explosion results.
+     * @param {Array<object>} affectedObjectsData - Data about objects to damage.
+     * @param {object} explosionSource - The original source of the explosion.
+     */
+    applyWorkerExplosionResults(affectedObjectsData, explosionSource) {
+        console.log(`💥 Barrel ${this.id} received explosion results from worker for ${affectedObjectsData.length} objects.`);
+        const game = Game.instance;
+        const collisionManager = CollisionManager.instance; 
         
-        // Calculate explosion effects
-        const explosionData = this.calculateExplosionEffects();
-        
-        // Apply damage to objects in explosion radius
-        const damageDealt = this.applyExplosionDamage(explosionSource);
-        
-        // Create explosion visual effects
-        this.createExplosionEffects();
-        
-        // Notify explosion event
-        EventManager.instance.notify(EVENT.BARREL_EXPLODED, {
+        if (!game || !collisionManager) return;
+
+        const damageDealt = [];
+
+ 
+        affectedObjectsData.forEach(({ objectId, distance, damage, force, isBarrel }) => {
+            const object = collisionManager.objectsMap.get(objectId);
+            if (!object || object.disposed) return;
+
+            // Apply damage
+            if (object.takeDamage && typeof object.takeDamage === 'function') {
+                object.takeDamage(damage, this);
+            }
+            
+            // Apply knockback
+            if (object.applyKnockback && typeof object.applyKnockback === 'function') {
+                const direction = new THREE.Vector3().subVectors(object.position, this.position).normalize();
+                
+                const horizontalDirection = direction.clone();
+                horizontalDirection.y = 0;
+                horizontalDirection.normalize();
+                
+                if (horizontalDirection.lengthSq() > 0) {
+                    object.applyKnockback(horizontalDirection, force);
+                }
+            }
+                        
+            damageDealt.push({ target: object, damage, distance });
+            console.log('Damage dealt:', damageDealt)
+            if (isBarrel && !object.hasExploded) {
+                setTimeout(() => {
+                    if (!object.hasExploded) {
+                        object.explode(this);
+                    }
+                }, 100 + Math.random() * 200);
+            }
+        });
+
+        this.notifyExplosionEvent(damageDealt, explosionSource);
+    }
+    
+    /**
+     * Centralized function to fire the explosion event.
+     * @param {Array} damageDealt - The list of damage results.
+     * @param {GameObject} explosionSource - The original source.
+     */
+    notifyExplosionEvent(damageDealt, explosionSource) {
+         EventManager.instance.notify(EVENT.BARREL_EXPLODED, {
             barrel: this,
             explosion: {
                 position: this.position.clone(),
@@ -296,9 +372,43 @@ class Barrel extends GameObject {
             chainReaction: GAMECONFIG.SCENERY.BARREL_EXPLOSION.CHAIN_REACTION,
             explosionSource: explosionSource
         });
-        
-        // Mark for disposal
-        this.destroy();
+    }
+
+    /**
+     * Legacy function for fallback calculation. Keep it for safety.
+     * This is the OLD applyExplosionDamage function, renamed.
+     */
+    applyExplosionDamageLegacy(explosionSource) {
+        const game = Game.instance;
+        if (!game) return [];
+
+        const allObjects = [
+            ...(game.enemies || []),
+            ...(game.barrels || []),
+            game.playerTank
+        ].filter(obj => obj && !obj.disposed && obj !== this);
+
+        const damageDealt = [];
+
+        allObjects.forEach(obj => {
+            const distance = this.position.distanceTo(obj.position);
+            if (distance <= this.explosionRadius) {
+                const damageMultiplier = Math.max(0, 1 - (distance / this.explosionRadius));
+                const actualDamage = Math.floor(this.explosionDamage * damageMultiplier);
+                
+                if (obj.takeDamage && typeof obj.takeDamage === 'function') {
+                    obj.takeDamage(actualDamage, this);
+                }
+                
+                damageDealt.push({ target: obj, damage: actualDamage, distance });
+
+                if (obj instanceof Barrel && GAMECONFIG.SCENERY.BARREL_EXPLOSION.CHAIN_REACTION && !obj.hasExploded) {
+                    setTimeout(() => !obj.hasExploded && obj.explode(this), 100 + Math.random() * 200);
+                }
+            }
+        });
+
+        return damageDealt;
     }
 
     /**
@@ -472,7 +582,7 @@ class Barrel extends GameObject {
 
 
 
-        const shockwaveGeometry = new THREE.RingGeometry(this.explosionRadius * 0.8, this.explosionRadius * 0.85, 64);
+        const shockwaveGeometry = new THREE.RingGeometry(this.explosionRadius * 0.3, this.explosionRadius * 0.35, 64);
         const shockwaveMaterial = new THREE.MeshBasicMaterial({
             color: 0xffd700,
             transparent: true,

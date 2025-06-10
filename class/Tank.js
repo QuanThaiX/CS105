@@ -642,8 +642,10 @@ this._bulletPosition.copy(this.model.position);
  * @param {number} force - The magnitude of the force.
  */
 applyKnockback(direction, force) {
-    // We're adding to any existing knockback velocity
-    this.knockbackVelocity.add(direction.clone().multiplyScalar(force / 100)); // Divide by a factor to make it manageable
+    const horizontalDirection = direction.clone();
+    horizontalDirection.y = 0;
+    horizontalDirection.normalize();
+    this.knockbackVelocity.add(horizontalDirection.multiplyScalar(force / 100));
 }
 
 update() {
@@ -660,13 +662,6 @@ update() {
       this.model.rotation.x = Math.sin(this._hoverTime * 1.5) * 0.02;
       this.model.rotation.z = Math.cos(this._hoverTime * 1.2) * 0.02;
     }
-    if (this.isHoverTank && this.model) {
-
-      this.model.position.y = this.initialY + Math.sin(time * 2) * 0.1;
-
-      this.model.rotation.x = Math.sin(time * 1.5) * 0.02;
-      this.model.rotation.z = Math.cos(time * 1.2) * 0.02;
-    }
     if (this.model) {
       this.position.copy(this.model.position);
     }
@@ -680,8 +675,8 @@ update() {
 
 
     if (this.enemyIndicator) {
-      const time = performance.now() * 0.002;
-      this.enemyIndicator.position.y = 3.5 + Math.sin(time) * 0.25;
+      const indicatorTime = this._hoverTime * 2;
+      this.enemyIndicator.position.y = 3.5 + Math.sin(indicatorTime) * 0.25;
     }
 
     const currentTime = Date.now();
