@@ -41,7 +41,6 @@ export function createTank() {
         toneMapped: false,
     });
     
-    // --- Central Body ---
     const bodyGeo = new THREE.IcosahedronGeometry(1.5, 1);
     const body = new THREE.Mesh(bodyGeo, bodyMaterial);
     body.scale.y = 0.6;
@@ -50,7 +49,6 @@ export function createTank() {
     body.receiveShadow = true;
     tank.add(body);
     
-    // --- Detail Lights ---
     const lightGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
     const light1 = new THREE.Mesh(lightGeo, accentGlowMaterial);
     light1.position.set(-0.7, 0.6, 1.2);
@@ -61,7 +59,6 @@ export function createTank() {
     tank.add(light2);
 
 
-    // --- Turret ---
     const turretGroup = new THREE.Group();
     turretGroup.position.y = 0.8;
     
@@ -76,7 +73,6 @@ export function createTank() {
 
     tank.add(turretGroup);
 
-    // --- Cannon ---
     const cannonGroup = new THREE.Group();
     cannonGroup.position.set(0, 0.7, 0.5);
     turretGroup.add(cannonGroup);
@@ -161,7 +157,6 @@ export function createTank() {
     const initialY = 1.8; 
     tank.position.y = initialY;
 
-    // Set a default "at rest" pose for the legs
     const initialUpperAngle = THREE.MathUtils.degToRad(40);
     const initialLowerAngle = THREE.MathUtils.degToRad(-110);
     legs.forEach(leg => {

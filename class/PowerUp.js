@@ -1,4 +1,4 @@
-// ./class/PowerUp.js
+
 import * as THREE from 'three';
 import { GameObject } from './GameObject.js';
 import { Game } from './Game.js';
@@ -29,22 +29,22 @@ const glowTexture = (() => {
 
 export class PowerUp extends GameObject {
     constructor(id, type) {
-        // Create at an inactive position
-        super(id, FACTION.NEUTRAL, { x: 0, y: -100, z: 0 }, false); // isCollision = false initially
-        
+
+        super(id, FACTION.NEUTRAL, { x: 0, y: -100, z: 0 }, false);
+
         this.powerUpType = type;
         this.isActive = false;
 
-        this.initialY = 1.5; 
+        this.initialY = 1.5;
         this.time = Math.random() * Math.PI * 2;
 
         this.innerCore = null;
         this.outerIndicator = null;
-        
+
         this.createEnhancedModel();
         this.model.visible = false;
     }
-    
+
     createEnhancedModel() {
         const powerUpGroup = new THREE.Group();
         const coreGeometry = new THREE.IcosahedronGeometry(0.6, 0);
@@ -71,11 +71,11 @@ export class PowerUp extends GameObject {
         this.outerIndicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
         this.outerIndicator.rotation.x = Math.PI / 2;
         powerUpGroup.add(this.outerIndicator);
-        
+
         const light = new THREE.PointLight(this.powerUpType.color, 20, 12);
         light.castShadow = true;
         powerUpGroup.add(light);
-        
+
         const glowMaterial = new THREE.SpriteMaterial({
             map: glowTexture,
             color: this.powerUpType.color,
@@ -87,16 +87,16 @@ export class PowerUp extends GameObject {
         const glowSprite = new THREE.Sprite(glowMaterial);
         glowSprite.scale.set(5, 5, 1);
         powerUpGroup.add(glowSprite);
-        
+
         powerUpGroup.position.copy(this.position);
         this.setModel(powerUpGroup);
     }
-    
+
     activate(position) {
         this.isActive = true;
-        this.isCollision = true; 
+        this.isCollision = true;
         this.model.visible = true;
-        this.model.scale.set(1, 1, 1); 
+        this.model.scale.set(1, 1, 1);
 
         this.position.copy(position);
         this.position.y = 1.5;
@@ -105,14 +105,14 @@ export class PowerUp extends GameObject {
 
         CollisionManager.instance.add(this);
     }
-    
+
     deactivate() {
         this.isActive = false;
-        this.isCollision = false; 
+        this.isCollision = false;
         this.model.visible = false;
-        
-        CollisionManager.instance.remove(this); 
-        
+
+        CollisionManager.instance.remove(this);
+
         this.position.set(0, -100, 0);
         this.model.position.copy(this.position);
     }
@@ -129,10 +129,10 @@ export class PowerUp extends GameObject {
         this.outerIndicator.rotation.z += 0.02;
         this.position.copy(this.model.position);
     }
-    
+
     collect() {
         if (!this.isActive) return;
-        this.deactivate(); 
+        this.deactivate();
     }
 
 }

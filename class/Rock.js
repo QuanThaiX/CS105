@@ -1,4 +1,4 @@
-// ./class/Rock.js
+
 
 import * as THREE from 'three';
 import { GLTFLoader } from '../three/examples/jsm/loaders/GLTFLoader.js';
@@ -13,38 +13,38 @@ class Rock extends GameObject {
         super(id, 'neutral', position, true);
         this.scale = scale;
         this.rockType = rockType;
-        this.rotation = rotation; 
+        this.rotation = rotation;
         this.hitBoxScale = HITBOX_SCALE.ROCK;
         this.loadModel();
     }
 
     loadModel() {
-        // Thử lấy từ ModelLoader cache trước
+
         const modelLoader = new ModelLoader();
-        
+
         if (modelLoader.isPreloaded) {
             try {
                 const model = modelLoader.getRockModel(
-                    this.rockType, 
-                    this.position, 
-                    this.scale, 
+                    this.rockType,
+                    this.position,
+                    this.scale,
                     this.rotation
                 );
-                
+
                 if (model) {
-                    // Setup shadows cho model từ cache
+
                     model.traverse((child) => {
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
-                            
-                            // Cải thiện material cho đá để tạo shadow và ánh sáng tốt hơn
+
+
                             if (child.material) {
                                 if (child.material.isMeshStandardMaterial) {
-                                    child.material.roughness = 0.9; // Đá có bề mặt nhám
-                                    child.material.metalness = 0.1; // Đá không có tính kim loại
+                                    child.material.roughness = 0.9;
+                                    child.material.metalness = 0.1;
                                 } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
-                                    // Chuyển đổi sang MeshStandardMaterial để có shadow tốt hơn
+
                                     const newMaterial = new THREE.MeshStandardMaterial({
                                         map: child.material.map,
                                         color: child.material.color,
@@ -56,10 +56,10 @@ class Rock extends GameObject {
                             }
                         }
                     });
-                    
+
                     this.setModel(model);
-                    
-                    // Hiển thị box helper nếu debug mode
+
+
                     if (Game.instance.debug) {
                         this.createBoxHelper();
                     }
@@ -70,15 +70,15 @@ class Rock extends GameObject {
             }
         }
 
-        // Fallback: Load trực tiếp nếu chưa preload
+
         console.warn(`⚠️ Rock model ${this.rockType} chưa được preload, đang load trực tiếp...`);
         this.loadModelDirect();
     }
 
     loadModelDirect() {
-        // Xác định đường dẫn đến model dựa trên loại đá
+
         let modelPath;
-        
+
         switch (this.rockType) {
             case 'rock09':
                 modelPath = './assets/rock09/rock09.gltf';
@@ -91,31 +91,31 @@ class Rock extends GameObject {
                 break;
         }
 
-        // Sử dụng GLTFLoader để tải model
+
         const loader = new GLTFLoader();
         loader.load(
             modelPath,
             (gltf) => {
                 const model = gltf.scene;
-                
-                // Thiết lập vị trí, kích thước và góc xoay
+
+
                 model.position.copy(this.position);
                 model.scale.set(this.scale, this.scale, this.scale);
                 model.rotation.y = this.rotation;
-                
-                // Thiết lập bóng đổ
+
+
                 model.traverse((child) => {
                     if (child.isMesh) {
                         child.castShadow = true;
                         child.receiveShadow = true;
-                        
-                        // Cải thiện material cho đá để tạo shadow và ánh sáng tốt hơn
+
+
                         if (child.material) {
                             if (child.material.isMeshStandardMaterial) {
-                                child.material.roughness = 0.9; // Đá có bề mặt nhám
-                                child.material.metalness = 0.1; // Đá không có tính kim loại
+                                child.material.roughness = 0.9;
+                                child.material.metalness = 0.1;
                             } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
-                                // Chuyển đổi sang MeshStandardMaterial để có shadow tốt hơn
+
                                 const newMaterial = new THREE.MeshStandardMaterial({
                                     map: child.material.map,
                                     color: child.material.color,
@@ -127,10 +127,10 @@ class Rock extends GameObject {
                         }
                     }
                 });
-                
+
                 this.setModel(model);
-                
-                // Hiển thị box helper nếu debug mode
+
+
                 if (Game.instance.debug) {
                     this.createBoxHelper();
                 }
@@ -138,8 +138,8 @@ class Rock extends GameObject {
             undefined,
             (error) => {
                 console.error('Không thể tải model đá:', error);
-                
-                // Tạo hình khối đơn giản thay thế nếu không tải được model
+
+
                 this.createFallbackModel();
             }
         );
@@ -147,11 +147,11 @@ class Rock extends GameObject {
 
     createBoxHelper() {
         if (this.model && Game.instance.debug) {
-            // Tạo box helper
+
             const boxHelper = new THREE.BoxHelper(this.model, 0xffff00);
             Game.instance.scene.add(boxHelper);
-            
-            // Lưu tham chiếu để có thể xóa sau này
+
+
             this.boxHelper = boxHelper;
         }
     }
@@ -164,7 +164,7 @@ class Rock extends GameObject {
 
     createFallbackModel() {
         const geometry = new THREE.BoxGeometry(2 * this.scale, 2 * this.scale, 2 * this.scale);
-        const material = new THREE.MeshStandardMaterial({ 
+        const material = new THREE.MeshStandardMaterial({
             color: 0x888888,
             roughness: 0.9,
             metalness: 0.1
@@ -174,11 +174,11 @@ class Rock extends GameObject {
         mesh.rotation.y = this.rotation;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
-        
+
         const model = new THREE.Group();
         model.add(mesh);
         this.setModel(model);
-        
+
         if (Game.instance.debug) {
             this.createBoxHelper();
         }

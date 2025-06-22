@@ -1,4 +1,4 @@
-// ./class/ProjectilesManager.js
+
 import * as THREE from 'three';
 import { Bullet } from './Bullet.js';
 import { CollisionManager } from './CollisionManager.js';
@@ -18,21 +18,21 @@ class ProjectilesManager {
     ProjectilesManager.instance = this;
 
     if (typeof Worker !== 'undefined') {
-        this.worker = new Worker('./class/ProjectilesWorker.js', { type: 'module' });
-        this.worker.onmessage = this.handleWorkerMessage.bind(this);
-        this.worker.onerror = (e) => console.error("Projectile Worker Error:", e);
-        this.worker.postMessage({
-            type: 'init',
-            payload: {
-                lifeTime: 5000,
-                worldBoundary: GAMECONFIG.WORLD_BOUNDARY,
-            }
-        });
-        console.log('🔫 Projectile Worker initialized.');
+      this.worker = new Worker('./class/ProjectilesWorker.js', { type: 'module' });
+      this.worker.onmessage = this.handleWorkerMessage.bind(this);
+      this.worker.onerror = (e) => console.error("Projectile Worker Error:", e);
+      this.worker.postMessage({
+        type: 'init',
+        payload: {
+          lifeTime: 5000,
+          worldBoundary: GAMECONFIG.WORLD_BOUNDARY,
+        }
+      });
+      console.log('🔫 Projectile Worker initialized.');
     } else {
-        console.warn("Projectiles: Web Workers not supported. Game will run without projectile simulation.");
+      console.warn("Projectiles: Web Workers not supported. Game will run without projectile simulation.");
     }
-    
+
     EventManager.instance.subscribe(EVENT.OBJECT_SHOOT, this.handleObjectShoot.bind(this));
     EventManager.instance.subscribe(EVENT.BULLET_HIT, this.handleBulletHit.bind(this));
   }
@@ -69,9 +69,9 @@ class ProjectilesManager {
     if (!tank) return;
     if (tank.tankType.name === TANKTYPE.V008.name) {
       console.log('V008 is firing a double shot!');
-      const spreadAngle = toRad(2); 
+      const spreadAngle = toRad(2);
       const qLeft = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0, 1, 0), // Rotate around the Y (up) axis
+        new THREE.Vector3(0, 1, 0),
         spreadAngle
       );
       const qRight = new THREE.Quaternion().setFromAxisAngle(
@@ -88,51 +88,51 @@ class ProjectilesManager {
       this.createBullet(tank, position, direction, speed, color);
       const burstDelay = 200;
       setTimeout(() => {
-          if (tank.disposed) {
-              return;
-          }
+        if (tank.disposed) {
+          return;
+        }
 
-          const currentPosition = new THREE.Vector3();
-          const currentDirection = new THREE.Vector3(0, 0, 1);
-          
-          tank.model.getWorldPosition(currentPosition);
-          currentPosition.y += 1.7; 
-          
-          tank.model.getWorldQuaternion(new THREE.Quaternion()).multiply(new THREE.Vector3(0, 0, 1));
-          currentDirection.applyQuaternion(tank.model.quaternion);
-          currentPosition.add(currentDirection.clone().multiplyScalar(4.0));
-          this.createBullet(tank, currentPosition, currentDirection, speed, color);
+        const currentPosition = new THREE.Vector3();
+        const currentDirection = new THREE.Vector3(0, 0, 1);
+
+        tank.model.getWorldPosition(currentPosition);
+        currentPosition.y += 1.7;
+
+        tank.model.getWorldQuaternion(new THREE.Quaternion()).multiply(new THREE.Vector3(0, 0, 1));
+        currentDirection.applyQuaternion(tank.model.quaternion);
+        currentPosition.add(currentDirection.clone().multiplyScalar(4.0));
+        this.createBullet(tank, currentPosition, currentDirection, speed, color);
 
       }, burstDelay);
 
     }
-    this.createBullet(tank, position, direction, speed, color);  
+    this.createBullet(tank, position, direction, speed, color);
   }
 
   handleBulletHit({ bullet }) {
-      if (bullet) {
-          this.removeBullet(bullet);
-      }
+    if (bullet) {
+      this.removeBullet(bullet);
+    }
   }
 
   createBullet(tank, position, direction, speed = 0.8, color) {
-    // 1. Create the visual Bullet object on the main thread
+
     const bullet = new Bullet(tank.faction, position, color);
     bullet.shooter = tank;
     bullet.damage = tank.damage;
 
-    // --- THE FIX ---
-    // First, calculate the final velocity vector.
-    // Clone the direction so we don't modify the original object passed to this function.
+
+
+
     const finalVelocity = direction.clone().multiplyScalar(speed);
 
-    // Set the velocity on the main-thread bullet object for lookAt calculations.
+
     bullet.velocity.copy(finalVelocity);
-    // --- END OF FIX ---
+
 
     this.projectilesMap.set(bullet.id, bullet);
 
-    // 2. Send the bullet's data (with the CORRECT, scaled velocity) to the worker.
+
     if (this.worker) {
       this.worker.postMessage({
         type: 'add',
@@ -146,7 +146,7 @@ class ProjectilesManager {
 
     return bullet;
   }
-  
+
   removeBullet(bullet) {
     if (!bullet || !this.projectilesMap.has(bullet.id)) return;
     if (this.worker) {
@@ -156,7 +156,7 @@ class ProjectilesManager {
     bullet.dispose();
   }
 
-  update() {}
+  update() { }
 
   clear() {
     if (this.worker) {

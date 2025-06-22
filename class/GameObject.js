@@ -6,31 +6,31 @@ import { EVENT } from '../utils.js';
 class GameObject {
     id;
     faction;
-    position; // THREE.Vector3
+    position;
     hitBox;
     model;
-    isCollision; // bool
+    isCollision;
     hp;
     maxHp;
     disposed = false;
 
-    constructor(id, faction, position, isCollision){
+    constructor(id, faction, position, isCollision) {
         this.id = id;
         this.faction = faction;
         this.position = new THREE.Vector3(position.x, position.y, position.z);
         this.isCollision = isCollision;
     }
 
-    setDefault(){
+    setDefault() {
     }
 
-    setPosition(position){
+    setPosition(position) {
         this.position = position;
         this.model.position = this.position;
         this.hitBox.position = this.position;
     }
 
-    setModel(model){
+    setModel(model) {
         if (!model) return;
         this.model = model;
         this.model.userData = model.userData;
@@ -41,11 +41,11 @@ class GameObject {
         });
     }
 
-    setFaction(faction){
+    setFaction(faction) {
         this.faction = faction;
     }
 
-    setCollision(isCollision){
+    setCollision(isCollision) {
         this.isCollision = isCollision;
     }
 
@@ -59,11 +59,11 @@ class GameObject {
                 source: source,
                 remainingHp: this.hp
             });
-            
+
             if (this.hp <= 0) {
                 this.destroy();
             }
-            
+
             return true;
         }
         return false;
@@ -78,10 +78,8 @@ class GameObject {
         }
     }
 
-    /*
-     * Xóa khỏi scene
-     */
-    dispose(){
+
+    dispose() {
         if (this.disposed) return;
         if (this.model && Game.instance.scene) {
             Game.instance.scene.remove(this.model);
@@ -90,7 +88,7 @@ class GameObject {
         this.disposed = true;
     }
 
-    update(){
+    update() {
     }
 }
 

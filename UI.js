@@ -1,4 +1,4 @@
-// ./UI.js
+
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
@@ -16,7 +16,7 @@ const uiManager = new UIManager();
 
 let game = null;
 let selectedTankModel = TANKTYPE.V001;
-let selectedGameMode = 'endless'; // Default, will be overridden by modal selection
+let selectedGameMode = 'endless';
 let menuScene, menuCamera, menuRenderer, menuControls;
 let tankModel = null;
 let initialTankY = 0;
@@ -28,8 +28,6 @@ let isPreloadingModels = false;
 
 const GAME_START_DELAY = 250;
 
-// This const is no longer needed here as descriptions are in the HTML modal
-// const modeDescriptions = { ... };
 
 const tankStatsData = {
     [TANKTYPE.V001.name]: { power: 80, speed: 100, defense: 70, hp: 50, firerate: 85 },
@@ -45,8 +43,6 @@ const tankStatsData = {
     [TANKTYPE.V011.name]: { power: 80, speed: 150, defense: 50, hp: 50, firerate: 110 },
 };
 
-// --- (No changes to preloadAllModels, initMenuScene, disposeTankModel, loadTankForMenu, etc.) ---
-// ... (functions from preloadAllModels to onWindowResize remain the same) ...
 async function preloadAllModels() {
     if (isPreloadingModels) {
         console.log("⏳ Models are already being preloaded...");
@@ -91,22 +87,20 @@ async function initMenuScene() {
 
     menuScene = new THREE.Scene();
 
-    // --- NEW: Professional Lighting & Environment Setup ---
 
-    // 1. Environment Lighting (HDRI for realistic reflections and ambient light)
-    if (qualityProfile.useSky) { // Only load HDRI on higher quality settings
+    if (qualityProfile.useSky) { 
         new RGBELoader()
-            .setPath('assets/hdr/') // Make sure you have this folder and the .hdr file
+            .setPath('assets/hdr/')
             .load(
                 'venice_sunset_1k.hdr',
-                (texture) => { // On success
+                (texture) => {
                     texture.mapping = THREE.EquirectangularReflectionMapping;
-                    menuScene.environment = texture; // Use for reflections
-                    menuScene.background = texture; // Use as the background
-                    menuScene.backgroundBlurriness = 0.5; // Blur the background to keep focus on the tank
+                    menuScene.environment = texture;
+                    menuScene.background = texture;
+                    menuScene.backgroundBlurriness = 0.5;
                 },
-                undefined, // onProgress callback
-                () => { // On error
+                undefined,
+                () => {
                     console.warn("Could not load HDRI. Falling back to simple lighting.");
                     menuScene.background = new THREE.Color(0x111827);
                     const hemiLight = new THREE.HemisphereLight(0x8899bb, 0x444444, 2);
@@ -115,45 +109,40 @@ async function initMenuScene() {
                 }
             );
     } else {
-        // Fallback for lower quality: Dark background and simple HemisphereLight
         menuScene.background = new THREE.Color(0x111827);
         const hemiLight = new THREE.HemisphereLight(0x8899bb, 0x444444, 2);
         hemiLight.position.set(0, 20, 0);
         menuScene.add(hemiLight);
     }
 
-    // 2. Key Light (Main light source, casts primary shadows)
-    const keyLight = new THREE.DirectionalLight(0xfff0dd, 3.5); // Warm white light
+    const keyLight = new THREE.DirectionalLight(0xfff0dd, 3.5); 
     keyLight.position.set(8, 10, 8);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = qualityProfile.shadowMapSize;
     keyLight.shadow.mapSize.height = qualityProfile.shadowMapSize;
-    const shadowSize = 4; // Tighter shadow area for better quality
+    const shadowSize = 4;
     keyLight.shadow.camera.left = -shadowSize;
     keyLight.shadow.camera.right = shadowSize;
     keyLight.shadow.camera.top = shadowSize;
     keyLight.shadow.camera.bottom = -shadowSize;
     keyLight.shadow.bias = -0.0002;
-    keyLight.shadow.radius = 2; // Softens shadow edges
+    keyLight.shadow.radius = 2;
     menuScene.add(keyLight);
     menuScene.add(keyLight.target);
     keyLight.target.position.set(0, 0.5, 0);
 
-    // 3. Fill Light (Softer, cool-colored light to fill in shadows)
     const fillLight = new THREE.DirectionalLight(0xdddeff, 1.0);
     fillLight.position.set(-8, 5, 5);
     menuScene.add(fillLight);
     menuScene.add(fillLight.target);
     fillLight.target.position.set(0, 0.5, 0);
 
-    // 4. Rim Light (Back light to create highlights and separate from background)
     const rimLight = new THREE.DirectionalLight(0x89d5ff, 4.0);
     rimLight.position.set(2, 4, -10);
     menuScene.add(rimLight);
     menuScene.add(rimLight.target);
     rimLight.target.position.set(0, 0.5, 0);
 
-    // --- End of new lighting setup ---
 
     const tankDisplayDiv = document.getElementById('tank-display');
     const displayWidth = tankDisplayDiv.clientWidth;
@@ -161,10 +150,9 @@ async function initMenuScene() {
     menuCamera = new THREE.PerspectiveCamera(45, displayWidth / displayHeight, 0.1, 100);
     menuCamera.position.set(0, 1.5, 6);
 
-    // 5. Interactive "Headlight" (Parented to the camera)
-    const cameraLight = new THREE.PointLight(0xffffff, 0.4, 20); // Soft, white, short-range
-    menuCamera.add(cameraLight); // Attach the light directly to the camera
-    menuScene.add(menuCamera); // The camera itself must be in the scene for the light to work
+    const cameraLight = new THREE.PointLight(0xffffff, 0.4, 20);
+    menuCamera.add(cameraLight); 
+    menuScene.add(menuCamera);
 
     menuRenderer = new THREE.WebGLRenderer({
         antialias: qualityProfile.antialias,
@@ -198,7 +186,7 @@ async function initMenuScene() {
         color: 0x222222,
         roughness: 0.8,
         metalness: 0.2,
-        envMapIntensity: 0.5 // Allow ground to receive some reflection from the HDRI
+        envMapIntensity: 0.5 
     });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
@@ -242,12 +230,12 @@ function disposeTankModel() {
 
 function loadTankForMenu(tankType) {
     document.getElementById('tank-name').textContent = `Loading ${tankType.name}...`;
-    updateTankStatsUI(null); // Clear stats while loading
+    updateTankStatsUI(null);
     disposeTankModel();
 
     const placeModelInScene = (model) => {
         tankModel = model;
-        initialTankY = tankModel.position.y; // Capture Y position for hover animation
+        initialTankY = tankModel.position.y;
 
         tankModel.traverse(node => {
             if (node.isMesh) {
@@ -294,7 +282,6 @@ function loadTankForMenu(tankType) {
         });
 }
 
-// UPDATED: Function now animates the stat bars
 function updateTankStatsUI(tankName) {
     const statIds = ['power', 'speed', 'defense', 'hp', 'firerate'];
     const stats = tankName ? tankStatsData[tankName] : null;
@@ -302,7 +289,7 @@ function updateTankStatsUI(tankName) {
     statIds.forEach(id => {
         const element = document.getElementById(`${id}-stat-fill`);
         if (element) {
-            const value = stats ? (stats[id] / 1.5) : 0; // Use a base value for scaling
+            const value = stats ? (stats[id] / 1.5) : 0;
             element.style.width = `${value}%`;
         }
     });
@@ -313,7 +300,6 @@ function animateMenu() {
     requestAnimationFrame(animateMenu);
     if (menuControls) menuControls.update();
 
-    // Subtle hover animation for the tank, respects initial position
     if (tankModel) {
         const time = performance.now() * 0.0005;
         tankModel.position.y = initialTankY + Math.sin(time * 2) * 0.05;
@@ -439,7 +425,6 @@ function returnToMainMenu(preserveGameInstanceForPause = false) {
     onWindowResize();
 }
 
-// MODIFIED: Start button now opens the game mode modal
 document.getElementById('start-button').addEventListener('click', () => {
     document.getElementById('game-mode-modal').style.display = 'flex';
 });
@@ -453,7 +438,6 @@ document.getElementById('continue-button').addEventListener('click', () => {
         startHUDUpdates();
         onWindowResize();
     } else {
-        // If there's no game to continue, show the mode selection
         document.getElementById('game-mode-modal').style.display = 'flex';
     }
 });
@@ -565,8 +549,6 @@ closeSettingsButton.addEventListener('click', () => {
     settingsModal.style.display = 'none';
 });
 
-// This listener is now handled inside DOMContentLoaded to include the new modal
-// window.addEventListener('click', (event) => { ... });
 
 document.getElementById('exit-button').addEventListener('click', () => {
     if (confirm('Are you sure you want to exit the game?')) {
@@ -696,12 +678,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const enterScreen = document.getElementById('enter-screen');
     const menuContainer = document.getElementById('menu-container');
 
-    // MODIFIED: This logic is now handled by the new modal
-    // const classicModeButton = document.getElementById('mode-classic-button');
-    // const endlessModeButton = document.getElementById('mode-endless-button');
-    // const modeDescriptionP = document.getElementById('game-mode-description');
-
-    // NEW: Game Mode Modal Logic
     const gameModeModal = document.getElementById('game-mode-modal');
     const closeModeModalButton = document.getElementById('close-mode-modal-button');
     const modeSelectButtons = document.querySelectorAll('.mode-select-button');
@@ -718,7 +694,6 @@ document.addEventListener('DOMContentLoaded', () => {
         gameModeModal.style.display = 'none';
     });
 
-    // MODIFIED: Centralized click listener for all modals
     window.addEventListener('click', (event) => {
         if (event.target == settingsModal) {
             settingsModal.style.display = 'none';

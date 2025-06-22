@@ -1,4 +1,4 @@
-// ./class/HealthBar.js
+
 
 import * as THREE from 'three';
 import { Game } from './Game.js';
@@ -13,41 +13,41 @@ class HealthBar {
         this.barWidth = 2.0;
         this.barHeight = 0.25;
         this.yOffset = 2.5;
-        
+
         this.canvas = document.createElement('canvas');
         this.canvas.width = 130;
         this.canvas.height = 25;
         this.context = this.canvas.getContext('2d');
-        
+
         this.texture = new THREE.CanvasTexture(this.canvas);
-        
+
         const material = new THREE.SpriteMaterial({
             map: this.texture,
             transparent: true,
             depthTest: true,
             sizeAttenuation: true
         });
-        
+
         this.sprite = new THREE.Sprite(material);
         this.sprite.scale.set(this.barWidth, this.barHeight, 1);
-        
-        this.sprite.visible = false; 
-        
+
+        this.sprite.visible = false;
+
         Game.instance.scene.add(this.sprite);
         this.updateBar();
     }
-    
+
     setReady() {
         this.isReady = true;
         this.sprite.visible = true;
-        this.update(); 
+        this.update();
     }
 
     updateHP(hp) {
         this.currentHP = Math.max(0, Math.min(hp, this.maxHp));
         this.updateBar();
     }
-    
+
     updateBar() {
         const ctx = this.context;
         const canvas = this.canvas;
@@ -64,16 +64,16 @@ class HealthBar {
             const healthWidth = (width - 4) * healthPercent;
             ctx.fillRect(2, 2, healthWidth, height - 4);
         }
-        
+
         this.texture.needsUpdate = true;
     }
-    
+
     update() {
         if (!this.isReady || !this.parent || !this.parent.position || !this.sprite) {
             return;
         }
-        
-        
+
+
         let yOffset = this.yOffset;
         if (this.parent.tankType && this.parent.tankType.name === "V003") {
             yOffset = 4.5;
@@ -81,7 +81,7 @@ class HealthBar {
         if (this.parent.tankType && this.parent.tankType.name === "V007") {
             yOffset = 3.5;
         }
-        
+
         this.sprite.position.set(
             this.parent.position.x,
             this.parent.position.y + yOffset,
@@ -89,7 +89,7 @@ class HealthBar {
         );
         this.sprite.renderOrder = 100;
     }
-    
+
     remove() {
         if (this.sprite) {
             Game.instance.scene.remove(this.sprite);

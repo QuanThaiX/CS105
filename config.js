@@ -51,7 +51,6 @@ export const gameSettings = {
     quality: QUALITY.MEDIUM,
     fog: true,
     dayNightCycle: 'day',
-    // NEW SETTINGS with default values
     cameraShake: true,
     showMinimap: true,
     volumeMaster: 0.8,
@@ -74,7 +73,6 @@ export function loadSettings() {
 
         gameSettings.fog = parsed.fog ?? QUALITY_SETTINGS_PROFILES[gameSettings.quality].useFog;
         
-        // NEW: Load camera shake and minimap settings, defaulting to true if not found
         gameSettings.cameraShake = parsed.cameraShake ?? true;
         gameSettings.showMinimap = parsed.showMinimap ?? true;
         
@@ -99,11 +97,11 @@ export const GAMECONFIG = Object.freeze({
     WORLD_BOUNDARY: 500,
     QUALITY_PROFILES: QUALITY_SETTINGS_PROFILES,
     SCENERY: {
-        NUM_ROCKS: 70,
+        NUM_ROCKS: 50,
         ROCK_TYPES: ['rock09', 'rock13'],
         ROCK_SCALE_MIN: 3.0,
         ROCK_SCALE_MAX: 12,
-        NUM_TREES: 70,
+        NUM_TREES: 50,
         TREE_TYPES: ['tree01'],
         TREE_SCALE_MIN: 0.9,
         TREE_SCALE_MAX: 2.9,
@@ -123,7 +121,7 @@ export const GAMECONFIG = Object.freeze({
         MAX_SPAWN_RADIUS_FACTOR: 1.,
     },
     ENEMY_CONFIG: {
-        NUM_ENEMIES:3,
+        NUM_ENEMIES:2,
         ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003,
              TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006, TANKTYPE.V007],
         ENEMY_POINT_VALUE: (type) => {
@@ -170,9 +168,9 @@ export const GAMECONFIG = Object.freeze({
         }
     },
     POWERUP_CONFIG: {
-        MAX_ACTIVE: 3,
-        SPAWN_INTERVAL: 15000,
-        TOTAL_SPAWN_LIMIT: 10,
+        MAX_ACTIVE: 2,
+        SPAWN_INTERVAL: 5000,
+        TOTAL_SPAWN_LIMIT: 5,
     },
     AUDIO: {
         BARREL_EXPLOSION: {

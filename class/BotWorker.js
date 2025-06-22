@@ -1,4 +1,4 @@
-// ./class/BotWorker.js
+
 
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
@@ -14,7 +14,7 @@ class Vec3 {
     applyQuaternion({ x, y, z, w }) { const ix = w * this.x + y * this.z - z * this.y, iy = w * this.y + z * this.x - x * this.z, iz = w * this.z + x * this.y - y * this.x, iw = -x * this.x - y * this.y - z * this.z; this.x = ix * w + iw * -x + iy * -z - iz * -y; this.y = iy * w + iw * -y + iz * -x - ix * -z; this.z = iz * w + iw * -z + ix * -y - iy * -x; return this; }
     dot(v) { return this.x * v.x + this.y * v.y + this.z * v.z; }
     crossVectors(a, b) { const ax = a.x, ay = a.y, az = a.z, bx = b.x, by = b.y, bz = b.z; this.x = ay * bz - az * by; this.y = az * bx - ax * bz; this.z = ax * by - ay * bx; return this; }
-    addVectors( a, b ) { this.x = a.x + b.x; this.y = a.y + b.y; this.z = a.z + b.z; return this; }
+    addVectors(a, b) { this.x = a.x + b.x; this.y = a.y + b.y; this.z = a.z + b.z; return this; }
 }
 
 class Box3 {
@@ -51,7 +51,7 @@ class Octree {
             let i = 0;
             while (i < this.objects.length) {
                 const currentObj = this.objects[i];
-                const currentBBox = new Box3(new Vec3(currentObj.position.x - 2, currentObj.position.y - 2, currentObj.position.z - 2), new Vec3(currentObj.position.x + 2, currentObj.position.y + 2, currentObj.position.z + 2)); // Simplified BBox for worker
+                const currentBBox = new Box3(new Vec3(currentObj.position.x - 2, currentObj.position.y - 2, currentObj.position.z - 2), new Vec3(currentObj.position.x + 2, currentObj.position.y + 2, currentObj.position.z + 2));
                 const index = this.getIndex(currentBBox);
                 if (index !== -1) { this.nodes[index].insert(currentObj, currentBBox); this.objects.splice(i, 1); } else { i++; }
             }
@@ -65,7 +65,6 @@ class Octree {
     }
     clear() { this.objects = []; for (let i = 0; i < this.nodes.length; i++) { this.nodes[i].clear(); } this.nodes = []; }
 }
-// --- End of Self-Contained Classes ---
 
 
 const BotState = Object.freeze({
@@ -77,10 +76,9 @@ const BotState = Object.freeze({
 let bots = new Map();
 let gameState = {};
 let config = {};
-let worldOctree; // The new Octree for the BotWorker
+let worldOctree;
 
-// Main entry point for the worker
-self.onmessage = function(e) {
+self.onmessage = function (e) {
     const { type, payload } = e.data;
 
     switch (type) {
@@ -120,7 +118,6 @@ function rebuildWorldOctree() {
     ];
 
     for (const obj of allObjects) {
-        // Create a minimal bounding box for insertion
         const size = (obj.type === 'Tank') ? 8 : 4;
         const center = new Vec3().copy(obj.position);
         const bbox = new Box3().setFromCenterAndSize(center, new Vec3(size, size, size));
@@ -146,19 +143,19 @@ function updateAllBots() {
 function updateTankBehavior(tankState, botConfig, commands) {
     const currentTime = Date.now();
     botConfig.stateTimer = currentTime - botConfig.stateStartTime;
-    
+
     if (currentTime - botConfig.lastBehaviorUpdate >= botConfig.behaviorUpdateInterval) {
         botConfig.lastBehaviorUpdate = currentTime;
         evaluateStateTransition(tankState, botConfig, commands);
     }
-    
+
     executeCurrentState(tankState, botConfig, commands);
     commands.push({ tankId: tankState.id, action: 'updateDebugInfo', value: botConfig.debugInfo });
 }
 
 function evaluateStateTransition(tankState, botConfig, commands) {
     if (botConfig.stateTimer < botConfig.minStateTime) return;
-    
+
     if (!gameState.playerTank || gameState.playerTank.hp <= 0) {
         transitionTo(tankState, botConfig, BotState.PATROL, commands);
         return;
@@ -168,7 +165,7 @@ function evaluateStateTransition(tankState, botConfig, commands) {
     const playerPosition = new Vec3().copy(gameState.playerTank.position);
     const distanceToPlayer = tankPosition.distanceTo(playerPosition);
     botConfig.debugInfo.distanceToPlayer = distanceToPlayer;
-    
+
     if (distanceToPlayer <= botConfig.attackRange) {
         if (botConfig.currentState !== BotState.ATTACK) transitionTo(tankState, botConfig, BotState.ATTACK, commands);
     } else if (distanceToPlayer <= botConfig.detectionRange) {
@@ -180,7 +177,7 @@ function evaluateStateTransition(tankState, botConfig, commands) {
 
 function transitionTo(tankState, botConfig, newState, commands) {
     if (newState === botConfig.currentState) return;
-    
+
     botConfig.currentState = newState;
     botConfig.stateStartTime = Date.now();
     botConfig.stateTimer = 0;
@@ -233,7 +230,7 @@ function executeHuntState(tankState, botConfig, commands) {
 
 function executeAttackState(tankState, botConfig, commands) {
     if (!gameState.playerTank) return;
-    
+
     const tankPosition = new Vec3().copy(tankState.position);
     const playerPosition = new Vec3().copy(gameState.playerTank.position);
 
@@ -243,9 +240,9 @@ function executeAttackState(tankState, botConfig, commands) {
     if (tacticalTarget) {
         botConfig.debugInfo.currentAction = `Attacking tactical target! (Barrel)`;
     }
-    
+
     faceTarget(tankState, botConfig, finalTargetPosition, commands, true);
-    
+
     const distanceToTarget = tankPosition.distanceTo(finalTargetPosition);
     if (distanceToTarget > botConfig.optimalAttackRange * 1.3) {
         moveWithObstacleAvoidance(tankState, botConfig, finalTargetPosition, commands, 0.6);
@@ -315,9 +312,9 @@ function calculateObstacleAvoidance(tankState, botConfig) {
     const avoidanceVector = new Vec3();
     const tankPosition = new Vec3().copy(tankState.position);
     if (!worldOctree) return { avoidanceVector, nearestObstacleDistance: Infinity };
-    
+
     let nearestObstacleDistance = Infinity;
-    
+
     const searchRadius = botConfig.minDistanceToObstacles + 5;
     const searchBox = new Box3().setFromCenterAndSize(tankPosition, new Vec3(searchRadius * 2, 20, searchRadius * 2));
     const potentialObstacles = worldOctree.retrieve(tankState, searchBox);
@@ -328,12 +325,12 @@ function calculateObstacleAvoidance(tankState, botConfig) {
         const obstaclePosition = new Vec3().copy(obstacleState.position);
         const distance = tankPosition.distanceTo(obstaclePosition);
         if (distance < nearestObstacleDistance) nearestObstacleDistance = distance;
-        
+
         let minDistance = botConfig.minDistanceToObstacles;
         if (obstacleState.type === 'Tank' || (gameState.playerTank && obstacleState.id === gameState.playerTank.id)) {
             minDistance = botConfig.minDistanceToTanks;
         }
-        
+
         if (distance < minDistance) {
             const avoidDirection = new Vec3().subVectors(tankPosition, obstaclePosition).normalize();
             const avoidanceStrength = (minDistance - distance) / minDistance;
@@ -350,7 +347,7 @@ function moveTowardTarget(tankState, botConfig, targetPosition, commands, speedM
     const direction = new Vec3().subVectors(targetPosition, tankPosition).normalize();
     const forward = new Vec3(0, 0, 1).applyQuaternion(tankState.quaternion).normalize();
     const dot = forward.dot(direction);
-    
+
     if (isBackingAway) {
         commands.push({ tankId: tankState.id, action: 'moveBackward', value: botConfig.moveSpeed * speedMultiplier });
     } else {
@@ -364,13 +361,13 @@ function faceTarget(tankState, botConfig, targetPosition, commands, preciseMode 
     const direction = new Vec3().subVectors(targetPosition, tankPosition).normalize();
     const targetAngle = Math.atan2(direction.x, direction.z);
     let angleDifference = targetAngle - tankState.rotationY;
-    
+
     while (angleDifference > Math.PI) angleDifference -= 2 * Math.PI;
     while (angleDifference < -Math.PI) angleDifference += 2 * Math.PI;
-    
+
     const rotationTolerance = preciseMode ? 0.05 : 0.15;
     const rotationSpeed = preciseMode ? botConfig.rotateSpeed : botConfig.rotateSpeed * 1.5;
-    
+
     if (Math.abs(angleDifference) > rotationTolerance) {
         const rotationAmount = Math.min(Math.abs(angleDifference), rotationSpeed);
         commands.push({ tankId: tankState.id, action: angleDifference > 0 ? 'rotateLeft' : 'rotateRight', value: rotationAmount });

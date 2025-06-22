@@ -1,4 +1,4 @@
-// ./class/createEnvrionment.js
+
 import * as THREE from 'three';
 import { Sky } from '../three/examples/jsm/objects/Sky.js';
 import { OrbitControls } from '../three/examples/jsm/controls/OrbitControls.js';
@@ -22,13 +22,12 @@ const CONTROLS_CONFIG = {
     maxPolarAngle: Math.PI / 2,
 };
 
-// NEW: Define presets for day and night for easier interpolation
 const DAY_CONFIG = {
     turbidity: 10,
     rayleigh: 2,
     mieCoefficient: 0.005,
     mieDirectionalG: 0.8,
-    sunPosition: new THREE.Vector3().setFromSphericalCoords(1, toRad(90 - 45), toRad(180)), // Afternoon sun
+    sunPosition: new THREE.Vector3().setFromSphericalCoords(1, toRad(90 - 45), toRad(180)),
     ambientLightColor: new THREE.Color(0x66728c),
     ambientLightIntensity: 0.8,
     directionalLightIntensity: 1.5,
@@ -41,10 +40,10 @@ const NIGHT_CONFIG = {
     rayleigh: 0.05,
     mieCoefficient: 0.002,
     mieDirectionalG: 0.7,
-    sunPosition: new THREE.Vector3().setFromSphericalCoords(1, toRad(90 - (-5)), toRad(180)), // Sun below horizon
+    sunPosition: new THREE.Vector3().setFromSphericalCoords(1, toRad(90 - (-5)), toRad(180)),
     ambientLightColor: new THREE.Color(0x0a142c),
     ambientLightIntensity: 0.2,
-    directionalLightIntensity: 0.1, // Moonlight
+    directionalLightIntensity: 0.1,
     rimLightIntensity: 0.2,
     fogColor: new THREE.Color(0x050a14)
 };
@@ -57,13 +56,13 @@ const NIGHT_CONFIG = {
 function createRenderer() {
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio); // For sharper images on high-DPI screens
+    renderer.setPixelRatio(window.devicePixelRatio);
 
-    // Shadow mapping
+
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Color and lighting
+
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.physicallyCorrectLights = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -110,17 +109,17 @@ function createCamera(scene, targetPosition, renderer) {
  * @returns {{directionalLight: THREE.DirectionalLight, ambientLight: THREE.AmbientLight, rimLight: THREE.DirectionalLight, shadowHelper?: THREE.CameraHelper}} An object containing lights that may need to be updated.
  */
 function createLights(scene) {
-    // MODIFIED: Capture ambient light to return it.
+
     const ambientLight = new THREE.AmbientLight(DAY_CONFIG.ambientLightColor, DAY_CONFIG.ambientLightIntensity);
     scene.add(ambientLight);
 
-    // Main directional light (sun/moon), which casts shadows.
+
     const directionalLight = new THREE.DirectionalLight(0xffffff, DAY_CONFIG.directionalLightIntensity);
     directionalLight.position.set(200, 400, 200);
     directionalLight.target.position.set(0, 0, 0);
     directionalLight.castShadow = true;
 
-    // Configure shadow properties for better quality
+
     directionalLight.shadow.camera.left = -100;
     directionalLight.shadow.camera.right = 100;
     directionalLight.shadow.camera.top = 100;
@@ -130,17 +129,17 @@ function createLights(scene) {
     directionalLight.shadow.mapSize.width = SHADOW_MAP_SIZE;
     directionalLight.shadow.mapSize.height = SHADOW_MAP_SIZE;
     directionalLight.shadow.bias = -0.0001;
-    directionalLight.shadow.radius = 3;      // Soften shadow edges
-    directionalLight.shadow.normalBias = 0.02; // Prevents shadow acne
+    directionalLight.shadow.radius = 3;
+    directionalLight.shadow.normalBias = 0.02;
     scene.add(directionalLight);
 
-    // Rim light to create highlights on object edges.
+
     const rimLight = new THREE.DirectionalLight(0x7799ff, DAY_CONFIG.rimLightIntensity);
     rimLight.position.set(-100, 200, -100);
     rimLight.target.position.set(0, 0, 0);
     scene.add(rimLight);
 
-    // Additional point lights for better reflections and highlights.
+
     const pointLightConfigs = [
         { color: 0xffffcc, intensity: 0.8, distance: 100, position: [0, 40, 0], castShadow: true },
         { color: 0xccccff, intensity: 0.5, distance: 80, position: [30, 20, 30] },
@@ -166,7 +165,7 @@ function createLights(scene) {
         scene.add(shadowHelper);
     }
 
-    // MODIFIED: Return more lights for manipulation.
+
     return { directionalLight, ambientLight, rimLight, shadowHelper };
 }
 
@@ -190,7 +189,7 @@ function createSky(scene) {
     sky.scale.setScalar(10000);
     scene.add(sky);
 
-    // Initial setup will be handled by updateEnvironment
+
     return sky;
 }
 
@@ -229,7 +228,7 @@ function createGround(scene, { width = 500, height = 500, repeatX = 20, repeatY 
     });
 
     const geometry = new THREE.PlaneGeometry(width, height, 1, 1);
-    // Add UV2 attributes for Ambient Occlusion map
+
     geometry.setAttribute('uv2', new THREE.BufferAttribute(geometry.attributes.uv.array, 2));
 
     const plane = new THREE.Mesh(geometry, material);
@@ -310,7 +309,6 @@ function updateSceneFog(scene, { enabled, useSky, fogColor }) {
 }
 
 /**
- * NEW: Updates all environment visuals based on a progress value (0=day, 1=night).
  * @param {number} progress - A value from 0 (full day) to 1 (full night).
  * @param {THREE.Scene} scene - The main scene.
  * @param {Sky} sky - The sky object.
@@ -320,28 +318,28 @@ function updateEnvironment(progress, scene, sky, lights) {
     if (!sky || !lights || !lights.ambientLight) return;
 
     const uniforms = sky.material.uniforms;
-    const easedProgress = 1 - Math.cos(progress * Math.PI / 2); // Ease-out for smoother transition
+    const easedProgress = 1 - Math.cos(progress * Math.PI / 2);
 
     uniforms['turbidity'].value = THREE.MathUtils.lerp(DAY_CONFIG.turbidity, NIGHT_CONFIG.turbidity, easedProgress);
     uniforms['rayleigh'].value = THREE.MathUtils.lerp(DAY_CONFIG.rayleigh, NIGHT_CONFIG.rayleigh, easedProgress);
     uniforms['mieCoefficient'].value = THREE.MathUtils.lerp(DAY_CONFIG.mieCoefficient, NIGHT_CONFIG.mieCoefficient, easedProgress);
     uniforms['mieDirectionalG'].value = THREE.MathUtils.lerp(DAY_CONFIG.mieDirectionalG, NIGHT_CONFIG.mieDirectionalG, easedProgress);
 
-    // Animate sun position
-    const sunAngle = Math.PI * progress; // 0 to PI
-    const sunY = Math.cos(sunAngle); // 1 to -1
-    const sunX = Math.sin(sunAngle); // 0 to 0
+
+    const sunAngle = Math.PI * progress;
+    const sunY = Math.cos(sunAngle);
+    const sunX = Math.sin(sunAngle);
     uniforms['sunPosition'].value.set(sunX, sunY, 0.2);
 
-    // Animate lights
+
     lights.ambientLight.intensity = THREE.MathUtils.lerp(DAY_CONFIG.ambientLightIntensity, NIGHT_CONFIG.ambientLightIntensity, easedProgress);
     lights.directionalLight.intensity = THREE.MathUtils.lerp(DAY_CONFIG.directionalLightIntensity, NIGHT_CONFIG.directionalLightIntensity, easedProgress);
     lights.rimLight.intensity = THREE.MathUtils.lerp(DAY_CONFIG.rimLightIntensity, NIGHT_CONFIG.rimLightIntensity, easedProgress);
 
-    // Animate colors
+
     lights.ambientLight.color.lerpColors(DAY_CONFIG.ambientLightColor, NIGHT_CONFIG.ambientLightColor, easedProgress);
-    
-    // Animate fog
+
+
     const currentFogColor = new THREE.Color().lerpColors(DAY_CONFIG.fogColor, NIGHT_CONFIG.fogColor, easedProgress);
     updateSceneFog(scene, { enabled: true, useSky: true, fogColor: currentFogColor });
 }
@@ -358,5 +356,5 @@ export {
     handleWindowResize,
     updateShadowArea,
     updateSceneFog,
-    updateEnvironment // EXPORTED the new function
+    updateEnvironment
 };

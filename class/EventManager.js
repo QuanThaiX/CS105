@@ -12,28 +12,28 @@ class EventManager {
     constructor() {
         if (EventManager.instance) {
             return EventManager.instance;
-          }
+        }
         EventManager.instance = this;
-        
-        // Event storage
-        this.events = new Map(); // event -> { callbacks: [], priority: number, async: boolean }
-        this.eventQueue = []; // Priority queue cho events
+
+
+        this.events = new Map();
+        this.eventQueue = [];
         this.isProcessing = false;
-        
-        // Performance tracking
+
+
         this.eventStats = new Map();
         this.maxQueueSize = 5000;
         this.batchSize = 100;
-        
-        // Debouncing and throttling
+
+
         this.debouncedEvents = new Map();
         this.throttledEvents = new Map();
-        
-        // Worker support (if available)
+
+
         this.supportsWorker = typeof Worker !== 'undefined';
         this.workers = new Map();
-        
-        // Start processing queue
+
+
         this.startQueueProcessor();
     }
 
@@ -74,10 +74,10 @@ class EventManager {
             id: Date.now() + Math.random()
         });
 
-        // Sort by priority (higher first)
+
         eventData.callbacks.sort((a, b) => b.priority - a.priority);
 
-        // Initialize stats
+
         if (!this.eventStats.has(event)) {
             this.eventStats.set(event, {
                 totalFired: 0,
@@ -173,7 +173,7 @@ class EventManager {
         } else if (handler.async) {
             return await handler.callback(data);
         } else {
-            // Run in next tick to not block main thread
+
             return new Promise(resolve => {
                 setTimeout(() => {
                     try {
@@ -209,13 +209,13 @@ class EventManager {
      * @private
      */
     addToQueue(eventItem) {
-        // Check queue size limit
+
         if (this.eventQueue.length >= this.maxQueueSize) {
             console.warn('Event queue overflow, dropping oldest events');
             this.eventQueue.shift();
         }
 
-        // Insert with priority order
+
         let inserted = false;
         for (let i = 0; i < this.eventQueue.length; i++) {
             if (eventItem.priority > this.eventQueue[i].priority) {
@@ -245,9 +245,9 @@ class EventManager {
             const batchSize = Math.min(this.batchSize, this.eventQueue.length);
             const batch = this.eventQueue.splice(0, batchSize);
 
-            // Process batch
+
             const batchPromises = batch.map(eventItem => this.processEvent(eventItem));
-            
+
             try {
                 await Promise.all(batchPromises);
             } catch (error) {
@@ -273,17 +273,17 @@ class EventManager {
 
         const eventData = this.events.get(event);
 
-        // Apply debouncing
+
         if (eventData.debounce > 0) {
             if (this.shouldDebounce(event, eventData.debounce)) return;
         }
 
-        // Apply throttling
+
         if (eventData.throttle > 0) {
             if (this.shouldThrottle(event, eventData.throttle)) return;
         }
 
-        // Execute callbacks
+
         for (const handler of eventData.callbacks) {
             try {
                 if (handler.async) {
@@ -296,7 +296,7 @@ class EventManager {
             }
         }
 
-        // Update performance stats
+
         const processingTime = performance.now() - startTime;
         this.updateStats(event, processingTime);
     }
@@ -308,11 +308,11 @@ class EventManager {
     shouldDebounce(event, debounceTime) {
         const now = Date.now();
         const lastCall = this.debouncedEvents.get(event) || 0;
-        
+
         if (now - lastCall < debounceTime) {
-            return true; // Skip this call
+            return true;
         }
-        
+
         this.debouncedEvents.set(event, now);
         return false;
     }
@@ -324,11 +324,11 @@ class EventManager {
     shouldThrottle(event, throttleTime) {
         const now = Date.now();
         const lastCall = this.throttledEvents.get(event) || 0;
-        
+
         if (now - lastCall < throttleTime) {
-            return true; // Skip this call
+            return true;
         }
-        
+
         this.throttledEvents.set(event, now);
         return false;
     }

@@ -28,11 +28,9 @@ function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
     return new Promise((resolve, reject) => {
         const modelLoader = new ModelLoader();
         
-        // If preloaded, get from cache
         if (modelLoader.isPreloaded) {
             const model = modelLoader.getTankModel(tankType, position);
             if (model instanceof Promise) {
-                // Xử lý trường hợp getTankModel trả về Promise (cho custom JS tank)
                 model.then(resolvedModel => {
                     if (resolvedModel) {
                         resolve(resolvedModel);
@@ -47,10 +45,8 @@ function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
             }
         }
         
-        // Fallback: Load directly if not preloaded (for backward compatibility)
         console.warn(`⚠️ Tank model ${tankType.name} not preloaded, loading directly...`);
         
-        // Xử lý custom tank từ JavaScript
         if (tankType.useCustomRenderer && tankType.assetPathJS) {
             import(tankType.assetPathJS)
                 .then(module => {
@@ -58,9 +54,7 @@ function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
                     
                     if (tankType == TANKTYPE.V007) {
                         model.position.copy(position);
-                        // Giảm scale của V007 xuống còn 1.2 (từ 1.5)
                         model.scale.set(1.2, 1.2, 1.2);
-                        // Điều chỉnh vị trí y để phù hợp với các tank khác và tăng thêm 0.3
                         model.position.y = position.y - 1 + 0.3;
                     }
                     
@@ -73,7 +67,6 @@ function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
             return;
         }
         
-        // Load GLTF model
         let modelPath = tankType.assetPathGLTF;
         if (!modelPath) {
             reject(new Error(`No model path defined for tank type: ${tankType.name}`));
@@ -114,16 +107,12 @@ function loadTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
                         child.castShadow = true;
                         child.receiveShadow = true;
 
-                        // Cải thiện material properties cho hiệu ứng metal
                         if (child.material) {
-                            // Nếu là MeshStandardMaterial hoặc có thể chuyển đổi
                             if (child.material.isMeshStandardMaterial) {
-                                // Giữ nguyên texture hiện có nhưng cải thiện material properties
-                                child.material.metalness = 0.3; // Tăng metalness cho hiệu ứng kim loại
-                                child.material.roughness = 0.2; // Giảm roughness để tăng phản chiếu
-                                child.material.envMapIntensity = 1.0; // Tăng cường environment mapping nếu có
+                                child.material.metalness = 0.3; 
+                                child.material.roughness = 0.2;
+                                child.material.envMapIntensity = 1.0; 
                             } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
-                                // Chuyển đổi sang MeshStandardMaterial để có hiệu ứng tốt hơn
                                 const newMaterial = new THREE.MeshStandardMaterial({
                                     map: child.material.map,
                                     color: child.material.color,
@@ -313,7 +302,7 @@ const TANKTYPE = Object.freeze({
 });
 
 const EVENT = Object.freeze({
-    // =================== CORE GAME EVENTS ===================
+    
     /**
      * GAME_STARTED - Fired when game starts
      * @param {Object} data - { playerTank: Tank, score: number, highScore: number }
@@ -344,7 +333,7 @@ const EVENT = Object.freeze({
      */
     GAME_WIN: "game_win",
 
-    // =================== LEVEL & WORLD EVENTS ===================
+    
     /**
      * LEVEL_LOADED - Fired when level is fully loaded
      * @param {Object} data - { playerTank: Tank, enemies: Tank[], rocks: Rock[], trees: Tree[], barrels: Barrel[] }
@@ -357,7 +346,7 @@ const EVENT = Object.freeze({
      */
     LEVEL_COMPLETED: "level_completed",
 
-    // =================== OBJECT LIFECYCLE EVENTS ===================
+    
     /**
      * OBJECT_MOVED - Fired when any game object moves
      * @param {Object} data - { object: GameObject, previousPosition: Vector3, newPosition: Vector3, velocity: Vector3 }
@@ -393,7 +382,7 @@ const EVENT = Object.freeze({
      */
     OBJECT_HEALED: 'objectHealed', 
 
-    // =================== COLLISION EVENTS ===================
+    
     /**
      * COLLISION - Fired when objects collide
      * @param {Object} data - { objectA: GameObject, objectB: GameObject, collisionPoint: Vector3, force: number }
@@ -412,7 +401,7 @@ const EVENT = Object.freeze({
      */
     COLLISION_TANK_TANK: "collision_tank_tank",
 
-    // =================== PLAYER EVENTS ===================
+    
     /**
      * PLAYER_MOVE - Fired when player moves
      * @param {Object} data - { player: Tank, direction: Vector3, speed: number, position: Vector3 }
@@ -437,7 +426,7 @@ const EVENT = Object.freeze({
      */
     PLAYER_SHOOT: "player_shoot",
 
-    // =================== PROJECTILE EVENTS ===================
+    
     /**
      * BULLET_CREATED - Fired when bullet is created
      * @param {Object} data - { bullet: Bullet, shooter: GameObject, targetDirection: Vector3 }
@@ -456,7 +445,7 @@ const EVENT = Object.freeze({
      */
     BULLET_HIT: "bullet_hit",
 
-    // =================== TANK SPECIFIC EVENTS ===================
+    
     /**
      * TANK_DESTROYED - Fired when tank is destroyed
      * @param {Object} data - { tank: Tank, pointValue: number, destroyer: GameObject, explosionPosition: Vector3 }
@@ -475,7 +464,7 @@ const EVENT = Object.freeze({
      */
     TANK_SPAWNED: "tank_spawned",
 
-    // =================== SCORING EVENTS ===================
+    
     /**
      * SCORE_CHANGED - Fired when score changes
      * @param {Object} data - { score: number, highScore: number, pointsAdded: number, reason: string }
@@ -488,7 +477,7 @@ const EVENT = Object.freeze({
      */
     HIGH_SCORE_ACHIEVED: "high_score_achieved",
 
-    // =================== ITEM & PICKUP EVENTS ===================
+    
     /**
      * ITEM_SPAWNED - Fired when item spawns
      * @param {Object} data - { item: GameObject, itemType: string, position: Vector3, value: number }
@@ -501,7 +490,7 @@ const EVENT = Object.freeze({
      */
     ITEM_COLLECTED: "item_collected",
 
-    // =================== AUDIO EVENTS (CRITICAL FOR HEALING EFFECT) ===================
+    
     /**
      * AUDIO_PLAY - Fired when audio should play
      * @param {Object} data - { soundId: string, soundPath: string, volume: number, position?: Vector3, loop: boolean }
@@ -514,7 +503,7 @@ const EVENT = Object.freeze({
      */
     AUDIO_STOP: "audio_stop",
 
-    // =================== UI EVENTS (CRITICAL FOR HEALING EFFECT) ===================
+    
     /**
      * UI_UPDATE_HUD - Fired when HUD needs update
      * @param {Object} data - { playerHP: number, score: number, highScore: number, ammo: number }
@@ -527,7 +516,7 @@ const EVENT = Object.freeze({
      */
     UI_SHOW_MESSAGE: "ui_show_message",
 
-    // =================== EXPLOSION EVENTS ===================
+    
     /**
      * BARREL_EXPLODED - Fired when barrel explodes
      * @param {Object} data - { barrel: Barrel, explosion: Object, damageDealt: Array, chainReaction: boolean }
@@ -540,7 +529,7 @@ const EVENT = Object.freeze({
      */
     EXPLOSION_DAMAGE: "explosion_damage",
 
-    // =================== SYSTEM EVENTS ===================
+    
     /**
      * SYSTEM_ERROR - Fired when system error occurs
      * @param {Object} data - { error: Error, context: string, severity: string, timestamp: number }
@@ -559,7 +548,7 @@ const EVENT = Object.freeze({
      */
     SYSTEM_RESOURCE_LOADED: "system_resource_loaded",
     
-    // =================== LOBBY & SETTINGS EVENTS ===================
+    
     /**
      * ENTER_LOBBY - Fired when enter the lobby
      */
@@ -569,8 +558,18 @@ const EVENT = Object.freeze({
      * SETTINGS_UPDATED - Fired when game settings are changed
      */
     SETTINGS_UPDATED: 'settings:updated', 
+    
+    /**
+     * POWERUP_COLLECTED - Fired when pick up power ups
+     */
     POWERUP_COLLECTED: 'powerup_collected',
+    /**
+     * POWERUP_EXPIRED - Fired when power up expired
+     */
     POWERUP_EXPIRED: 'powerup_expired',
+    /**
+     * POWERUP_SPAWNED - Fired when power up spawned
+     */
     POWERUP_SPAWNED: 'powerup_spawned',
 });
 

@@ -1,4 +1,4 @@
-// ./class/Tree.js
+
 import * as THREE from 'three';
 import { GLTFLoader } from '../three/examples/jsm/loaders/GLTFLoader.js';
 import { GameObject } from './GameObject.js';
@@ -12,13 +12,13 @@ class Tree extends GameObject {
         super(id, 'neutral', position, true);
         this.scale = scale;
         this.treeType = treeType;
-        this.rotation = rotation; // Góc xoay theo trục y (radians)
+        this.rotation = rotation; 
         this.hitBoxScale = HITBOX_SCALE.TREE;
         this.loadModel();
     }
 
     loadModel() {
-        // Thử lấy từ ModelLoader cache trước
+        
         const modelLoader = new ModelLoader();
         
         if (modelLoader.isPreloaded) {
@@ -31,19 +31,19 @@ class Tree extends GameObject {
                 );
                 
                 if (model) {
-                    // Setup shadows cho model từ cache
+                    
                     model.traverse((child) => {
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
                             
-                            // Cải thiện material cho cây để tạo shadow tốt hơn
+                            
                             if (child.material) {
                                 if (child.material.isMeshStandardMaterial) {
-                                    child.material.roughness = 0.8; // Cây có bề mặt nhám
-                                    child.material.metalness = 0.0; // Cây không có tính kim loại
+                                    child.material.roughness = 0.8; 
+                                    child.material.metalness = 0.0; 
                                 } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
-                                    // Chuyển đổi sang MeshStandardMaterial để có shadow tốt hơn
+                                    
                                     const newMaterial = new THREE.MeshStandardMaterial({
                                         map: child.material.map,
                                         color: child.material.color,
@@ -58,7 +58,7 @@ class Tree extends GameObject {
                     
                     this.setModel(model);
                     
-                    // Hiển thị box helper nếu debug mode
+                    
                     if (Game.instance.debug) {
                         this.createBoxHelper();
                     }
@@ -69,13 +69,13 @@ class Tree extends GameObject {
             }
         }
 
-        // Fallback: Load trực tiếp nếu chưa preload
+        
         console.warn(`⚠️ Tree model ${this.treeType} chưa được preload, đang load trực tiếp...`);
         this.loadModelDirect();
     }
 
     loadModelDirect() {
-        // Xác định đường dẫn đến model dựa trên loại cây
+        
         let modelPath;
         
         switch (this.treeType) {
@@ -93,31 +93,31 @@ class Tree extends GameObject {
                 break;
         }
 
-        // Sử dụng GLTFLoader để tải model
+        
         const loader = new GLTFLoader();
         loader.load(
             modelPath,
             (gltf) => {
                 const model = gltf.scene;
                 
-                // Thiết lập vị trí, kích thước và góc xoay
+                
                 model.position.copy(this.position);
                 model.scale.set(this.scale, this.scale, this.scale);
                 model.rotation.y = this.rotation;
                 
-                // Thiết lập bóng đổ
+                
                 model.traverse((child) => {
                     if (child.isMesh) {
                         child.castShadow = true;
                         child.receiveShadow = true;
                         
-                        // Cải thiện material cho cây để tạo shadow tốt hơn
+                        
                         if (child.material) {
                             if (child.material.isMeshStandardMaterial) {
-                                child.material.roughness = 0.8; // Cây có bề mặt nhám
-                                child.material.metalness = 0.0; // Cây không có tính kim loại
+                                child.material.roughness = 0.8; 
+                                child.material.metalness = 0.0; 
                             } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
-                                // Chuyển đổi sang MeshStandardMaterial để có shadow tốt hơn
+                                
                                 const newMaterial = new THREE.MeshStandardMaterial({
                                     map: child.material.map,
                                     color: child.material.color,
@@ -132,7 +132,7 @@ class Tree extends GameObject {
                 
                 this.setModel(model);
                 
-                // Hiển thị box helper nếu debug mode
+                
                 if (Game.instance.debug) {
                     this.createBoxHelper();
                 }
@@ -141,7 +141,7 @@ class Tree extends GameObject {
             (error) => {
                 console.error('Không thể tải model cây:', error);
                 
-                // Tạo hình khối đơn giản thay thế nếu không tải được model
+                
                 this.createFallbackModel();
             }
         );
@@ -149,11 +149,11 @@ class Tree extends GameObject {
 
     createBoxHelper() {
         if (this.model && Game.instance.debug) {
-            // Tạo box helper
+            
             const boxHelper = new THREE.BoxHelper(this.model, 0x00ff00);
             Game.instance.scene.add(boxHelper);
             
-            // Lưu tham chiếu để có thể xóa sau này
+            
             this.boxHelper = boxHelper;
         }
     }
@@ -165,7 +165,7 @@ class Tree extends GameObject {
     }
 
     createFallbackModel() {
-        // Tạo hình khối đơn giản thay thế nếu không tải được model
+        
         const geometry = new THREE.CylinderGeometry(0, 1 * this.scale, 2 * this.scale, 4);
         const material = new THREE.MeshStandardMaterial({ 
             color: 0x228B22,
@@ -182,18 +182,18 @@ class Tree extends GameObject {
         model.add(mesh);
         this.setModel(model);
         
-        // Hiển thị box helper nếu debug mode
+        
         if (Game.instance.debug) {
             this.createBoxHelper();
         }
     }
 
-    // Phương thức này được gọi khi Tree bị phá hủy
+    
     destroy() {
         super.destroy();
     }
 
-    // Phương thức này được gọi khi Tree bị loại bỏ khỏi scene
+    
     dispose() {
         if (this.boxHelper) {
             Game.instance.scene.remove(this.boxHelper);

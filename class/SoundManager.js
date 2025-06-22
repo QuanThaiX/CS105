@@ -1,4 +1,4 @@
-// ./class/SoundManager.js
+
 import { EventManager } from './EventManager.js';
 import { EVENT } from '../utils.js';
 import { FACTION } from '../utils.js';
@@ -46,7 +46,6 @@ class SoundManager {
     }
 
     /**
-     * [FIXED] Centralized volume calculation logic.
      * @param {string} soundKey - The key for the sound in this.sounds.
      * @returns {number} The calculated volume between 0 and 1.
      */
@@ -72,7 +71,7 @@ class SoundManager {
             return;
         }
 
-        // Use the centralized calculation
+        
         soundData.audio.volume = this._getCalculatedVolume(soundKey);
     }
 
@@ -120,9 +119,6 @@ class SoundManager {
         }
     }
 
-    /**
-     * [FIXED] All one-shot sounds now use the central volume calculation.
-     */
     handleTankShot() {
         const audio = this.sounds.tankShot.audio.cloneNode();
         audio.volume = this._getCalculatedVolume('tankShot');
@@ -154,7 +150,7 @@ class SoundManager {
 
     playLobbyMusic() { this.stopAllSounds(); this.sounds.lobbyMusic.audio.play().catch(e => {}); }
     playBgm() { this.stopAllSounds(); this.sounds.gameBgm.audio.play().catch(e => {}); }
-    calculateDistanceVolume(pos, maxVol, maxDist) { return maxVol; } // Dummy function, not implemented
+    calculateDistanceVolume(pos, maxVol, maxDist) { return maxVol; } 
     dispose() { this.stopAllSounds(); SoundManager.instance = null; }
 }
 

@@ -1,22 +1,22 @@
-// ./class/Bullet.js
+
 import * as THREE from "three";
 import { COLOR, EVENT } from "../utils.js";
 import { CollisionManager } from "./CollisionManager.js";
 import { Tank } from './Tank.js';
 import { Game } from './Game.js';
 import { GameObject } from "./GameObject.js";
-import { EventManager} from "./EventManager.js";
+import { EventManager } from "./EventManager.js";
 import { Rock } from "./Rock.js";
 import { Tree } from "./Tree.js";
-import { Barrel } from "./Barrel.js"; // Added Barrel import
+import { Barrel } from "./Barrel.js";
 
-class Bullet extends GameObject{
+class Bullet extends GameObject {
   static count = 0;
   hasCollided = false;
   damage = 100;
-  shooter = null; // Reference to the entity that fired the bullet
+  shooter = null;
   color;
-  velocity; // Keep velocity for lookAt calculation
+  velocity;
 
   trail;
   trailPoints = [];
@@ -27,7 +27,7 @@ class Bullet extends GameObject{
     super(id, faction, position, true);
 
     this.color = color || COLOR.orange;
-    this.velocity = new THREE.Vector3(); // Initialized but set by Manager
+    this.velocity = new THREE.Vector3();
 
     this.setModel(this.createTracerHead());
     this.createTrail();
@@ -39,10 +39,8 @@ class Bullet extends GameObject{
     if (this.hasCollided) return;
     this.hasCollided = true;
     this.createImpactEffect();
-    // Do not call dispose here. The manager will do it.
   }
 
-  // createTracerHead() and createTrail() remain the same
   createTracerHead() {
     const geometry = new THREE.SphereGeometry(0.2, 8, 8);
     const material = new THREE.MeshStandardMaterial({
@@ -76,7 +74,6 @@ class Bullet extends GameObject{
     Game.instance.scene.add(this.trail);
   }
 
-  // updateTrail() remains the same
   updateTrail() {
     this.trailPoints.push(this.position.clone());
     while (this.trailPoints.length > this.trailLength) {
@@ -105,16 +102,14 @@ class Bullet extends GameObject{
    * and applied by the ProjectilesManager.
    */
   update() {
-    // No-op
+
   }
 
-  // Collision logic remains on the main thread
   handleCollision({ objA, objB }) {
     if (this.hasCollided) return;
 
     if (objA === this || objB === this) {
       const otherObject = objA === this ? objB : objA;
-      // Do not collide with the entity that shot the bullet
       if (otherObject === this.shooter) return;
 
       if (
@@ -128,7 +123,6 @@ class Bullet extends GameObject{
     }
   }
 
-  // createImpactEffect() remains the same
   createImpactEffect() {
     const scene = Game.instance.scene;
     const impactPosition = this.position;
@@ -140,20 +134,20 @@ class Bullet extends GameObject{
     const posArray = new Float32Array(particleCount * 3);
     const velocities = [];
     for (let i = 0; i < particleCount; i++) {
-        posArray[i * 3 + 0] = 0;
-        posArray[i * 3 + 1] = 0;
-        posArray[i * 3 + 2] = 0;
-        const velocity = new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
-        velocity.normalize().multiplyScalar(Math.random() * 0.3 + 0.1);
-        velocities.push(velocity);
+      posArray[i * 3 + 0] = 0;
+      posArray[i * 3 + 1] = 0;
+      posArray[i * 3 + 2] = 0;
+      const velocity = new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2);
+      velocity.normalize().multiplyScalar(Math.random() * 0.3 + 0.1);
+      velocities.push(velocity);
     }
     particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
     const particleMaterial = new THREE.PointsMaterial({
-        color: this.color,
-        size: 0.15,
-        blending: THREE.AdditiveBlending,
-        transparent: true,
-        sizeAttenuation: true,
+      color: this.color,
+      size: 0.15,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      sizeAttenuation: true,
     });
     const sparks = new THREE.Points(particlesGeometry, particleMaterial);
     sparks.position.copy(impactPosition);
@@ -162,35 +156,33 @@ class Bullet extends GameObject{
     let elapsed = 0;
     const clock = new THREE.Clock();
     const animate = () => {
-        const dt = clock.getDelta();
-        elapsed += dt;
-        if (elapsed > duration) {
-            scene.remove(sparks);
-            scene.remove(flashLight);
-            sparks.geometry.dispose();
-            sparks.material.dispose();
-            return;
-        }
-        const progress = elapsed / duration;
-        flashLight.intensity = 20 * (1 - progress);
-        particleMaterial.opacity = 1 - progress;
-        const positions = sparks.geometry.attributes.position.array;
-        for (let i = 0; i < particleCount; i++) {
-            positions[i * 3 + 0] += velocities[i].x * dt * 10;
-            positions[i * 3 + 1] += velocities[i].y * dt * 10;
-            positions[i * 3 + 2] += velocities[i].z * dt * 10;
-        }
-        sparks.geometry.attributes.position.needsUpdate = true;
-        requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+      elapsed += dt;
+      if (elapsed > duration) {
+        scene.remove(sparks);
+        scene.remove(flashLight);
+        sparks.geometry.dispose();
+        sparks.material.dispose();
+        return;
+      }
+      const progress = elapsed / duration;
+      flashLight.intensity = 20 * (1 - progress);
+      particleMaterial.opacity = 1 - progress;
+      const positions = sparks.geometry.attributes.position.array;
+      for (let i = 0; i < particleCount; i++) {
+        positions[i * 3 + 0] += velocities[i].x * dt * 10;
+        positions[i * 3 + 1] += velocities[i].y * dt * 10;
+        positions[i * 3 + 2] += velocities[i].z * dt * 10;
+      }
+      sparks.geometry.attributes.position.needsUpdate = true;
+      requestAnimationFrame(animate);
     };
     animate();
   }
 
   dispose() {
-    // Unsubscribe and remove from CollisionManager
     CollisionManager.instance.remove(this);
 
-    // Clean up Three.js resources
     if (this.trail) {
       if (this.trail.parent) this.trail.parent.remove(this.trail);
       this.trail.geometry.dispose();
@@ -198,7 +190,6 @@ class Bullet extends GameObject{
       this.trail = null;
     }
 
-    // Call super.dispose() which handles the main model
     super.dispose();
   }
 }

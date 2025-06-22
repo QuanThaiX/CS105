@@ -1,4 +1,4 @@
-// ./class/Bot.js
+
 import * as THREE from 'three';
 import { Game } from './Game.js';
 import { GAMECONFIG } from '../config.js';
@@ -8,26 +8,26 @@ class Bot {
     static instance;
     tanks = [];
     worker;
-    
+
     constructor() {
         if (Bot.instance) {
             return Bot.instance;
         }
         Bot.instance = this;
 
-        if (typeof(Worker) === "undefined") {
+        if (typeof (Worker) === "undefined") {
             console.error("❌ This browser does not support Web Workers. Bot AI will not function.");
             return;
         }
 
         console.log("🚀 Initializing Bot AI with Web Worker support.");
-        
+
         this.worker = new Worker('./class/BotWorker.js', { type: 'module' });
         this.worker.onmessage = this.handleWorkerMessage.bind(this);
         this.worker.onerror = (error) => {
             console.error("🤖 Bot Worker Error:", error.message, error);
         };
-        
+
         this.worker.postMessage({
             type: 'init',
             payload: {
@@ -39,13 +39,12 @@ class Bot {
     addTank(tank) {
         if (!this.worker) return;
 
-        // The initial bot configuration is still defined here
         tank.bot = {
             currentState: 'patrol',
             stateStartTime: Date.now(),
             stateTimer: 0,
             minStateTime: 1000,
-            playerTank: null, // This will be provided by gameState now
+            playerTank: null,
             detectionRange: 2000,
             attackRange: 150,
             optimalAttackRange: 20,
@@ -71,7 +70,7 @@ class Bot {
         };
 
         this.tanks.push(tank);
-        
+
         this.worker.postMessage({
             type: 'add',
             payload: { id: tank.id, botConfig: tank.bot }
@@ -133,21 +132,21 @@ class Bot {
             }
         }
     }
-    
-     serializeGameState() {
+
+    serializeGameState() {
         const game = Game.instance;
         if (!game || !game.playerTank || !game.playerTank.model) return null;
-        
+
         const gsm = game.getGameStateManager();
         if (!gsm) return null;
-        
+
         const playerTank = gsm.getPlayerTank();
         const serializedPlayer = playerTank ? {
             id: playerTank.id,
             position: { x: playerTank.position.x, y: playerTank.position.y, z: playerTank.position.z },
             hp: playerTank.hp
         } : null;
-        
+
         const allTanks = gsm.getAllTanks();
         const serializedTanks = allTanks
             .filter(tank => tank.model)
@@ -157,16 +156,14 @@ class Bot {
                 quaternion: { x: tank.model.quaternion.x, y: tank.model.quaternion.y, z: tank.model.quaternion.z, w: tank.model.quaternion.w },
                 rotationY: tank.model.rotation.y
             }));
-        
+
         const allObstacles = gsm.getAllObstacles();
         const serializedObstacles = allObstacles.map(obs => ({
             id: obs.id,
             position: { x: obs.position.x, y: obs.position.y, z: obs.position.z },
-            // Add a type property so the worker knows what it is
-            type: obs.constructor.name 
+            type: obs.constructor.name
         }));
-        
-        // --- NEW: Serialize barrels for tactical AI ---
+
         const allBarrels = game.barrels || [];
         const serializedBarrels = allBarrels
             .filter(barrel => barrel && !barrel.hasExploded)
@@ -180,7 +177,7 @@ class Bot {
             playerTank: serializedPlayer,
             tanks: serializedTanks,
             obstacles: serializedObstacles,
-            barrels: serializedBarrels, // <-- ADDED
+            barrels: serializedBarrels,
         };
     }
 

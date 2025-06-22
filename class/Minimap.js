@@ -1,7 +1,7 @@
-// ./class/Minimap.js
+
 import { Game } from './Game.js';
 import { FACTION, toRad } from '../utils.js';
-import { gameSettings } from '../config.js'; // <-- IMPORT gameSettings
+import { gameSettings } from '../config.js';
 
 class Minimap {
     constructor() {
@@ -22,21 +22,20 @@ class Minimap {
             viewCone: 'rgba(102, 255, 102, 0.2)',
             enemy: '#F44336',
             barrel: '#FF9800',
-            // powerup: '#2196F3',
+            powerup: '#2196F3',
             obstacle: 'rgba(150, 150, 150, 0.4)'
         };
 
         this.staticObstacles = [];
         this.staticGeometryProcessed = false;
 
-        // --- NEW: Worker Implementation ---
         this.worker = null;
         if (typeof Worker !== 'undefined') {
             this.worker = new Worker('./class/MinimapWorker.js', { type: 'module' });
             this.worker.onmessage = this.handleWorkerMessage.bind(this);
             this.worker.onerror = (e) => console.error("Minimap Worker Error:", e);
 
-            // Initialize worker
+            
             this.worker.postMessage({
                 type: 'init',
                 payload: {
@@ -49,11 +48,10 @@ class Minimap {
             console.warn("Minimap: Web Workers not supported. Calculations will run on the main thread (not implemented).");
         }
 
-        // Set initial visibility based on settings
+        
         this.toggleVisibility(gameSettings.showMinimap);
     }
 
-    // This runs once to gather static data. The result is then sent to the worker every frame.
     processStaticGeometry() {
         if (this.staticGeometryProcessed) return;
         const gsm = this.game.getGameStateManager();
@@ -72,7 +70,6 @@ class Minimap {
         console.log(`Minimap: Processed ${this.staticObstacles.length} static obstacles for worker.`);
     }
 
-    // The main update function now gathers data and sends it to the worker.
     update() {
         if (!this.ctx || !this.game.isRunning || !this.worker) return;
 
@@ -86,7 +83,6 @@ class Minimap {
         const gsm = this.game.getGameStateManager();
         if (!gsm) return;
 
-        // --- Serialize game state for the worker ---
         const gameState = {
             player: {
                 position: { x: player.position.x, z: player.position.z },
@@ -99,9 +95,9 @@ class Minimap {
             barrels: this.game.barrels
                 .filter(b => !b.hasExploded)
                 .map(b => ({ position: { x: b.position.x, z: b.position.z } })),
-            // powerups: this.game.powerUpManager.powerUpPool
-            //     .filter(p => p.isActive)
-            //     .map(p => ({ position: { x: p.position.x, z: p.position.z } })),
+            powerups: this.game.powerUpManager.powerUpPool
+                .filter(p => p.isActive)
+                .map(p => ({ position: { x: p.position.x, z: p.position.z } })),
             staticObstacles: this.staticObstacles,
         };
 
@@ -123,18 +119,15 @@ class Minimap {
         const mapCenterX = canvasWidth / 2;
         const mapCenterY = canvasHeight / 2;
 
-        // 1. Clear and clip canvas
         this.ctx.clearRect(0, 0, canvasWidth, canvasHeight);
         this.ctx.save();
         this.ctx.beginPath();
         this.ctx.arc(mapCenterX, mapCenterY, mapCenterX, 0, Math.PI * 2);
         this.ctx.clip();
 
-        // 2. Draw background
         this.ctx.fillStyle = this.colors.background;
         this.ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-        // 3. Execute draw commands from worker
         commands.forEach(cmd => {
             const color = this.colors[cmd.entityType];
             if (!color) return;
@@ -156,7 +149,6 @@ class Minimap {
             }
         });
 
-        // 4. Draw UI elements that are fixed relative to the player
         this.ctx.fillStyle = this.colors.viewCone;
         this.ctx.beginPath();
         this.ctx.moveTo(mapCenterX, mapCenterY);
@@ -166,7 +158,6 @@ class Minimap {
 
         this.drawPlayerIcon(mapCenterX, mapCenterY, this.colors.player, 6);
 
-        // 5. Restore from clipping mask and draw border
         this.ctx.restore();
         this.ctx.strokeStyle = this.colors.border;
         this.ctx.lineWidth = 4;
@@ -205,7 +196,6 @@ class Minimap {
         this.ctx.restore();
     }
 
-    // NEW: Method to show/hide the minimap canvas
     toggleVisibility(show) {
         if (this.canvas) {
             this.canvas.style.display = show ? 'block' : 'none';

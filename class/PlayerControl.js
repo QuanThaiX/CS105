@@ -1,4 +1,4 @@
-// ./class/PlayerControl.js
+
 import { Game } from './Game.js';
 
 class PlayerControl {
@@ -37,7 +37,6 @@ class PlayerControl {
       return;
     }
 
-    // --- Movement & Shooting Logic ---
     if (this.keys["KeyA"] || this.keys["ArrowLeft"]) {
       this.tank.rotateLeft();
     }
@@ -51,7 +50,7 @@ class PlayerControl {
     if (this.keys["KeyS"] || this.keys["ArrowDown"]) {
       this.tank.moveBackward();
     }
-    
+
     if (this.keys["Space"]) {
       const currentTime = Date.now();
       const timeSinceLastShot = currentTime - this.tank.lastShotTime;

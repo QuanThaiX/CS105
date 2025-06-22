@@ -1,4 +1,3 @@
-// ./class/CollisionManager.js
 import * as THREE from 'three';
 import { GAMECONFIG } from '../config.js';
 import { Game } from './Game.js';
@@ -35,7 +34,6 @@ class CollisionManager {
     this.bboxCache = new WeakMap();
     this.boxHelpers = new Map();
     
-    // Create and initialize the worker
     if (typeof Worker !== 'undefined') {
         this.worker = new Worker('./class/CollisionWorker.js', { type: 'module' });
         this.worker.onmessage = this.handleWorkerMessage.bind(this);
@@ -47,7 +45,6 @@ class CollisionManager {
             new THREE.Vector3(worldSize, worldSize, worldSize)
         );
 
-        // Send initialization data to the worker
         this.worker.postMessage({
             type: 'init',
             payload: {
@@ -142,7 +139,7 @@ class CollisionManager {
 
             let wasHit = false;
             if (target instanceof Tank && bullet.faction !== target.faction) {
-                target.takeDamage(bullet.damage, bullet.shooter); // Use bullet.shooter here
+                target.takeDamage(bullet.damage, bullet.shooter);
                 wasHit = true;
             }
             else if (target instanceof Rock || target instanceof Tree) {
@@ -155,21 +152,17 @@ class CollisionManager {
                 wasHit = true;
             }
 
-            // --- THE FIX ---
-            // If a valid hit occurred, call onHit() and notify the system.
             if (wasHit) {
                 bullet.onHit(target);
                 EventManager.instance.notify(EVENT.BULLET_HIT, {
                     bullet: bullet,
                     target: target,
-                    hitPoint: bullet.position.clone() // Provide the impact point
+                    hitPoint: bullet.position.clone()
                 });
             }
-            // --- END OF FIX ---
             return;
         }
 
-        // This is only called for non-bullet collisions now.
         EventManager.instance.notify(EVENT.COLLISION, { objA, objB });
     }
 
@@ -198,8 +191,6 @@ class CollisionManager {
                           min: { x: this._reusableBox3.min.x, y: this._reusableBox3.min.y, z: this._reusableBox3.min.z },
                           max: { x: this._reusableBox3.max.x, y: this._reusableBox3.max.y, z: this._reusableBox3.max.z }
                       },
-                      // --- THAY ĐỔI Ở ĐÂY ---
-                      // Gửi thêm thông tin để worker biết đây là thùng phuy
                       isBarrel: obj instanceof Barrel 
                   });
               }
@@ -207,7 +198,6 @@ class CollisionManager {
       }
 
         if (!this.staticObjectsSent) {
-            // First frame: send everything
             const staticPayload = [];
             for (const obj of this.staticObjects) {
                 if (obj.model && !obj.disposed) {
@@ -232,7 +222,6 @@ class CollisionManager {
             });
             this.staticObjectsSent = true;
         } else {
-            // Subsequent frames: send only dynamic objects
             this.worker.postMessage({
                 type: 'dynamic_update',
                 payload: {
@@ -322,10 +311,9 @@ class CollisionManager {
     notifyObjectStateChange(gameObject) {
         if (!this.worker) return;
 
-        this.remove(gameObject); // Remove from its current list (likely dynamic)
-        this.add(gameObject);    // Re-add it, it will now be classified as static
+        this.remove(gameObject);
+        this.add(gameObject);
 
-        // Send a specific command to the worker to update its internal lists
         const bbox = this.createScaledBoundingBox(gameObject);
         if (bbox) {
             this.worker.postMessage({

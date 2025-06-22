@@ -1,4 +1,4 @@
-// ./class/UIManager.js
+
 import { EventManager } from './EventManager.js';
 import { EVENT, FACTION } from '../utils.js';
 
@@ -10,7 +10,7 @@ class UIManager {
             return UIManager.instance;
         }
         UIManager.instance = this;
-        // Find or create the message container
+        
         this.messageContainer = document.getElementById('message-container');
         if (!this.messageContainer) {
             this.messageContainer = document.createElement('div');
@@ -47,12 +47,12 @@ class UIManager {
     
         const { message, duration = 1000, type = 'info' } = data;
 
-        // Create the message element
+        
         const messageElement = document.createElement('div');
         messageElement.className = `game-message ${type}`;
         messageElement.textContent = message;
 
-        // Add it to the container
+        
         this.messageContainer.appendChild(messageElement);
 
         setTimeout(() => {
@@ -66,7 +66,6 @@ class UIManager {
     }
     
     /**
-     * NEW: Handles TANK_DESTROYED to display a kill feed message.
      * @param {object} data - The event data.
      * @param {Tank} data.tank - The tank that was destroyed.
      * @param {GameObject} data.killer - The object that got the kill.

@@ -1,4 +1,4 @@
-// ./class/Tank.js
+
 import * as THREE from "three";
 import { loadTankModel, POWERUP_TYPE, FACTION, EVENT, TANKTYPE, COLOR, TANK_STATS } from "../utils.js";
 import { GAMECONFIG } from '../config.js';
@@ -37,7 +37,7 @@ class Tank extends GameObject {
   reloadBar;
   enemyIndicator;
   indicatorLight;
-  // activePowerUps;
+  
   originalStats;
   _forward = new THREE.Vector3(0, 0, 1);
   _backward = new THREE.Vector3(0, 0, -1);
@@ -77,7 +77,7 @@ class Tank extends GameObject {
 
     this.prevPosition = this.position.clone();
     this.prevRotation = 0;
-    // this.activePowerUps = new Map();
+    this.activePowerUps = new Map();
     this.originalStats = {
       shootCooldown: this.shootCooldown,
       damage: this.damage
@@ -122,7 +122,7 @@ class Tank extends GameObject {
     if (!this.model) return;
 
     const arrowGeometry = new THREE.ConeGeometry(0.3, 0.6, 8);
-    const arrowMaterial = new THREE.MeshBasicMaterial({ color: 0xff4444 }); // Bright red
+    const arrowMaterial = new THREE.MeshBasicMaterial({ color: 0xff4444 }); 
     this.enemyIndicator = new THREE.Mesh(arrowGeometry, arrowMaterial);
 
     this.enemyIndicator.position.set(0, 3.5, 0);
@@ -153,7 +153,7 @@ class Tank extends GameObject {
       }
     }
 
-    // Fallback: sử dụng loadTankModel function cũ
+    
     console.warn(`⚠️ Tank model ${this.tankType.name} chưa được preload, đang load trực tiếp...`);
     loadTankModel(this.tankType, this.position).then((model) => {
       this.setModel(model);
@@ -186,7 +186,7 @@ class Tank extends GameObject {
     }
   }
 
-  // MOVE --------------------------------------------------------------------------------------------------------------------------------
+  
 
   moveForward(distance = this.moveSpeed) {
     if (this.model) {
@@ -197,8 +197,8 @@ class Tank extends GameObject {
       }
       this.prevPosition.copy(this.position);
 
-      // BEFORE: const forward = new THREE.Vector3(0, 0, 1);
-      // AFTER: Reuse the helper vector
+      
+      
       this._forward.set(0, 0, 1);
       this._forward.applyQuaternion(this.model.quaternion);
       this.model.position.add(this._forward.multiplyScalar(distance));
@@ -216,8 +216,8 @@ class Tank extends GameObject {
       }
       this.prevPosition.copy(this.position);
       
-      // BEFORE: const backward = new THREE.Vector3(0, 0, -1);
-      // AFTER: Reuse the helper vector
+      
+      
       this._backward.set(0, 0, -1);
       this._backward.applyQuaternion(this.model.quaternion);
       this.model.position.add(this._backward.multiplyScalar(distance));
@@ -257,13 +257,13 @@ class Tank extends GameObject {
     }
 
     if (this.model) {
-      // Lấy vị trí gốc của đạn từ vị trí tank
+      
 this._bulletPosition.copy(this.model.position);
-      // Thiết lập offset cho vị trí đạn dựa vào loại tank
-      let bulletOffsetY = 1.2; // Offset Y mặc định
-      let bulletOffsetZ = 4;   // Offset Z mặc định (phía trước tank)
+      
+      let bulletOffsetY = 1.2; 
+      let bulletOffsetZ = 4;   
 
-      // Thiết lập offset riêng cho từng loại tank
+      
       if (this.tankType.name === TANKTYPE.V001) {
         bulletOffsetY = 1.2;
         bulletOffsetZ = 4;
@@ -300,7 +300,7 @@ this._bulletPosition.copy(this.model.position);
       }
       this._bulletPosition.y += bulletOffsetY;
 
-      // Tính toán hướng và áp dụng offset Z
+      
       this._bulletDirection.set(0, 0, 1).applyQuaternion(this.model.quaternion).normalize();
     this._bulletPosition.add(this._bulletDirection.clone().multiplyScalar(bulletOffsetZ));
     
@@ -374,7 +374,7 @@ this._bulletPosition.copy(this.model.position);
   destroy() {
     if (this.disposed) return;
 
-    // --- Gameplay Death Effects ---
+    
     this.playDestructionSound();
 
     EventManager.instance.notify(EVENT.TANK_DESTROYED, {
@@ -387,7 +387,7 @@ this._bulletPosition.copy(this.model.position);
       faction: this.faction
     });
 
-    // Call GameObject.destroy() which in turn calls this.dispose() for cleanup
+    
     super.destroy();
   }
 
@@ -399,7 +399,7 @@ this._bulletPosition.copy(this.model.position);
   dispose() {
     if (this.disposed) return;
 
-    // --- Resource Cleanup Logic ---
+    
     this.stopAutoShoot();
 
     if (this.model) {
@@ -439,7 +439,7 @@ this._bulletPosition.copy(this.model.position);
       CollisionManager.instance.remove(this);
     }
 
-    // Call parent dispose to finalize cleanup (remove model from scene, set disposed flag)
+    
     super.dispose();
   }
 
@@ -552,9 +552,9 @@ this._bulletPosition.copy(this.model.position);
         if (otherObject.isActive) {
           this.collectPowerUp(otherObject);
           otherObject.collect();
-          // if (Game.instance.powerUpManager) {
-          //    Game.instance.powerUpManager.onPowerUpCollected();
-          // }
+          
+          
+          
         }
         return;
       }
@@ -574,70 +574,69 @@ this._bulletPosition.copy(this.model.position);
       }
     }
   }
-  // collectPowerUp(powerUp) {
-  //   const type = powerUp.powerUpType;
-  //   console.log(`Player collected: ${type.name}`);
+  collectPowerUp(powerUp) {
+    const type = powerUp.powerUpType;
+    console.log(`Player collected: ${type.name}`);
 
-  //   EventManager.instance.notify(EVENT.POWERUP_COLLECTED, { tank: this, powerUpType: type });
-  //   EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
-  //     message: `${type.name} Activated!`,
-  //     duration: 2000,
-  //     type: 'heal' // Use 'heal' style for positive feedback
-  //   });
+    EventManager.instance.notify(EVENT.POWERUP_COLLECTED, { tank: this, powerUpType: type });
+    EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
+      message: `${type.name} Activated!`,
+      duration: 2000,
+      type: 'heal' 
+    });
 
-  //   // Clear any existing timeout for this power-up type
-  //   if (this.activePowerUps.has(type.name)) {
-  //     clearTimeout(this.activePowerUps.get(type.name));
-  //     this.expirePowerUp(type); // Reset stats before applying new buff
-  //   }
+    
+    if (this.activePowerUps.has(type.name)) {
+      clearTimeout(this.activePowerUps.get(type.name));
+      this.expirePowerUp(type); 
+    }
 
-  //   // Apply the effect
-  //   switch (type.name) {
-  //     case POWERUP_TYPE.HEALTH_PACK.name:
-  //       this.heal(type.value);
-  //       break;
-  //     case POWERUP_TYPE.SHIELD.name:
-  //       // For a shield, we can give temporary extra HP or a damage reduction flag
-  //       this.defense *= 2; // Double defense
-  //       break;
-  //     case POWERUP_TYPE.RAPID_FIRE.name:
-  //       this.shootCooldown /= 2; // Halve cooldown
-  //       break;
-  //     case POWERUP_TYPE.DAMAGE_BOOST.name:
-  //       this.damage *= 1.5; // 50% more damage
-  //       break;
-  //   }
+    
+    switch (type.name) {
+      case POWERUP_TYPE.HEALTH_PACK.name:
+        this.heal(type.value);
+        break;
+      case POWERUP_TYPE.SHIELD.name:
+        
+        this.defense *= 2; 
+        break;
+      case POWERUP_TYPE.RAPID_FIRE.name:
+        this.shootCooldown /= 2; 
+        break;
+      case POWERUP_TYPE.DAMAGE_BOOST.name:
+        this.damage *= 1.5; 
+        break;
+    }
 
-  //   // Set a timer to remove the effect (if it has a duration)
-  //   if (type.duration > 0) {
-  //     const timeoutId = setTimeout(() => {
-  //       this.expirePowerUp(type);
-  //     }, type.duration);
-  //     this.activePowerUps.set(type.name, timeoutId);
-  //   }
-  // }
+    
+    if (type.duration > 0) {
+      const timeoutId = setTimeout(() => {
+        this.expirePowerUp(type);
+      }, type.duration);
+      this.activePowerUps.set(type.name, timeoutId);
+    }
+  }
 
-  // expirePowerUp(powerUpType) {
-  //   console.log(`${powerUpType.name} expired.`);
-  //   this.activePowerUps.delete(powerUpType.name);
-  //   EventManager.instance.notify(EVENT.POWERUP_EXPIRED, { tank: this, powerUpType });
+  expirePowerUp(powerUpType) {
+    console.log(`${powerUpType.name} expired.`);
+    this.activePowerUps.delete(powerUpType.name);
+    EventManager.instance.notify(EVENT.POWERUP_EXPIRED, { tank: this, powerUpType });
 
-  //   // Revert the stat changes
-  //   switch (powerUpType.name) {
-  //     case POWERUP_TYPE.SHIELD.name:
-  //       this.defense = this.originalStats.defense;
-  //       break;
-  //     case POWERUP_TYPE.RAPID_FIRE.name:
-  //       this.shootCooldown = this.originalStats.shootCooldown;
-  //       break;
-  //     case POWERUP_TYPE.DAMAGE_BOOST.name:
-  //       this.damage = this.originalStats.damage;
-  //       break;
-  //   }
-  // }
+    
+    switch (powerUpType.name) {
+      case POWERUP_TYPE.SHIELD.name:
+        this.defense = this.originalStats.defense;
+        break;
+      case POWERUP_TYPE.RAPID_FIRE.name:
+        this.shootCooldown = this.originalStats.shootCooldown;
+        break;
+      case POWERUP_TYPE.DAMAGE_BOOST.name:
+        this.damage = this.originalStats.damage;
+        break;
+    }
+  }
 
 /**
- * NEW: Applies a force to the tank, causing it to slide.
  * @param {THREE.Vector3} direction - The normalized direction of the force.
  * @param {number} force - The magnitude of the force.
  */

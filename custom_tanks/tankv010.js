@@ -22,14 +22,14 @@ export function createTank() {
     trackTexture.offset.set(0, 0);
 
     const hullMaterial = new THREE.MeshStandardMaterial({
-        // color: 0x555555, // Darker, more gunmetal color
+        // color: 0x555555, 
         map: bodyTexture,
         metalness: 0.95,
         roughness: 0.4,
         flatShading: true,
     });
     const bodyMaterial = new THREE.MeshStandardMaterial({
-        color: 0x555555, // Darker, more gunmetal color
+        color: 0x555555, 
         // map: bodyTexture,
         metalness: 0.95,
         roughness: 0.4,
@@ -56,16 +56,13 @@ export function createTank() {
         toneMapped: false,
     });
     
-    // Material for the new engine glow
     const engineGlowMaterial = new THREE.MeshStandardMaterial({
-        color: 0xff4500, // Orange-Red glow
+        color: 0xff4500,
         emissive: 0xff4500,
         emissiveIntensity: 4,
         toneMapped: false,
     });
 
-    // --- Hull (Thân xe) ---
-    // The core chassis remains the same angular shape
     const hullShape = new THREE.Shape();
     const w = 1.6, l = 2.5;
     hullShape.moveTo(-w, -l);
@@ -84,7 +81,6 @@ export function createTank() {
     hull.receiveShadow = true;
     tank.add(hull);
 
-    // --- NEW: Side Armor Plating (Layering) ---
     const armorPlateGeo = new THREE.BoxGeometry(0.2, 0.4, 3.5);
     const leftArmor = new THREE.Mesh(armorPlateGeo, darkMaterial);
     leftArmor.position.set(-1.7, 0.1, 0);
@@ -96,7 +92,6 @@ export function createTank() {
     rightArmor.castShadow = true;
     tank.add(rightArmor);
     
-    // --- NEW: Rear Engine Block ---
     const engineBlockGeo = new THREE.BoxGeometry(2, 0.6, 0.8);
     const engineBlock = new THREE.Mesh(engineBlockGeo, darkMaterial);
     engineBlock.position.set(0, 0.2, -2.4);
@@ -105,11 +100,10 @@ export function createTank() {
 
     const engineGlowGeo = new THREE.PlaneGeometry(1.6, 0.3);
     const engineGlow = new THREE.Mesh(engineGlowGeo, engineGlowMaterial);
-    engineGlow.position.set(0, 0.2, -2.81); // Positioned just on the outside
+    engineGlow.position.set(0, 0.2, -2.81); 
     tank.add(engineGlow);
-    tank.userData.engineGlow = engineGlow; // Store for animation
+    tank.userData.engineGlow = engineGlow;
 
-    // --- NEW: Hull Detail Lights (Greebling) ---
     const lightGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
     const light1 = new THREE.Mesh(lightGeo, accentGlowMaterial);
     light1.position.set(-1, 0.45, 2.2);
@@ -120,7 +114,6 @@ export function createTank() {
     tank.add(light2);
 
 
-    // --- Turret (Tháp pháo) ---
     const turretGroup = new THREE.Group();
     turretGroup.position.y = 0.35;
     
@@ -133,7 +126,6 @@ export function createTank() {
     turretBody.castShadow = true;
     turretGroup.add(turretBody);
     
-    // --- NEW: Sensor Pods on Turret ---
     const podGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.3, 8);
     const leftPod = new THREE.Mesh(podGeo, darkMaterial);
     leftPod.position.set(-1.1, 0.7, 0);
@@ -145,21 +137,18 @@ export function createTank() {
 
     tank.add(turretGroup);
 
-    // --- Cannon (Vũ khí năng lượng) ---
     const cannonGroup = new THREE.Group();
-    cannonGroup.position.set(0, 0.7, 0.5); // Attached to turret body
+    cannonGroup.position.set(0, 0.7, 0.5); 
     turretGroup.add(cannonGroup);
     
-    // --- NEW: Cannon Mantlet ---
     const mantletGeo = new THREE.BoxGeometry(0.8, 0.7, 0.3);
     const mantlet = new THREE.Mesh(mantletGeo, darkMaterial);
     mantlet.position.z = 0.8;
     cannonGroup.add(mantlet);
 
-    // Barrel is now longer and originates from the mantlet
     const cannonBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2.8, 8), darkMaterial);
     cannonBarrel.rotation.x = Math.PI / 2;
-    cannonBarrel.position.z = 2.3; // Pushed forward
+    cannonBarrel.position.z = 2.3;
     cannonBarrel.castShadow = true;
     cannonGroup.add(cannonBarrel);
 
@@ -210,32 +199,25 @@ export function createTank() {
     createPad(-1.2, -1.8);
     createPad(1.2, -1.8);
     
-    tank.userData.hoverCones = hoverCones; // Make cones accessible for animation
+    tank.userData.hoverCones = hoverCones;
 
 
-    // --- Animation ---
     const initialY = 1.0;
     tank.position.y = initialY;
 
-    // This function will be called from your Tank class's update method
     tank.userData.update = (time) => {
-        // Main hover animation
         tank.position.y = initialY + Math.sin(time * 2) * 0.1;
         tank.rotation.x = Math.sin(time * 1.5) * 0.02;
         tank.rotation.z = Math.cos(time * 1.2) * 0.02;
 
-        // --- NEW ANIMATIONS ---
-        // Animate the thruster cone opacity to make it flicker
         if (tank.userData.hoverCones) {
             tank.userData.hoverCones.forEach((cone, i) => {
-                // Use a different offset for each cone so they don't flicker in sync
                 cone.material.opacity = 0.2 + (Math.sin(time * 15 + i * 2) + 1) * 0.1;
             });
         }
         
-        // Animate the engine glow intensity
         if(tank.userData.engineGlow) {
-            const engineIntensity = 3 + (Math.sin(time * 5) + 1) * 1.5; // Pulse between 3 and 6
+            const engineIntensity = 3 + (Math.sin(time * 5) + 1) * 1.5;
             tank.userData.engineGlow.material.emissiveIntensity = engineIntensity;
         }
     };

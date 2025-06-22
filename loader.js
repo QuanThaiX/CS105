@@ -1,4 +1,4 @@
-// ./loader.js
+
 import * as THREE from 'three';
 import { GLTFLoader } from "./three/examples/jsm/loaders/GLTFLoader.js";
 import { TANKTYPE } from './utils.js';
@@ -13,11 +13,11 @@ class ModelLoader {
         ModelLoader.instance = this;
         
         this.loader = new GLTFLoader();
-        this.modelCache = new Map(); // Cache for loaded models
-        this.loadingPromises = new Map(); // Track loading promises
+        this.modelCache = new Map();
+        this.loadingPromises = new Map();
         this.isPreloaded = false;
-        this.maxCacheSize = 20; // Giới hạn số lượng model trong cache
-        this.cloneCount = new Map(); // Theo dõi số lần clone
+        this.maxCacheSize = 20; 
+        this.cloneCount = new Map();
     }
 
     /**
@@ -30,15 +30,13 @@ class ModelLoader {
         const loadPromises = [];
         const failedLoads = [];
         
-        // Load all tank models
         Object.values(TANKTYPE).forEach(tankType => {
-            // Xử lý tank với custom renderer (JS model)
             if (tankType.useCustomRenderer && tankType.assetPathJS) {
                 console.log(`📥 Adding custom JS tank ${tankType.name} to preload queue`);
                 
                 const promise = import(tankType.assetPathJS)
                     .then(module => {
-                        // Gọi hàm createTank để tạo model
+                        
                         const tank = module.createTank();
                         this.modelCache.set(`tank_${tankType.name}`, tank);
                         this.cloneCount.set(`tank_${tankType.name}`, 0);
@@ -53,7 +51,6 @@ class ModelLoader {
                     
                 loadPromises.push(promise);
             }
-            // Xử lý tank với GLTF model
             else if (tankType.assetPathGLTF) {
                 const promise = this._loadModel(tankType.assetPathGLTF, `tank_${tankType.name}`)
                     .catch(err => {
@@ -65,7 +62,6 @@ class ModelLoader {
             }
         });
         
-        // Load rock models
         const rockTypes = ['rock09', 'rock13'];
         rockTypes.forEach(rockType => {
             const promise = this._loadModel(`./assets/${rockType}/${rockType}.gltf`, `rock_${rockType}`)
@@ -77,7 +73,6 @@ class ModelLoader {
             loadPromises.push(promise);
         });
         
-        // Load tree models
         const treeTypes = ['tree01'];
         treeTypes.forEach(treeType => {
             const promise = this._loadModel(`./assets/${treeType}/${treeType}.gltf`, `tree_${treeType}`)
@@ -89,7 +84,6 @@ class ModelLoader {
             loadPromises.push(promise);
         });
         
-        // Load barrel model (if available)
         const additionalModels = [
             { path: './assets/barrel/barrel.gltf', key: 'barrel' }
         ];
@@ -115,7 +109,7 @@ class ModelLoader {
                 console.warn(`❌ Failed to load: ${failedLoads.join(', ')}`);
             }
             
-            return successfulLoads > 0; // Return true if at least some models loaded
+            return successfulLoads > 0; 
         } catch (error) {
             console.error("❌ Critical error while preloading models:", error);
             return false;
@@ -130,17 +124,14 @@ class ModelLoader {
      * @returns {Promise<THREE.Group>} - Promise resolve with loaded model
      */
     async _loadModel(path, cacheKey) {
-        // If already cached, return cached version
         if (this.modelCache.has(cacheKey)) {
             return this.modelCache.get(cacheKey);
         }
         
-        // If currently loading, return existing promise
         if (this.loadingPromises.has(cacheKey)) {
             return this.loadingPromises.get(cacheKey);
         }
         
-        // Check cache size limit
         if (this.modelCache.size >= this.maxCacheSize) {
             console.warn(`⚠️ Model cache full (${this.maxCacheSize}), clearing least used models`);
             this._clearLeastUsedModels();
@@ -152,27 +143,23 @@ class ModelLoader {
                 (gltf) => {
                     const model = gltf.scene;
                     
-                    // Setup shadows for all meshes in model
                     model.traverse((child) => {
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
                             
-                            // Cải thiện material properties cho hiệu ứng metal (đặc biệt cho tank)
                             if (cacheKey.startsWith('tank_') && child.material) {
                                 if (child.material.isMeshStandardMaterial) {
-                                    // Giữ nguyên texture hiện có nhưng cải thiện material properties
-                                    child.material.metalness = 0.1; // Tăng metalness cho hiệu ứng kim loại
-                                    child.material.roughness = 0.9; // Giảm roughness để tăng phản chiếu
-                                    //child.material.envMapIntensity = 1.0; // Tăng cường environment mapping
+                                    child.material.metalness = 0.1;
+                                    child.material.roughness = 0.9; 
+                                    
                                 } else if (child.material.isMeshBasicMaterial || child.material.isMeshPhongMaterial) {
-                                    // Chuyển đổi sang MeshStandardMaterial để có hiệu ứng tốt hơn
                                     const newMaterial = new THREE.MeshStandardMaterial({
                                         map: child.material.map,
                                         color: child.material.color,
                                         metalness: 0.1,
                                         roughness: 0.9,
-                                        //envMapIntensity: 1.0
+                                        
                                     });
                                     child.material = newMaterial;
                                 }
@@ -180,7 +167,6 @@ class ModelLoader {
                         }
                     });
                     
-                    // Cache model và khởi tạo clone counter
                     this.modelCache.set(cacheKey, model);
                     this.cloneCount.set(cacheKey, 0);
                     this.loadingPromises.delete(cacheKey);
@@ -189,10 +175,9 @@ class ModelLoader {
                     resolve(model);
                 },
                 (progress) => {
-                    // Progress callback ít verbose hơn
                     if (progress.total > 0) {
                         const percent = (progress.loaded / progress.total * 100).toFixed(0);
-                        if (percent % 25 === 0) { // Chỉ log ở 0%, 25%, 50%, 75%, 100%
+                        if (percent % 25 === 0) {
                             console.log(`📥 Loading ${cacheKey}: ${percent}%`);
                         }
                     }
@@ -214,11 +199,8 @@ class ModelLoader {
      * @private
      */
     _clearLeastUsedModels() {
-        // Sắp xếp theo số lần sử dụng (clone count)
         const sortedEntries = Array.from(this.cloneCount.entries())
-            .sort((a, b) => a[1] - b[1]); // Tăng dần theo clone count
-        
-        // Xóa 25% model ít được sử dụng nhất
+            .sort((a, b) => a[1] - b[1]);
         const toRemove = Math.floor(this.modelCache.size * 0.25);
         
         for (let i = 0; i < toRemove && i < sortedEntries.length; i++) {
@@ -265,19 +247,15 @@ class ModelLoader {
     getTankModel(tankType, position = new THREE.Vector3(0, 0, 0)) {
         const cacheKey = `tank_${tankType.name}`;
         if (!this.modelCache.has(cacheKey)) {
-            // Xử lý custom JS tank model
             if (tankType.useCustomRenderer && tankType.assetPathJS) {
                 console.log(`⚠️ Custom JS tank ${tankType.name} not in cache, loading on-demand...`);
                 
                 try {
-                    // Sử dụng dynamic import để load module
                     return import(tankType.assetPathJS)
                         .then(module => {
                             const model = module.createTank();
-                            // Cache model và khởi tạo clone counter
                             this.modelCache.set(cacheKey, model);
                             this.cloneCount.set(cacheKey, 1);
-                            // Apply tank transforms
                             this._applyTankTransforms(model, tankType, position);
                             return model;
                         })
@@ -299,10 +277,8 @@ class ModelLoader {
             const originalModel = this.modelCache.get(cacheKey);
             const clonedModel = this._deepCloneModel(originalModel);
             
-            // Tăng clone counter
             this.cloneCount.set(cacheKey, (this.cloneCount.get(cacheKey) || 0) + 1);
             
-            // Apply tank-specific transforms
             this._applyTankTransforms(clonedModel, tankType, position);
             return clonedModel;
         } catch (error) {
@@ -331,7 +307,6 @@ class ModelLoader {
             const originalModel = this.modelCache.get(cacheKey);
             const clonedModel = this._deepCloneModel(originalModel);
             
-            // Tăng clone counter
             this.cloneCount.set(cacheKey, (this.cloneCount.get(cacheKey) || 0) + 1);
             
             clonedModel.position.copy(position);
@@ -365,7 +340,6 @@ class ModelLoader {
             const originalModel = this.modelCache.get(cacheKey);
             const clonedModel = this._deepCloneModel(originalModel);
             
-            // Tăng clone counter
             this.cloneCount.set(cacheKey, (this.cloneCount.get(cacheKey) || 0) + 1);
             
             clonedModel.position.copy(position);
@@ -399,7 +373,6 @@ class ModelLoader {
             const originalModel = this.modelCache.get(cacheKey);
             const clonedModel = this._deepCloneModel(originalModel);
             
-            // Tăng clone counter
             this.cloneCount.set(cacheKey, (this.cloneCount.get(cacheKey) || 0) + 1);
             
             clonedModel.position.copy(position);
@@ -422,10 +395,8 @@ class ModelLoader {
     _deepCloneModel(originalModel) {
         const clonedModel = originalModel.clone();
         
-        // Ensure materials are properly cloned to avoid sharing references
         clonedModel.traverse((child) => {
             if (child.isMesh && child.material) {
-                // Clone material to avoid shared references
                 if (Array.isArray(child.material)) {
                     child.material = child.material.map(mat => mat.clone());
                 } else {
@@ -445,9 +416,6 @@ class ModelLoader {
      * @param {THREE.Vector3} position - Tank position
      */
     _applyTankTransforms(model, tankType, position) {
-        // ============================ THE FIX ============================
-        // Compare tankType.name (a string) instead of the tankType object.
-        // This is a robust way to identify the tank type.
         switch (tankType.name) {
             case TANKTYPE.V001.name:
                 model.position.set(position.x, position.y, position.z);
@@ -494,12 +462,10 @@ class ModelLoader {
                 model.position.y = position.y - 0.2; 
                 break;
             default:
-                // Default behavior for any tanks not listed above
                 model.position.copy(position);
                 model.scale.set(3.5, 3.5, 3.5);
                 break;
         }
-        // ===============================================================
     }
 
     /**
@@ -629,7 +595,6 @@ class ModelLoader {
             let totalMaterials = 0;
             let totalTextures = 0;
             
-            // Count all model components
             Object.values(this.modelCache).forEach(category => {
                 Object.values(category).forEach(model => {
                     if (model && model.traverse) {
@@ -647,10 +612,9 @@ class ModelLoader {
                 });
             });
             
-            // Rough estimation of memory (very approximate)
-            const vertexBytes = totalGeometryVertices * 12; // 3 floats * 4 bytes per vertex
-            const materialBytes = totalMaterials * 1024; // ~1KB per material (rough estimate)
-            const textureBytes = totalTextures * 262144; // ~256KB per texture (very rough)
+            const vertexBytes = totalGeometryVertices * 12; 
+            const materialBytes = totalMaterials * 1024;
+            const textureBytes = totalTextures * 262144;
             
             const totalBytes = vertexBytes + materialBytes + textureBytes;
             

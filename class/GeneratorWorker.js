@@ -1,4 +1,4 @@
-// ./class/GeneratorWorker.js
+
 
 /**
  * This worker handles the computationally intensive task of generating
@@ -62,7 +62,7 @@ function generateEnemyDefinitions(count, types, pointValueFn, hpFn, maxSpawnRadi
         const x = radius * Math.cos(angle);
         const z = radius * Math.sin(angle);
         const selectedType = getRandomElement(types);
-        
+
         definitions.push({
             id: `enemy-${i + 1}`,
             position: { x, y: 1, z },
@@ -84,7 +84,6 @@ self.onmessage = (e) => {
         const worldBoundaryHalf = config.worldBoundary / 2;
         const playerSafeRadius = 35;
 
-        // Generate enemy definitions
         const maxEnemySpawnRadius = worldBoundaryHalf * config.enemyConfig.MAX_SPAWN_RADIUS_FACTOR;
         const minEnemySpawnRadius = Math.max(config.enemyConfig.MIN_SPAWN_RADIUS, playerSafeRadius);
         const enemyDefinitions = generateEnemyDefinitions(
@@ -96,7 +95,6 @@ self.onmessage = (e) => {
             minEnemySpawnRadius
         );
 
-        // Generate scenery definitions
         const sceneryConfig = config.sceneryConfig;
         const maxScenerySpawnRadius = worldBoundaryHalf * sceneryConfig.MAX_SPAWN_RADIUS_FACTOR;
 
@@ -114,9 +112,9 @@ self.onmessage = (e) => {
             sceneryConfig.NUM_BARRELS, sceneryConfig.BARREL_TYPES, sceneryConfig.BARREL_SCALE_MIN,
             sceneryConfig.BARREL_SCALE_MAX, maxScenerySpawnRadius, sceneryConfig.MIN_SPAWN_RADIUS, playerSafeRadius + 10
         );
-        
+
         console.log("✅ Generator Worker: Generation complete. Sending definitions back to main thread.");
-        
+
         self.postMessage({
             type: 'generationComplete',
             payload: {

@@ -1,4 +1,4 @@
-// ./class/Rock.js
+
 
 import * as THREE from 'three';
 import { Game } from './Game.js';
@@ -19,8 +19,8 @@ class ReloadBar {
             opacity: 0.8
         });
         this.background = new THREE.Mesh(bgGeometry, bgMaterial);
-        
-        // Create the foreground of the bar (the filling part)
+
+
         const fgGeometry = new THREE.PlaneGeometry(this.barWidth, this.barHeight);
         const fgMaterial = new THREE.MeshBasicMaterial({
             color: 0xf0ad4e,
@@ -30,11 +30,11 @@ class ReloadBar {
         this.barGroup = new THREE.Group();
         this.barGroup.add(this.background);
         this.barGroup.add(this.foreground);
-        
+
 
         this.foreground.position.z = 0.001;
-        
-        // The group is hidden by default
+
+
         this.barGroup.visible = false;
         this.scene.add(this.barGroup);
     }
@@ -84,15 +84,15 @@ class ReloadBar {
             );
         } else {
             const barPosition = this.tank.position.clone();
-            barPosition.y += 2.2; 
+            barPosition.y += 2.2;
             this.barGroup.position.copy(barPosition);
         }
 
 
-        // Make the bar always face the camera
+
         this.barGroup.quaternion.copy(Game.instance.camera.quaternion);
 
-        // --- HIDE WHEN COMPLETE ---
+
         if (reloadProgress >= 1.0) {
             this.isVisible = false;
             this.barGroup.visible = false;

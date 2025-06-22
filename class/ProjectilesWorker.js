@@ -1,6 +1,6 @@
-// ./class/ProjectileWorker.js
 
-// --- A lightweight, self-contained Vec3 for math inside the worker ---
+
+
 class Vec3 {
     constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
     copy(v) { this.x = v.x; this.y = v.y; this.z = v.z; return this; }
@@ -12,9 +12,9 @@ let config = {
     worldBoundary: 500,
 };
 let updateInterval = null;
-const TICK_RATE = 1000 / 60; // 60 FPS
+const TICK_RATE = 1000 / 60;
 
-// --- Main Message Handler ---
+
 self.onmessage = (e) => {
     const { type, payload } = e.data;
 
@@ -26,7 +26,7 @@ self.onmessage = (e) => {
             }
             break;
         case 'add':
-            // Convert plain object to Vec3 instances for calculations
+
             payload.position = new Vec3(payload.position.x, payload.position.y, payload.position.z);
             payload.velocity = new Vec3(payload.velocity.x, payload.velocity.y, payload.velocity.z);
             payload.creationTime = performance.now();
@@ -53,7 +53,7 @@ function tick() {
     const boundary = config.worldBoundary / 2;
 
     projectiles.forEach(p => {
-        // 1. Update position based on velocity
+
         p.position.x += p.velocity.x;
         p.position.y += p.velocity.y;
         p.position.z += p.velocity.z;
@@ -71,12 +71,12 @@ function tick() {
         }
     });
 
-    // 4. Process all removals
+
     if (removals.length > 0) {
         removals.forEach(id => projectiles.delete(id));
     }
 
-    // 5. Send a single batch of updates back to the main thread
+
     if (updates.length > 0 || removals.length > 0) {
         self.postMessage({ type: 'updates', payload: { updates, removals } });
     }

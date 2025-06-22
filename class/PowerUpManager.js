@@ -1,4 +1,4 @@
-// ./class/PowerUpManager.js
+
 import { Game } from './Game.js';
 import { PowerUp } from './PowerUp.js';
 import { POWERUP_TYPE, EVENT } from '../utils.js';
@@ -10,25 +10,25 @@ export class PowerUpManager {
         this.game = Game.instance;
         this.powerUpPool = [];
         this.worker = null;
+
         
-        // For throttling state updates to the worker
         this.lastStateUpdateTime = 0;
-        this.stateUpdateInterval = 500; // ms
+        this.stateUpdateInterval = 500; 
 
         this.initializePool();
         this.initializeWorker();
     }
-    
+
     initializePool() {
         console.log("🔥 Initializing Power-Up Object Pool...");
-        const maxPoolSize = 5; 
+        const maxPoolSize = 5;
         const powerUpTypes = Object.values(POWERUP_TYPE);
 
         for (const type of powerUpTypes) {
             for (let i = 0; i < maxPoolSize; i++) {
                 const powerUp = new PowerUp(`powerup-${type.name}-${i}`, type);
                 this.powerUpPool.push(powerUp);
-                this.game.dynamicObjects.push(powerUp); 
+                this.game.dynamicObjects.push(powerUp);
             }
         }
         console.log(`✅ Power-Up Pool created with ${this.powerUpPool.length} objects.`);
@@ -54,7 +54,6 @@ export class PowerUpManager {
                 maxPowerUps: powerUpConfig.MAX_ACTIVE,
                 totalSpawnLimit: powerUpConfig.TOTAL_SPAWN_LIMIT,
                 powerUpTypes: this.getSerializablePowerUpTypes(),
-                // NEW: Send spawn rules to the worker
                 spawnRules: {
                     worldBoundary: worldBoundary,
                     minPlayerDist: 30,
@@ -67,7 +66,7 @@ export class PowerUpManager {
 
     handleWorkerMessage(e) {
         const { type, payload } = e.data;
-        // The worker now sends a specific command with the final position
+        
         if (type === 'spawnPowerUpAtPosition') {
             this.activatePowerUp(payload.typeName, payload.position);
         }
@@ -83,10 +82,10 @@ export class PowerUpManager {
         if (now - this.lastStateUpdateTime > this.stateUpdateInterval) {
             this.lastStateUpdateTime = now;
 
-            // Serialize only what the worker needs: positions.
+            
             const gsm = this.game.getGameStateManager();
             if (!gsm || !gsm.getPlayerTank()) return;
-            
+
             const serializableObstacles = gsm.getAllObstacles().map(obs => ({
                 id: obs.id,
                 position: { x: obs.position.x, y: obs.position.y, z: obs.position.z }
@@ -106,7 +105,7 @@ export class PowerUpManager {
             });
         }
     }
-    
+
     /**
      * Activates a power-up from the pool at a specific position.
      * This is called in response to a worker command.
@@ -116,22 +115,22 @@ export class PowerUpManager {
 
         if (powerUp) {
             powerUp.activate(position);
-            this.updateWorkerCount(); // Tell worker the count has changed
+            this.updateWorkerCount(); 
             EventManager.instance.notify(EVENT.POWERUP_SPAWNED, { powerUp });
         } else {
             console.warn(`No inactive power-ups of type ${typeName} available in the pool.`);
         }
     }
-    
+
     onPowerUpCollected() {
-        // When a power-up is collected on the main thread, we just need to notify
-        // the worker that a slot has been freed up.
+        
+        
         this.updateWorkerCount();
     }
-    
+
     updateWorkerCount() {
         if (!this.worker) return;
-        
+
         const activeCount = this.powerUpPool.filter(p => p.isActive).length;
         this.worker.postMessage({
             type: 'updatePowerUpCount',

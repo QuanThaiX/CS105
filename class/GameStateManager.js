@@ -1,4 +1,4 @@
-// ./class/GameStateManager.js
+
 import * as THREE from 'three';
 import { FACTION } from '../utils.js';
 
@@ -17,7 +17,7 @@ class GameStateManager {
         GameStateManager.instance = this;
         this.game = game;
     }
-    
+
     /**
      * Creates a serializable, lightweight version of the game state for Web Workers.
      * @returns {object} A plain object with game state data.
@@ -30,18 +30,18 @@ class GameStateManager {
                 faction: obj.faction,
                 hp: obj.hp,
                 position: { x: obj.position.x, y: obj.position.y, z: obj.position.z },
-                // Tank-specific data
+
                 rotation: obj.model ? { y: obj.model.rotation.y } : { y: 0 },
             };
         };
 
         const playerTank = this.getPlayerTank();
-        
+
         return {
             playerTank: playerTank ? serializeObject(playerTank) : null,
             tanks: this.getEnemyTanks().map(serializeObject).filter(Boolean),
             obstacles: this.getAllObstacles().map(serializeObject).filter(Boolean),
-            // We can add projectiles or other data here if needed by the worker
+
         };
     }
 
@@ -51,13 +51,13 @@ class GameStateManager {
      */
     getAllTanks() {
         const tanks = [];
-        
-        // Add player tank
+
+
         if (this.game.playerTank && !this.game.playerTank.disposed) {
             tanks.push(this.game.playerTank);
         }
-        
-        // Add enemy tanks
+
+
         if (this.game.enemies) {
             this.game.enemies.forEach(tank => {
                 if (tank && !tank.disposed) {
@@ -65,7 +65,7 @@ class GameStateManager {
                 }
             });
         }
-        
+
         return tanks;
     }
 
@@ -111,28 +111,28 @@ class GameStateManager {
      */
     getAllObstacles() {
         const obstacles = [];
-        
-        // Add rocks
+
+
         if (this.game.rocks) {
             this.game.rocks.forEach(rock => {
                 if (rock && !rock.disposed) obstacles.push(rock);
             });
         }
-        
-        // Add trees
+
+
         if (this.game.trees) {
             this.game.trees.forEach(tree => {
                 if (tree && !tree.disposed) obstacles.push(tree);
             });
         }
-        
-        // Add barrels
+
+
         if (this.game.barrels) {
             this.game.barrels.forEach(barrel => {
                 if (barrel && !barrel.disposed) obstacles.push(barrel);
             });
         }
-        
+
         return obstacles;
     }
 
@@ -178,11 +178,11 @@ class GameStateManager {
     hasLineOfSight(startPos, endPos, ignoreObjects = []) {
         const direction = this.getDirection(startPos, endPos);
         const distance = this.getDistance(startPos, endPos);
-        
+
         const raycaster = new THREE.Raycaster(startPos, direction);
         const obstacles = this.getAllObstacles().filter(obj => !ignoreObjects.includes(obj));
-        
-        // Get intersections with obstacles
+
+
         const intersections = [];
         obstacles.forEach(obstacle => {
             if (obstacle.model) {
@@ -192,8 +192,8 @@ class GameStateManager {
                 }
             }
         });
-        
-        // Check if any intersection is closer than target
+
+
         return !intersections.some(intersection => intersection.distance < distance);
     }
 
@@ -205,10 +205,10 @@ class GameStateManager {
      */
     findNearestObject(position, objects) {
         if (!objects || objects.length === 0) return null;
-        
+
         let nearest = null;
         let minDistance = Infinity;
-        
+
         objects.forEach(obj => {
             if (obj && obj.position) {
                 const distance = this.getDistance(position, obj.position);
@@ -218,7 +218,7 @@ class GameStateManager {
                 }
             }
         });
-        
+
         return nearest ? { object: nearest, distance: minDistance } : null;
     }
 
@@ -231,7 +231,7 @@ class GameStateManager {
      */
     findObjectsInRadius(position, radius, objects) {
         if (!objects || objects.length === 0) return [];
-        
+
         const result = [];
         objects.forEach(obj => {
             if (obj && obj.position) {
@@ -241,7 +241,7 @@ class GameStateManager {
                 }
             }
         });
-        
+
         return result.sort((a, b) => a.distance - b.distance);
     }
 
@@ -268,7 +268,7 @@ class GameStateManager {
     isPositionInBounds(position) {
         const bounds = this.getWorldBoundaries();
         return position.x >= bounds.minX && position.x <= bounds.maxX &&
-               position.z >= bounds.minZ && position.z <= bounds.maxZ;
+            position.z >= bounds.minZ && position.z <= bounds.maxZ;
     }
 
     /**
@@ -281,7 +281,7 @@ class GameStateManager {
     getSafePositions(position, radius = 10, samples = 8) {
         const safePositions = [];
         const angleStep = (Math.PI * 2) / samples;
-        
+
         for (let i = 0; i < samples; i++) {
             const angle = i * angleStep;
             const testPos = new THREE.Vector3(
@@ -289,8 +289,8 @@ class GameStateManager {
                 position.y,
                 position.z + Math.sin(angle) * radius
             );
-            
-            // Check if position is in bounds and not colliding
+
+
             if (this.isPositionInBounds(testPos)) {
                 const obstacles = this.findObjectsInRadius(testPos, 5, this.getAllObstacles());
                 if (obstacles.length === 0) {
@@ -298,7 +298,7 @@ class GameStateManager {
                 }
             }
         }
-        
+
         return safePositions;
     }
 
@@ -310,21 +310,21 @@ class GameStateManager {
      */
     getPredictedPosition(object, timeAhead) {
         if (!object.position) return null;
-        
+
         const predicted = object.position.clone();
-        
-        // If object has velocity or is moving, predict future position
+
+
         if (object.velocity) {
             predicted.add(object.velocity.clone().multiplyScalar(timeAhead));
         } else if (object.isMoving && object.moveSpeed) {
-            // Estimate based on current rotation and movement
+
             const forward = new THREE.Vector3(0, 0, 1);
             if (object.model) {
                 forward.applyQuaternion(object.model.quaternion);
             }
-            predicted.add(forward.multiplyScalar(object.moveSpeed * timeAhead * 60)); // 60 FPS assumption
+            predicted.add(forward.multiplyScalar(object.moveSpeed * timeAhead * 60));
         }
-        
+
         return predicted;
     }
 
@@ -338,7 +338,7 @@ class GameStateManager {
         const nearbyAllies = this.findObjectsInRadius(position, 30, [this.getPlayerTank()].filter(Boolean));
         const nearbyObstacles = this.findObjectsInRadius(position, 20, this.getAllObstacles());
         const nearbyBullets = this.findObjectsInRadius(position, 15, this.getAllProjectiles());
-        
+
         return {
             position,
             nearbyEnemies,
@@ -359,22 +359,22 @@ class GameStateManager {
      */
     calculateThreatLevel(nearbyEnemies, nearbyBullets) {
         let threat = 0;
-        
-        // Add threat from nearby enemies
+
+
         nearbyEnemies.forEach(enemy => {
             const distance = enemy.distance;
-            const enemyThreat = Math.max(0, 10 - (distance / 5)); // Closer = more dangerous
+            const enemyThreat = Math.max(0, 10 - (distance / 5));
             threat += enemyThreat;
         });
-        
-        // Add threat from nearby bullets
+
+
         nearbyBullets.forEach(bullet => {
             const distance = bullet.distance;
             const bulletThreat = Math.max(0, 5 - (distance / 3));
             threat += bulletThreat;
         });
-        
-        return Math.min(10, threat); // Cap at 10
+
+        return Math.min(10, threat);
     }
 
     /**

@@ -34,7 +34,6 @@
     </div>
 </div>
     <div id="menu-container">
-        <!-- Left Menu -->
         <div id="menu-left">
             <h1 class="menu-title">TANK BATTLE</h1>
             <div class="menu-actions">
@@ -45,10 +44,9 @@
             </div>
         </div>
 
-        <!-- Right Menu - Tank Selection -->
         <div id="menu-right">
             <div id="tank-display-wrapper">
-                <div id="tank-display"></div> <!-- Canvas host -->
+                <div id="tank-display"></div>
             </div>
             <div id="tank-selection-panel">
                 <div id="prev-tank" class="nav-button">‹</div>
@@ -83,7 +81,6 @@
         </div>
     </div>
     <div id="message-container"></div>
-    <!-- Game Container -->
     <div id="game-container">
         <div id="hud">
             <div id="player-stats">
@@ -92,12 +89,10 @@
                 <div id="high-score">High Score: 0</div>
             </div>
             
-            <!-- NEW: Mini-map container -->
             <div id="minimap-container">
                 <canvas id="minimap-canvas" width="200" height="200"></canvas>
             </div>
 
-            <!-- NEW: Kill feed container -->
             <div id="kill-feed-container"></div>
         </div>
 
@@ -112,7 +107,6 @@
         </div>
     </div>
 </div>
-    <!-- Game Over Screen -->
     <div id="game-over-screen" class="endgame-screen">
         <div class="endgame-content">
             <h2 id="gameover-title">GAME OVER</h2>
@@ -126,8 +120,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Win Screen -->
     <div id="win-screen" class="endgame-screen">
         <div class="endgame-content">
             <h2 id="win-title">VICTORY!</h2>
@@ -184,7 +176,6 @@
             </div>
         </div>
         
-        <!-- NEW: Camera Shake Setting -->
         <div class="setting-item">
             <h3>Enable Camera Shake</h3>
             <p class="setting-description">Adds a shaking effect during explosions and firing for better impact.</p>
@@ -196,7 +187,6 @@
             </div>
         </div>
 
-        <!-- NEW: Minimap Setting -->
         <div class="setting-item">
             <h3>Show Minimap</h3>
             <p class="setting-description">Displays a top-down map of the battlefield in the corner of the screen.</p>

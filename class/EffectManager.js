@@ -1,9 +1,9 @@
-// ./class/EffectManager.js
+
 import * as THREE from 'three';
 import { EventManager } from './EventManager.js';
 import { EVENT } from '../utils.js';
 import { Game } from './Game.js';
-import { gameSettings } from '../config.js'; // <-- IMPORT gameSettings
+import { gameSettings } from '../config.js';
 
 class CameraShaker {
     constructor(camera) {
@@ -18,7 +18,6 @@ class CameraShaker {
     }
 
     shake(intensity, duration) {
-        // NEW: Check the setting before applying any shake
         if (!gameSettings.cameraShake) return;
 
         if (this.shakeInfo.active && this.shakeInfo.intensity > intensity) {
@@ -158,7 +157,7 @@ class Effect {
 }
 
 const EXPLOSION_DEFAULTS = {
-    // General
+
     particleCount: 500,
     maxLife: 1.5,
     baseSpeed: 15,
@@ -169,7 +168,7 @@ const EXPLOSION_DEFAULTS = {
         new THREE.Color(0xff4000),
         new THREE.Color(0xffc040),
     ],
-    // Light
+
     addLight: true,
     lightColor: 0xffa000,
     lightIntensity: 2000,
@@ -190,7 +189,7 @@ function createParticleTexture(size = 64) {
     const context = canvas.getContext('2d');
     if (!context) {
         console.error("Could not get 2D context for particle texture");
-        return new THREE.Texture(); // Return empty texture on error
+        return new THREE.Texture();
     }
     const gradient = context.createRadialGradient(
         canvas.width / 2, canvas.height / 2, 0,
@@ -266,9 +265,9 @@ class Explosion extends EffectInstance {
 
     _createShockwave() {
         const geometry = new THREE.RingGeometry(
-            this.options.shockwaveInitialRadius, // innerRadius
+            this.options.shockwaveInitialRadius,
             this.options.shockwaveInitialRadius - this.options.shockwaveThickness * this.size,
-            64 // thetaSegments
+            64
         );
 
         const material = new THREE.MeshBasicMaterial({
@@ -296,7 +295,7 @@ class Explosion extends EffectInstance {
             vertexColors: true,
             transparent: true,
             depthWrite: false,
-            blending: THREE.AdditiveBlending, // Glowing effect
+            blending: THREE.AdditiveBlending,
             sizeAttenuation: true
         });
 
@@ -345,7 +344,7 @@ class Explosion extends EffectInstance {
         const dt = Math.min(deltaTime, 0.1);
         const elapsedTime = this.clock.getElapsedTime();
 
-        // --- Update Light ---
+
         if (this.light && this.light.visible) {
             const lifeRatio = Math.min(elapsedTime / (this.options.maxLife * 0.25), 1.0);
             const decay = Math.pow(1.0 - lifeRatio, 2.0);
@@ -365,11 +364,11 @@ class Explosion extends EffectInstance {
             );
             this.shockwave.scale.set(currentRadius, currentRadius, currentRadius);
 
-            // Fade the shockwave out over its life
+
             this.shockwave.material.opacity = Math.pow(1.0 - shockwaveLife, 2.0);
 
             if (shockwaveLife >= 1.0) {
-                this.shockwave.visible = false; // Mark for cleanup
+                this.shockwave.visible = false;
             }
         }
 
@@ -390,7 +389,7 @@ class Explosion extends EffectInstance {
                     positionAttribute.setXYZ(i, currentPos.x, currentPos.y, currentPos.z);
                     data.velocity.y += this.options.gravity * dt;
                     const lifeRatio = Math.max(0, data.life / data.initialLife);
-                    // Fade out particles quadratically for a nice fade effect
+
                     alphaAttribute.setX(i, lifeRatio * lifeRatio);
                 }
             }
@@ -448,12 +447,12 @@ class MuzzleFlash extends EffectInstance {
         this.position = position.clone();
         this.direction = direction.clone();
 
-        // Default options
+
         this.options = {
             color: options.color || 0xffaa00,
             intensity: options.intensity || 40,
             distance: options.distance || 10,
-            duration: options.duration || 100, // milliseconds
+            duration: options.duration || 100,
             particleCount: options.particleCount || 9,
             particleSize: options.particleSize || 0.2,
             ...options
@@ -475,7 +474,7 @@ class MuzzleFlash extends EffectInstance {
         this.light.position.copy(this.position);
         this.scene.add(this.light);
 
-        // Create particles
+
         const particleGeometry = new THREE.BufferGeometry();
         const posArray = new Float32Array(this.options.particleCount * 3);
 

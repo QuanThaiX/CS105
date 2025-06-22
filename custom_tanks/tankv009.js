@@ -33,12 +33,11 @@ export function createTank() {
 
     const trackMaterial = new THREE.MeshStandardMaterial({
         color: 0x212121,
-        // map: trackTexture,     // <<< SỬ DỤNG TEXTURE
+        // map: trackTexture,    
         metalness: 0.2,
         roughness: 0.8,
     });
 
-    // Các vật liệu khác giữ nguyên vì chúng không dùng texture chính
     const cannonMaterial = new THREE.MeshStandardMaterial({
         color: 0x333333,
         metalness: 0.9,
@@ -60,20 +59,17 @@ export function createTank() {
     const hull = new THREE.Group();
     hull.name = "Hull";
 
-    // Khung chính
     const mainHullGeo = new THREE.BoxGeometry(3.2, 1, 4.8);
     const mainHull = new THREE.Mesh(mainHullGeo, bodyMaterial);
     mainHull.position.y = 0.8;
     hull.add(mainHull);
 
-    // Tấm giáp nghiêng phía trước
     const frontArmorGeo = new THREE.BoxGeometry(3.2, 1, 1);
     const frontArmor = new THREE.Mesh(frontArmorGeo, bodyMaterial);
     frontArmor.position.set(0, 0.4, 2.1);
     frontArmor.rotation.x = THREE.MathUtils.degToRad(30);
     hull.add(frontArmor);
     
-    // Khối động cơ phía sau với khe tản nhiệt phát sáng
     const engineBlockGeo = new THREE.BoxGeometry(2.5, 0.8, 0.5);
     const engineBlock = new THREE.Mesh(engineBlockGeo, bodyMaterial);
     engineBlock.position.set(0, 1, -2.5);

@@ -1,6 +1,6 @@
-// ./class/Game.js
+
 import * as THREE from 'three';
-import { createGround, createSky, createCamera, createDebugHelpers, createLights, createRenderer, createScene, updateShadowArea, updateSceneFog, updateEnvironment } from './createEnvironment.js'; // Import updateEnvironment
+import { createGround, createSky, createCamera, createDebugHelpers, createLights, createRenderer, createScene, updateShadowArea, updateSceneFog, updateEnvironment } from './createEnvironment.js';
 import { startLoadingScreen, hideLoadingScreen } from '../UI.js';
 import { QUALITY, GAMECONFIG, gameSettings, loadSettings, saveSettings } from '../config.js';
 import { FACTION, EVENT, TANKTYPE } from '../utils.js';
@@ -39,10 +39,10 @@ const DEFAULT_SCENERY_CONFIG = {
 const DEFAULT_ENEMY_CONFIG = {
   NUM_ENEMIES: 5,
   ENEMY_TYPES: [TANKTYPE.V001, TANKTYPE.V002, TANKTYPE.V003, TANKTYPE.V004, TANKTYPE.V005, TANKTYPE.V006],
-  ENEMY_POINT_VALUE: 100, // Can be a number or a function(type) => number
-  ENEMY_HP: 100,          // Can be a number or a function(type) => number
-  MIN_SPAWN_RADIUS: 30,   // Min distance from player start (0,0,0)
-  MAX_SPAWN_RADIUS_FACTOR: 0.8 // Relative to world boundary
+  ENEMY_POINT_VALUE: 100,
+  ENEMY_HP: 100,
+  MIN_SPAWN_RADIUS: 30,
+  MAX_SPAWN_RADIUS_FACTOR: 0.8
 };
 
 const HIGH_SCORE_STORAGE_KEY = 'tankGame_highScore';
@@ -131,11 +131,10 @@ class Game {
     this.boundHandleGameWin = this.handleGameWin.bind(this);
     this.boundHandleTankDestroyed = this.handleTankDestroyed.bind(this);
     this.boundOnWindowResize = this.onWindowResize.bind(this);
-    this.boundHandleSettingsUpdate = this.handleSettingsUpdate.bind(this); // NEW: Bind handler
+    this.boundHandleSettingsUpdate = this.handleSettingsUpdate.bind(this);
 
     this.cutsceneClock = new THREE.Clock();
-    this.cycleClock = new THREE.Clock(); // NEW: Clock for day/night cycle
-
+    this.cycleClock = new THREE.Clock();
     this.initGame();
   }
 
@@ -164,13 +163,12 @@ class Game {
     this.lights = createLights(this.scene);
     this.sky = createSky(this.scene);
     this.ground = createGround(this.scene, { width: this.gameConfig.WORLD_BOUNDARY, height: this.gameConfig.WORLD_BOUNDARY, repeatX: this.gameConfig.WORLD_BOUNDARY / 20, repeatY: this.gameConfig.WORLD_BOUNDARY / 20 });
-    // this.powerUpManager = new PowerUpManager();
+    this.powerUpManager = new PowerUpManager();
     this.minimap = new Minimap();
     if (Game.debug) {
       this.debugHelpers = createDebugHelpers(this.scene);
     }
 
-    // MODIFIED: Initial environment setup is now centralized
     this.applyEnvironmentSettings();
 
     this.registerEventListeners();
@@ -186,15 +184,15 @@ class Game {
     this.camera = camera;
     this.controls = controls;
 
-    // Initialize the camera shaker in EffectManager now that the camera exists
+
     if (this.effectManager) {
-        this.effectManager.initCameraShaker(this.camera);
+      this.effectManager.initCameraShaker(this.camera);
     }
 
     EventManager.instance.notify(EVENT.TANK_SPAWNED, {
-        tank: this.playerTank,
-        position: this.playerTank.position,
-        tankType: this.selectedTankType
+      tank: this.playerTank,
+      position: this.playerTank.position,
+      tankType: this.selectedTankType
     });
   }
 
@@ -272,61 +270,56 @@ class Game {
     const pauseScreen = document.getElementById('pause-screen');
 
     if (this.isRunning) {
-        pauseScreen.style.display = 'none';
-        EventManager.instance.notify(EVENT.GAME_RESUMED, { /* ... */ });
-        this._animate();
+      pauseScreen.style.display = 'none';
+      EventManager.instance.notify(EVENT.GAME_RESUMED, {});
+      this._animate();
     } else {
-        pauseScreen.style.display = 'flex';
-        EventManager.instance.notify(EVENT.GAME_PAUSED, { /* ... */ });
+      pauseScreen.style.display = 'flex';
+      EventManager.instance.notify(EVENT.GAME_PAUSED, {});
     }
-}
+  }
   updateFog() {
-      if (!this.scene) return;
-      const qualityProfile = this.gameConfig.QUALITY_PROFILES[gameSettings.quality];
-      const settings = {
-          enabled: gameSettings.fog,
-          useSky: qualityProfile.useSky
-      };
-      // Fog is now handled by updateEnvironment, this function can be deprecated or removed.
-      // updateSceneFog(this.scene, settings);
+    if (!this.scene) return;
+    const qualityProfile = this.gameConfig.QUALITY_PROFILES[gameSettings.quality];
+    const settings = {
+      enabled: gameSettings.fog,
+      useSky: qualityProfile.useSky
+    };
   }
 
   handleFogSettingChanged() {
     this.applyEnvironmentSettings();
   }
 
-  // NEW: Central handler for all settings changes.
   handleSettingsUpdate() {
-      console.log('⚙️ Game detected settings update. Applying changes...');
-      this.applyEnvironmentSettings();
-      if (this.minimap) {
-          this.minimap.toggleVisibility(gameSettings.showMinimap);
-      }
+    console.log('⚙️ Game detected settings update. Applying changes...');
+    this.applyEnvironmentSettings();
+    if (this.minimap) {
+      this.minimap.toggleVisibility(gameSettings.showMinimap);
+    }
   }
 
-  // NEW: Applies environment settings based on gameSettings.
   applyEnvironmentSettings() {
-      if (!this.scene || !this.sky || !this.lights) return;
+    if (!this.scene || !this.sky || !this.lights) return;
 
-      switch(gameSettings.dayNightCycle) {
-          case 'day':
-              updateEnvironment(0, this.scene, this.sky, this.lights);
-              break;
-          case 'night':
-              updateEnvironment(1, this.scene, this.sky, this.lights);
-              break;
-          case 'dynamic':
-              // The updateLogic loop will handle this. No immediate action needed.
-              break;
-      }
+    switch (gameSettings.dayNightCycle) {
+      case 'day':
+        updateEnvironment(0, this.scene, this.sky, this.lights);
+        break;
+      case 'night':
+        updateEnvironment(1, this.scene, this.sky, this.lights);
+        break;
+      case 'dynamic':
+        break;
+    }
 
-      this.updateFog(); // Update fog based on new settings as well.
+    this.updateFog();
   }
 
   registerEventListeners() {
     window.addEventListener('resize', this.boundOnWindowResize, false);
 
-    // MODIFIED: Use the new central settings handler
+
     EventManager.instance.subscribe(EVENT.SETTINGS_UPDATED, this.boundHandleSettingsUpdate);
     EventManager.instance.subscribe(EVENT.FOG_SETTING_CHANGED, this.boundHandleFogSettingChanged);
 
@@ -378,45 +371,45 @@ class Game {
     const { tank, pointValue } = data;
 
     if (tank && tank.faction === FACTION.ENEMY && pointValue !== undefined) {
-        this.addScore(pointValue);
-        this.enemiesKilled++;
-        tank.isDestroyed = true;
-        const index = this.enemies.indexOf(tank);
-        if (index !== -1) {
-            this.enemies.splice(index, 1);
-        }
+      this.addScore(pointValue);
+      this.enemiesKilled++;
+      tank.isDestroyed = true;
+      const index = this.enemies.indexOf(tank);
+      if (index !== -1) {
+        this.enemies.splice(index, 1);
+      }
 
-        if (this.playerTank && !this.playerTank.isDestroyed && tank.maxHp > 0) {
-            const healAmount = tank.maxHp * 0.3;
-            const actualHealAmount = this.playerTank.heal(healAmount);
-            if (actualHealAmount > 0) {
-                const healPosition = this.playerTank.position.clone();
-                const healLight = new THREE.PointLight(0x50ff50, 70, 30, 2);
-                healLight.position.copy(healPosition).add(new THREE.Vector3(0, 1.5, 0));
-                this.scene.add(healLight);
+      if (this.playerTank && !this.playerTank.isDestroyed && tank.maxHp > 0) {
+        const healAmount = tank.maxHp * 0.3;
+        const actualHealAmount = this.playerTank.heal(healAmount);
+        if (actualHealAmount > 0) {
+          const healPosition = this.playerTank.position.clone();
+          const healLight = new THREE.PointLight(0x50ff50, 70, 30, 2);
+          healLight.position.copy(healPosition).add(new THREE.Vector3(0, 1.5, 0));
+          this.scene.add(healLight);
 
-                setTimeout(() => {
-                    if (this.scene) {
-                        this.scene.remove(healLight);
-                        healLight.dispose();
-                    }
-                }, 600);
-
-                EventManager.instance.notify(EVENT.AUDIO_PLAY, {
-                    soundId: `heal_effect_${Date.now()}`,
-                    soundPath: './assets/sound/heal.mp3',
-                    volume: 0.7,
-                    position: healPosition,
-                    loop: false,
-                });
-
-                EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
-                    message: `+${Math.round(actualHealAmount)} HP`,
-                    duration: 1500,
-                    type: 'heal',
-                });
+          setTimeout(() => {
+            if (this.scene) {
+              this.scene.remove(healLight);
+              healLight.dispose();
             }
+          }, 600);
+
+          EventManager.instance.notify(EVENT.AUDIO_PLAY, {
+            soundId: `heal_effect_${Date.now()}`,
+            soundPath: './assets/sound/heal.mp3',
+            volume: 0.7,
+            position: healPosition,
+            loop: false,
+          });
+
+          EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
+            message: `+${Math.round(actualHealAmount)} HP`,
+            duration: 1500,
+            type: 'heal',
+          });
         }
+      }
 
       EventManager.instance.notify(EVENT.SCORE_CHANGED, {
         score: this.score,
@@ -429,19 +422,19 @@ class Game {
 
       const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
       if (this.gameMode === 'endless' && respawnConfig.ENABLED && this.enemies.length < respawnConfig.MAX_ENEMIES_ALIVE) {
-          const respawnDelay = this.generator.getRandomInRange(respawnConfig.MIN_DELAY, respawnConfig.MAX_DELAY);
+        const respawnDelay = this.generator.getRandomInRange(respawnConfig.MIN_DELAY, respawnConfig.MAX_DELAY);
 
-          if (respawnDelay > 2000) {
-              setTimeout(() => {
-                  this.showSpawnWarning();
-              }, respawnDelay - 2000);
-          }
-
+        if (respawnDelay > 2000) {
           setTimeout(() => {
-              this.spawnNewEnemyTank();
-          }, respawnDelay);
+            this.showSpawnWarning();
+          }, respawnDelay - 2000);
+        }
 
-        console.log(`⏰ New enemy tank will spawn in ${(respawnDelay/1000).toFixed(1)}s (Killed: ${this.enemiesKilled}, Active: ${this.enemies.length})`);
+        setTimeout(() => {
+          this.spawnNewEnemyTank();
+        }, respawnDelay);
+
+        console.log(`⏰ New enemy tank will spawn in ${(respawnDelay / 1000).toFixed(1)}s (Killed: ${this.enemiesKilled}, Active: ${this.enemies.length})`);
       }
 
       if (this.isWin()) {
@@ -464,8 +457,8 @@ class Game {
         return;
       }
       const safePosition = this.spawnManager.findSafeSpawnPosition(
-          this.playerTank.position,
-          respawnConfig.MIN_DISTANCE_FROM_PLAYER
+        this.playerTank.position,
+        respawnConfig.MIN_DISTANCE_FROM_PLAYER
       );
 
       if (!safePosition) {
@@ -569,16 +562,16 @@ class Game {
     };
   }
 
- /**
-   * Tìm vị trí spawn an toàn cho tank mới
-   * @returns {Promise<Object|null>} Safe spawn position hoặc null nếu không tìm được
-   */
+  /**
+    * Tìm vị trí spawn an toàn cho tank mới
+    * @returns {Promise<Object|null>} Safe spawn position hoặc null nếu không tìm được
+    */
   async findSafeTankSpawnPosition() {
     const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
     const worldBoundary = this.gameConfig.WORLD_BOUNDARY;
 
     for (let attempt = 0; attempt < respawnConfig.MAX_SPAWN_ATTEMPTS; attempt++) {
-      // Generate random position trong world boundary
+
       const angle = Math.random() * Math.PI * 2;
       const radius = this.generator.getRandomInRange(
         respawnConfig.MIN_DISTANCE_FROM_PLAYER,
@@ -589,13 +582,13 @@ class Game {
       const z = radius * Math.sin(angle);
       const candidatePosition = { x, y: 1, z };
 
-      // Check collision với tất cả objects hiện tại
+
       if (await this.isPositionSafeForTank(candidatePosition, respawnConfig.TANK_SIZE, respawnConfig.MIN_DISTANCE_FROM_OBSTACLES)) {
         return candidatePosition;
       }
     }
 
-    // Nếu không tìm được position an toàn, thử tạo ở vị trí backup
+
     console.warn("⚠️ Could not find safe position, trying backup positions");
     const backupPositions = [
       { x: -100, y: 1, z: -100 },
@@ -616,7 +609,7 @@ class Game {
       }
     }
 
-    return null; // Không tìm được vị trí nào an toàn
+    return null;
   }
 
   /**
@@ -630,7 +623,7 @@ class Game {
     const respawnConfig = this.gameConfig.ENEMY_CONFIG.RESPAWN;
     const posVector = new THREE.Vector3(position.x, position.y, position.z);
 
-    // Check distance from player
+
     if (this.playerTank) {
       const playerPos = this.playerTank.position;
       const distanceFromPlayer = posVector.distanceTo(playerPos);
@@ -639,17 +632,17 @@ class Game {
       }
     }
 
-    // Check distance from other enemy tanks
+
     for (const enemy of this.enemies) {
       if (enemy && !enemy.disposed) {
         const distanceFromEnemy = posVector.distanceTo(enemy.position);
-        if (distanceFromEnemy < minDistance * 2) { // Double distance cho tanks
+        if (distanceFromEnemy < minDistance * 2) {
           return false;
         }
       }
     }
 
-    // Check distance from rocks
+
     if (this.rocks) {
       for (const rock of this.rocks) {
         if (rock && !rock.disposed) {
@@ -661,7 +654,7 @@ class Game {
       }
     }
 
-    // Check distance from trees
+
     if (this.trees) {
       for (const tree of this.trees) {
         if (tree && !tree.disposed) {
@@ -673,7 +666,7 @@ class Game {
       }
     }
 
-    // Check distance from barrels
+
     if (this.barrels) {
       for (const barrel of this.barrels) {
         if (barrel && !barrel.disposed) {
@@ -685,14 +678,14 @@ class Game {
       }
     }
 
-    // Check world boundaries
+
     const boundary = this.gameConfig.WORLD_BOUNDARY / 2;
     if (Math.abs(position.x) > boundary - tankSize ||
-        Math.abs(position.z) > boundary - tankSize) {
+      Math.abs(position.z) > boundary - tankSize) {
       return false;
     }
 
-    return true; // Position an toàn
+    return true;
   }
 
   isWin() {
@@ -747,10 +740,10 @@ class Game {
 
   updateLogic() {
     if (gameSettings.dayNightCycle === 'dynamic') {
-        const elapsedTime = this.cycleClock.getElapsedTime();
-        const cycleProgress = (elapsedTime % this.dayDuration) / this.dayDuration;
-        const nightToDayProgress = Math.abs(Math.sin(cycleProgress * Math.PI));
-        updateEnvironment(nightToDayProgress, this.scene, this.sky, this.lights);
+      const elapsedTime = this.cycleClock.getElapsedTime();
+      const cycleProgress = (elapsedTime % this.dayDuration) / this.dayDuration;
+      const nightToDayProgress = Math.abs(Math.sin(cycleProgress * Math.PI));
+      updateEnvironment(nightToDayProgress, this.scene, this.sky, this.lights);
     }
 
     const prevPlayerPos = this.playerTank.position.clone();
@@ -759,24 +752,24 @@ class Game {
     this.bot.update();
     this.collisionManager.update();
     this.projectilesManager.update();
-    // this.powerUpManager.update();
+    this.powerUpManager.update();
     this.playerTank.update();
     this.minimap.update();
 
     for (let i = this.dynamicObjects.length - 1; i >= 0; i--) {
-        const obj = this.dynamicObjects[i];
-        if (obj.isDestroyed) {
-            if (obj instanceof Tank && obj.faction === FACTION.ENEMY) {
-                const enemyIndex = this.enemies.indexOf(obj);
-                if (enemyIndex > -1) this.enemies.splice(enemyIndex, 1);
-            }
-            this.dynamicObjects.splice(i, 1);
-            continue;
+      const obj = this.dynamicObjects[i];
+      if (obj.isDestroyed) {
+        if (obj instanceof Tank && obj.faction === FACTION.ENEMY) {
+          const enemyIndex = this.enemies.indexOf(obj);
+          if (enemyIndex > -1) this.enemies.splice(enemyIndex, 1);
         }
-        if (obj && !obj.disposed && typeof obj.update === 'function') {
-            obj.update();
-        }
+        this.dynamicObjects.splice(i, 1);
+        continue;
       }
+      if (obj && !obj.disposed && typeof obj.update === 'function') {
+        obj.update();
+      }
+    }
 
     const newPlayerPos = this.playerTank.position.clone();
     const delta = new THREE.Vector3().subVectors(newPlayerPos, prevPlayerPos);
@@ -786,9 +779,9 @@ class Game {
     this.controls.update();
 
     updateShadowArea(this.lights.directionalLight, playerPos);
-    // Update the camera shaker last, after all other camera manipulations
+
     if (this.effectManager) {
-        this.effectManager.update();
+      this.effectManager.update();
     }
 
   }
@@ -798,8 +791,8 @@ class Game {
     const cutsceneDuration = 6.0;
 
     if (!this.cutsceneCamStartPos || !this.playerTank) {
-        this.isCutscenePlaying = false;
-        return;
+      this.isCutscenePlaying = false;
+      return;
     }
 
     let progress = Math.min(elapsedTime / cutsceneDuration, 1.0);
@@ -817,15 +810,15 @@ class Game {
     this.controls.update();
 
     if (progress >= 1.0) {
-        this.isCutscenePlaying = false;
-        this.controls.target.copy(endTarget);
-        this.controls.enabled = true;
+      this.isCutscenePlaying = false;
+      this.controls.target.copy(endTarget);
+      this.controls.enabled = true;
 
-        EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
-            message: 'GO!',
-            duration: 1500,
-            type: 'heal',
-        });
+      EventManager.instance.notify(EVENT.UI_SHOW_MESSAGE, {
+        message: 'GO!',
+        duration: 1500,
+        type: 'heal',
+      });
     }
   }
 
@@ -833,9 +826,9 @@ class Game {
     if (!this.isRunning) return;
 
     if (this.isCutscenePlaying) {
-        this._updateCutscene();
+      this._updateCutscene();
     } else {
-        this.updateLogic();
+      this.updateLogic();
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -844,7 +837,7 @@ class Game {
 
   resetGame() {
     this.stop();
-    // if (this.powerUpManager) this.powerUpManager.clear();
+    if (this.powerUpManager) this.powerUpManager.clear();
     this.unregisterEventListeners();
     this.enemiesKilled = 0;
     this.totalEnemiesSpawned = 0;
@@ -913,30 +906,30 @@ class Game {
     startLoadingScreen();
 
     setTimeout(() => {
-        this.isRunning = true;
+      this.isRunning = true;
 
-        EventManager.instance.notify(EVENT.GAME_STARTED, {
-            playerTank: this.playerTank,
-            score: this.score,
-            highScore: this.highScore,
-            startTime: Date.now(),
-            levelConfig: this.gameConfig,
-            gameMode: this.gameMode
-        });
+      EventManager.instance.notify(EVENT.GAME_STARTED, {
+        playerTank: this.playerTank,
+        score: this.score,
+        highScore: this.highScore,
+        startTime: Date.now(),
+        levelConfig: this.gameConfig,
+        gameMode: this.gameMode
+      });
 
-        if (this.playerTank && this.camera) {
-            this.isCutscenePlaying = true;
-            this.cutsceneClock.start();
+      if (this.playerTank && this.camera) {
+        this.isCutscenePlaying = true;
+        this.cutsceneClock.start();
 
-            this.cutsceneCamStartPos = new THREE.Vector3(0, 40, 50);
-            this.camera.position.copy(this.cutsceneCamStartPos);
+        this.cutsceneCamStartPos = new THREE.Vector3(0, 40, 50);
+        this.camera.position.copy(this.cutsceneCamStartPos);
 
-            this.controls.target.set(0, 0, 0);
-            this.controls.enabled = false;
-        }
+        this.controls.target.set(0, 0, 0);
+        this.controls.enabled = false;
+      }
 
-        this._animate();
-        hideLoadingScreen();
+      this._animate();
+      hideLoadingScreen();
 
     }, 1500);
   }
@@ -975,8 +968,8 @@ class Game {
 
   dispose() {
     this.stop();
-    // if (this.powerUpManager) this.powerUpManager.clear();
-    // this.powerUpManager = null;
+    if (this.powerUpManager) this.powerUpManager.clear();
+    this.powerUpManager = null;
     this.unregisterEventListeners();
     if (this.player) { this.player.dispose(); this.player = null; }
     if (this.rocks) { this.rocks.forEach(o => o.dispose()); this.rocks = []; }

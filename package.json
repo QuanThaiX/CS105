@@ -6,7 +6,7 @@
   "scripts": {
     "start": "live-server"
   },
-  "author": "NULL",
+  "author": "null",
   "license": "ISC",
   "devDependencies": {
     "live-server": "^1.2.2"
